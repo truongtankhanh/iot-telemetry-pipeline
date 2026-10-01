@@ -1,0 +1,47 @@
+{
+  "$comment": "Device registry for Langbiang Tech Campus (fictional). Zone codes match ops-command-center's seed.",
+  "devices": [
+    {
+      "id": "dc-env-01",
+      "kind": "server_room",
+      "zoneCode": "BLD-DC",
+      "name": "Data center — row A",
+      "metrics": ["temperature_c", "humidity_pct"]
+    },
+    {
+      "id": "dc-env-02",
+      "kind": "server_room",
+      "zoneCode": "BLD-DC",
+      "name": "Data center — row B",
+      "metrics": ["temperature_c", "humidity_pct"]
+    },
+    {
+      "id": "lib-air-01",
+      "kind": "indoor_air",
+      "zoneCode": "BLD-LIB",
+      "name": "Library reading room",
+      "metrics": ["co2_ppm", "temperature_c", "humidity_pct"]
+    },
+    {
+      "id": "lha-air-01",
+      "kind": "indoor_air",
+      "zoneCode": "BLD-LHA",
+      "name": "Lecture Hall A",
+      "metrics": ["co2_ppm", "temperature_c"]
+    },
+    {
+      "id": "stu-air-01",
+      "kind": "indoor_air",
+      "zoneCode": "BLD-STU",
+      "name": "Student Center hall",
+      "metrics": ["co2_ppm", "temperature_c"]
+    },
+    {
+      "id": "hub-power-01",
+      "kind": "power_meter",
+      "zoneCode": "BLD-HUB",
+      "name": "Innovation Hub main feed",
+      "metrics": ["power_kw"]
+    }
+  ]
+}

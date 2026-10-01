@@ -1,0 +1,53 @@
+{
+  "$comment": "Threshold rules per device kind. See docs/adr/0004-rules-with-hysteresis.md.",
+  "rules": [
+    {
+      "id": "server-room-hot",
+      "kind": "server_room",
+      "metric": "temperature_c",
+      "direction": "above",
+      "raise": 27,
+      "clear": 25.5,
+      "for": 3,
+      "severity": "high",
+      "incidentType": "equipment_fault",
+      "title": "Server room temperature high"
+    },
+    {
+      "id": "server-room-humid",
+      "kind": "server_room",
+      "metric": "humidity_pct",
+      "direction": "above",
+      "raise": 60,
+      "clear": 55,
+      "for": 3,
+      "severity": "medium",
+      "incidentType": "equipment_fault",
+      "title": "Server room humidity high"
+    },
+    {
+      "id": "indoor-co2",
+      "kind": "indoor_air",
+      "metric": "co2_ppm",
+      "direction": "above",
+      "raise": 1200,
+      "clear": 1000,
+      "for": 3,
+      "severity": "medium",
+      "incidentType": "crowding",
+      "title": "Poor air quality (CO₂)"
+    },
+    {
+      "id": "power-over-contract",
+      "kind": "power_meter",
+      "metric": "power_kw",
+      "direction": "above",
+      "raise": 180,
+      "clear": 160,
+      "for": 2,
+      "severity": "low",
+      "incidentType": "equipment_fault",
+      "title": "Power draw above contracted capacity"
+    }
+  ]
+}
