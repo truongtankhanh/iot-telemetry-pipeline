@@ -1,0 +1,33 @@
+{
+  "name": "@itp/telemetry-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MQTT topic layout and telemetry payload format shared by devices, the simulator and the ingest service.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --tsconfig tsconfig.build.json --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --tsconfig tsconfig.build.json --format esm,cjs --dts --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11"
+  }
+}
