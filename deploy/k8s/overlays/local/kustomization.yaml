@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Local cluster (kind, k3d, minikube) with an in-cluster PostgreSQL.
+namespace: telemetry
+resources:
+  - namespace.yaml
+  - ../../base
+  - postgres.yaml
+images:
+  - name: ghcr.io/truongtankhanh/telemetry-ingest
+    newName: telemetry-ingest
+    newTag: local
+secretGenerator:
+  - name: postgres-dev
+    literals: [password=postgres]
+  - name: telemetry-ingest-secrets
+    literals:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/telemetry
+patches:
+  # One replica is enough on a laptop.
+  - target: { kind: HorizontalPodAutoscaler, name: telemetry-ingest }
+    patch: |
+      - { op: replace, path: /spec/minReplicas, value: 1 }

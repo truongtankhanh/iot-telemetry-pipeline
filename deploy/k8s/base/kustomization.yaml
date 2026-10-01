@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Build with: kustomize build --load-restrictor LoadRestrictionsNone deploy/k8s/overlays/local
+# (the registry and broker config are read from the repo so there is a single copy of each).
+labels:
+  - pairs: { app.kubernetes.io/part-of: iot-telemetry-pipeline }
+resources:
+  - ingest.yaml
+  - mosquitto.yaml
+configMapGenerator:
+  - name: telemetry-registry
+    files:
+      - ../../../apps/ingest/config/devices.json
+      - ../../../apps/ingest/config/rules.json
+  - name: mosquitto-config
+    files:
+      - ../../mosquitto/mosquitto.conf
+  - name: telemetry-ingest-env
+    literals:
+      - MQTT_URL=mqtt://mosquitto:1883
+      - MQTT_SHARE_GROUP=ingest
+      - FLUSH_INTERVAL_MS=250
+      - FLUSH_MAX_READINGS=1000
+      - RETENTION_DAYS=30

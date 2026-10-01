@@ -1,0 +1,61 @@
+# Whole pipeline:  docker compose up --build
+# With demo traffic:  docker compose --profile demo up --build
+# Deliver alerts to a running ops-command-center:  OCC_API_URL=http://host.docker.internal:3000/api docker compose up
+name: iot-telemetry-pipeline
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: telemetry
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d telemetry']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - '5433:5432'
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    volumes:
+      - ./deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - '1883:1883'
+
+  ingest:
+    build:
+      context: .
+      dockerfile: apps/ingest/Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/telemetry
+      MQTT_URL: mqtt://mosquitto:1883
+      OCC_API_URL: ${OCC_API_URL:-}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    ports:
+      - '3100:3100'
+    # Matches the drain time on shutdown (ADR-0002).
+    stop_grace_period: 30s
+
+  simulator:
+    profiles: [demo]
+    build:
+      context: .
+      dockerfile: apps/simulator/Dockerfile
+    command: ['--broker', 'mqtt://mosquitto:1883', '--scenario', 'server-room-overheat']
+    depends_on:
+      ingest:
+        condition: service_healthy
+
+volumes:
+  pgdata:
