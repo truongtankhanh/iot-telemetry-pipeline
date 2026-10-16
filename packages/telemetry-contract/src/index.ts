@@ -26,7 +26,7 @@ export const METRIC_NAMES = Object.keys(METRICS) as MetricName[];
 export interface TelemetryPayload {
   /** Per-device counter, incremented on every message. Lets the receiver measure gaps. */
   seq: number;
-  /** Measurement time, ISO 8601 UTC. */
+  /** Measurement time, ISO 8601 with a zone (`Z` or `±HH:mm`). `parsePayload` returns it normalised to UTC. */
   ts: string;
   metrics: Partial<Record<MetricName, number>>;
 }
@@ -38,6 +38,9 @@ export interface TopicParts {
 
 const decoder = new TextDecoder();
 const SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+/** Shape only: year, month, day and hour are captured for the calendar check in `parseTimestamp`. */
+const TIMESTAMP =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 export function telemetryTopic({ zoneCode, deviceId }: TopicParts): string {
   return `${TOPIC_ROOT}/${zoneCode}/${deviceId}/${TELEMETRY_SUFFIX}`;
@@ -49,6 +52,30 @@ export function withShareGroup(filter: string, group?: string): string {
 }
 
 export type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string };
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28;
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+}
+
+/**
+ * Epoch milliseconds of a strict ISO 8601 timestamp with a zone, or NaN when it must be rejected.
+ * `Date.parse` alone is not enough: it reads a zone-less string as the server's local time, accepts
+ * date-only strings and free text, and rolls `02-31` over to March. It stays as the range check for
+ * month, minute, second and offset. The day is checked by rule, not by a `Date.UTC` round trip,
+ * because `Date.UTC` maps the years 0 to 99 to 1900 to 1999.
+ */
+function parseTimestamp(ts: string): number {
+  const match = TIMESTAMP.exec(ts);
+  if (!match) return NaN;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  // Hour 24 is valid ISO 8601 and V8 rolls it to the next day; the contract does not accept it.
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month) || hour > 23) return NaN;
+  return Date.parse(ts);
+}
 
 export function parseTopic(topic: string): ParseResult<TopicParts> {
   const parts = topic.split('/');
@@ -77,7 +104,8 @@ export function parsePayload(raw: Uint8Array | string): ParseResult<TelemetryPay
   if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0) {
     return { ok: false, reason: 'seq' };
   }
-  if (typeof ts !== 'string' || Number.isNaN(Date.parse(ts))) return { ok: false, reason: 'ts' };
+  const time = typeof ts === 'string' ? parseTimestamp(ts) : NaN;
+  if (Number.isNaN(time)) return { ok: false, reason: 'ts' };
   if (typeof metrics !== 'object' || metrics === null || Array.isArray(metrics)) {
     return { ok: false, reason: 'shape' };
   }
@@ -93,5 +121,5 @@ export function parsePayload(raw: Uint8Array | string): ParseResult<TelemetryPay
     if (value < spec.min || value > spec.max) return { ok: false, reason: 'range' };
   }
 
-  return { ok: true, value: { seq, ts: new Date(ts).toISOString(), metrics } };
+  return { ok: true, value: { seq, ts: new Date(time).toISOString(), metrics } };
 }

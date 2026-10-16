@@ -45,6 +45,8 @@ describe('parsePayload', () => {
     ['not json', '{', 'json'],
     ['negative seq', { ...valid, seq: -1 }, 'seq'],
     ['bad timestamp', { ...valid, ts: 'yesterday' }, 'ts'],
+    ['numeric timestamp', { ...valid, ts: 1_759_305_600_000 }, 'ts'],
+    ['missing timestamp', { seq: 1, metrics: valid.metrics }, 'ts'],
     ['no metrics', { ...valid, metrics: {} }, 'empty'],
     ['unknown metric', { ...valid, metrics: { pressure_hpa: 1000 } }, 'metric'],
     [
@@ -73,6 +75,72 @@ describe('parsePayload', () => {
   ])('rejects %s with reason %s', (_, input, reason) => {
     const raw = typeof input === 'string' ? input : JSON.stringify(input);
     expect(parsePayload(new TextEncoder().encode(raw))).toEqual({ ok: false, reason });
+  });
+
+  it.each([
+    // Read as local time, or not a full timestamp, by Date.parse.
+    ['a timestamp without a zone', '2026-10-01T08:00:00'],
+    ['a date without a time', '2026-10-01'],
+    ['a bare year', '2026'],
+    ['a bare number', '1'],
+    ['free text', 'Oct 1 2026'],
+    ['leading whitespace', ' 2026-10-01T08:00:00Z'],
+    ['a trailing newline', '2026-10-01T08:00:00Z\n'],
+    ['a lowercase t', '2026-10-01t08:00:00Z'],
+    ['a lowercase z', '2026-10-01T08:00:00z'],
+    ['a space instead of T', '2026-10-01 08:00:00Z'],
+    ['an offset without a colon', '2026-10-01T08:00:00+0700'],
+    ['no seconds', '2026-10-01T08:00Z'],
+    ['an empty fraction', '2026-10-01T08:00:00.Z'],
+    ['a fraction of 10 digits', '2026-10-01T08:00:00.1234567890Z'],
+    // Dates Date.parse accepts but rolls over to the next month.
+    ['a day that rolls over (31 February)', '2026-02-31T00:00:00Z'],
+    ['a day that rolls over (31 April)', '2026-04-31T00:00:00Z'],
+    ['29 February of a common year', '2026-02-29T00:00:00Z'],
+    ['29 February of a century year', '2100-02-29T00:00:00Z'],
+    ['day zero', '2026-10-00T00:00:00Z'],
+    ['month 13', '2026-13-01T00:00:00Z'],
+    // Hour 24 is valid ISO 8601 and rolls over; minute, second and offset ranges rely on Date.parse.
+    ['hour 24', '2026-10-01T24:00:00Z'],
+    ['second 60', '2026-10-01T23:59:60Z'],
+    ['an offset of 24 hours', '2026-10-01T08:00:00+24:00'],
+    ['an offset of 60 minutes', '2026-10-01T08:00:00+07:60'],
+  ])('rejects %s as ts', (_, ts) => {
+    expect(parsePayload(JSON.stringify({ ...valid, ts }))).toEqual({ ok: false, reason: 'ts' });
+  });
+
+  it.each([
+    ['Z', '2026-10-01T08:00:00Z', '2026-10-01T08:00:00.000Z'],
+    ['a positive offset', '2026-10-01T15:00:00+07:00', '2026-10-01T08:00:00.000Z'],
+    ['a negative offset', '2026-10-01T03:00:00-05:00', '2026-10-01T08:00:00.000Z'],
+    ['-00:00', '2026-10-01T08:00:00-00:00', '2026-10-01T08:00:00.000Z'],
+    ['the largest offset', '2026-10-01T08:00:00+23:59', '2026-09-30T08:01:00.000Z'],
+    ['1 fraction digit', '2026-10-01T08:00:00.1Z', '2026-10-01T08:00:00.100Z'],
+    ['3 fraction digits', '2026-10-01T08:00:00.123Z', '2026-10-01T08:00:00.123Z'],
+    [
+      '6 fraction digits (truncated to ms)',
+      '2026-10-01T08:00:00.123456Z',
+      '2026-10-01T08:00:00.123Z',
+    ],
+    [
+      '9 fraction digits (truncated to ms)',
+      '2026-10-01T08:00:00.123456789Z',
+      '2026-10-01T08:00:00.123Z',
+    ],
+    ['29 February of a leap year', '2028-02-29T00:00:00Z', '2028-02-29T00:00:00.000Z'],
+    ['29 February of a leap century year', '2000-02-29T00:00:00Z', '2000-02-29T00:00:00.000Z'],
+    // Fails if the day check is built on Date.UTC, which maps year 0 to 1900 (not a leap year).
+    ['29 February of year 0', '0000-02-29T00:00:00Z', '0000-02-29T00:00:00.000Z'],
+  ])('accepts %s and normalises it to UTC', (_, ts, expected) => {
+    expect(parsePayload(JSON.stringify({ ...valid, ts }))).toMatchObject({
+      ok: true,
+      value: { ts: expected },
+    });
+  });
+
+  it('normalises the Z form and the offset form of the same instant to the identical string', () => {
+    const at = (ts: string) => parsePayload(JSON.stringify({ ...valid, ts }));
+    expect(at('2026-10-01T15:00:00+07:00')).toEqual(at('2026-10-01T08:00:00Z'));
   });
 
   it.each(METRIC_NAMES)('still accepts the known metric %s at its minimum', (name) => {

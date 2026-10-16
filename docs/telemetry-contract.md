@@ -31,11 +31,15 @@ UTF-8 JSON, one object per message:
 }
 ```
 
-| Field     | Type    | Rules                                                                           |
-| --------- | ------- | ------------------------------------------------------------------------------- |
-| `seq`     | integer | Safe integer ≥ 0. Increments by 1 on every message the device sends.            |
-| `ts`      | string  | Time of the measurement, ISO 8601, ideally UTC. Stored normalised to UTC.       |
-| `metrics` | object  | One or more metric names mapped to finite numbers. An empty object is rejected. |
+| Field     | Type    | Rules                                                                                                      |
+| --------- | ------- | ---------------------------------------------------------------------------------------------------------- |
+| `seq`     | integer | Safe integer ≥ 0. Increments by 1 on every message the device sends.                                       |
+| `ts`      | string  | Time of the measurement, ISO 8601 with a zone (`Z` or `±HH:mm`), calendar-valid. Stored normalised to UTC. |
+| `metrics` | object  | One or more metric names mapped to finite numbers. An empty object is rejected.                            |
+
+`ts` must be `YYYY-MM-DDTHH:mm:ss`, an optional fraction of 1 to 9 digits, then `Z` or `±HH:mm`. `T` and `Z` are
+uppercase, the hour is 00 to 23 (`24:00:00` is rejected) and the date must exist in the calendar. Zone-less,
+date-only and space-separated values are rejected, never read as local time.
 
 All metrics in one message share the message's `ts`. Send them together when they were sampled
 together; the pipeline stores one row per metric.
@@ -110,7 +114,7 @@ Every rejected message increments `telemetry_messages_total{result="rejected"}` 
 | `json`                  | Payload is not valid JSON                                        | contract       |
 | `shape`                 | Payload (or `metrics`) is not an object                          | contract       |
 | `seq`                   | Missing, negative, non-integer or unsafe `seq`                   | contract       |
-| `ts`                    | Missing or unparseable `ts`                                      | contract       |
+| `ts`                    | Missing, unparseable, zone-less or calendar-invalid `ts`         | contract       |
 | `empty`                 | `metrics` has no entries                                         | contract       |
 | `metric`                | A metric name the contract does not define                       | contract       |
 | `value`                 | A metric value that is not a finite number                       | contract       |
