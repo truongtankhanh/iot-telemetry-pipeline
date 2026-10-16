@@ -1,6 +1,9 @@
 # Architecture
 
-> Status: **M1 — Ingest to alert**. Updated with every milestone.
+> Status: **M1 — Ingest to alert** complete; M2 in progress (idempotent incident creation, client
+> credentials, AWS IoT Core support are done — see the [roadmap](roadmap.md)). Updated with every
+> milestone. How this service fits with ops-command-center and platform-aws:
+> [system-context.md](system-context.md).
 
 ## 1. Problem
 
@@ -103,11 +106,12 @@ The deployment on AWS is described in [platform-aws](https://github.com/truongta
 
 ## 7. Decisions
 
-| ADR                                                          | Decision                                                                                |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| [0001](adr/0001-mqtt-shared-subscriptions.md)                | Scale ingest horizontally with MQTT 5 shared subscriptions                              |
-| [0002](adr/0002-ack-on-receipt-with-bounded-loss.md)         | Acknowledge on receipt; bound and measure the loss window instead of acking per write   |
-| [0003](adr/0003-plain-postgres-partitions-and-rollups.md)    | Plain PostgreSQL: daily partitions + write-time rollups, TimescaleDB as an upgrade path |
-| [0004](adr/0004-rules-with-hysteresis.md)                    | Threshold rules with consecutive-breach count and a separate clear threshold            |
-| [0005](adr/0005-alert-outbox.md)                             | Deliver alerts through a transactional outbox                                           |
-| [0006](adr/0006-client-credentials-to-the-command-center.md) | Authenticate to the command center with client credentials                              |
+| ADR                                                          | Decision                                                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| [0001](adr/0001-mqtt-shared-subscriptions.md)                | Scale ingest horizontally with MQTT 5 shared subscriptions                                  |
+| [0002](adr/0002-ack-on-receipt-with-bounded-loss.md)         | Acknowledge on receipt; bound and measure the loss window instead of acking per write       |
+| [0003](adr/0003-plain-postgres-partitions-and-rollups.md)    | Plain PostgreSQL: daily partitions + write-time rollups, TimescaleDB as an upgrade path     |
+| [0004](adr/0004-rules-with-hysteresis.md)                    | Threshold rules with consecutive-breach count and a separate clear threshold                |
+| [0005](adr/0005-alert-outbox.md)                             | Deliver alerts through a transactional outbox                                               |
+| [0006](adr/0006-client-credentials-to-the-command-center.md) | Authenticate to the command center with client credentials                                  |
+| [0007](adr/0007-pipeline-as-the-single-telemetry-source.md)  | The pipeline becomes the platform's single telemetry source; the command center consumes it |

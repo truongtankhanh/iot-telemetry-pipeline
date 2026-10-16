@@ -17,6 +17,32 @@ _The incident above was raised by this pipeline: three readings over 27 °C open
 outbox delivered it to ops-command-center, and when the temperature fell back below 25.5 °C the
 incident was resolved automatically._
 
+## Scope: V1, demo only
+
+> **This is a V1 demonstration system. It is not intended for production use.** Devices and
+> readings are synthetic, the broker allows anonymous clients, the HTTP API has no authentication,
+> and some data-loss and metric-accuracy limits are known and open. The manifests and the
+> platform-aws "production" stage show how it could be run, not that it should be.
+
+Open issues are tracked as V1 tasks in [docs/tasks/v1](docs/tasks/v1/README.md). The next version
+(V2) makes this pipeline the platform's single telemetry source: see
+[ADR-0007](docs/adr/0007-pipeline-as-the-single-telemetry-source.md) and the [V2 tasks](docs/tasks/v2/README.md).
+
+## Part of the campus operations platform
+
+This service is one of three repositories that make up the platform:
+
+| Repository                                                                 | Role                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **iot-telemetry-pipeline** (this repo)                                     | Sensor telemetry: ingest, storage, rollups, alerts                       |
+| [ops-command-center](https://github.com/truongtankhanh/ops-command-center) | Operator console and API: incidents, site map, cameras, Keycloak sign-in |
+| [platform-aws](https://github.com/truongtankhanh/platform-aws)             | AWS CDK that runs both on Fargate, RDS, CloudFront and AWS IoT Core      |
+
+The pipeline owns telemetry; the command center owns incidents. Only a sustained, filtered breach
+crosses between them — as an incident in the right zone, authenticated with client credentials.
+Each side also runs without the other. What they exchange, and the values that must agree across
+the repositories, are in [docs/system-context.md](docs/system-context.md).
+
 ## Highlights
 
 - **≈ 10 000 messages/s (≈ 20 000 readings/s) end to end on one replica** — broker to committed
@@ -26,7 +52,8 @@ incident was resolved automatically._
   rows actually inserted, so duplicates never inflate counts.
 - **Completeness is measured**: per-device sequence numbers expose every lost message as a
   metric. In the first benchmark that metric caught a broker silently dropping 10 % of a burst
-  under default settings — accounting for every one of 5 127 missing messages.
+  under default settings — accounting for every one of 5 127 missing messages. (Exact with one
+  consumer, approximate across replicas — [known limitations](docs/operations.md#known-limitations).)
 - **Alerts that don't flap**: consecutive-breach counts and separate clear thresholds.
 - **Reliable delivery** through a transactional outbox, `SKIP LOCKED` claiming and backoff.
 - **No extensions required**: plain PostgreSQL with daily partitions, retention by `DROP TABLE`,
@@ -46,6 +73,8 @@ flowchart LR
 ```
 
 1. Devices publish `{ seq, ts, metrics }` to `campus/<zone>/<device>/telemetry`.
+   The simulator in this repository stands in for real sensors; MQTT is used only up to the
+   ingest service, and alerts reach ops-command-center over HTTP (step 5).
 2. The service validates topic, device, zone and values; rejections are counted by reason.
 3. Readings are buffered and flushed every 250 ms or 1 000 readings in one transaction:
    insert → roll up what was inserted → update `last_seen`.
@@ -54,13 +83,17 @@ flowchart LR
 5. The delivery worker creates the incident in ops-command-center, and resolves it when the
    alert clears.
 
-Design and trade-offs: [architecture](docs/architecture.md) and six ADRs —
+Devices follow the [telemetry contract](docs/telemetry-contract.md); a rejected message is counted
+by reason, never silently dropped.
+
+Design and trade-offs: [architecture](docs/architecture.md) and seven ADRs —
 [shared subscriptions](docs/adr/0001-mqtt-shared-subscriptions.md) ·
 [ack on receipt, bounded loss](docs/adr/0002-ack-on-receipt-with-bounded-loss.md) ·
 [partitions and rollups](docs/adr/0003-plain-postgres-partitions-and-rollups.md) ·
 [rules with hysteresis](docs/adr/0004-rules-with-hysteresis.md) ·
 [alert outbox](docs/adr/0005-alert-outbox.md) ·
-[client credentials to the command center](docs/adr/0006-client-credentials-to-the-command-center.md).
+[client credentials to the command center](docs/adr/0006-client-credentials-to-the-command-center.md) ·
+[the pipeline as the single telemetry source](docs/adr/0007-pipeline-as-the-single-telemetry-source.md).
 
 ## Run it
 
@@ -117,7 +150,8 @@ packages/
 deploy/
   mosquitto/     broker config (queue limits matter — see benchmarks)
   k8s/           kustomize base + local overlay
-docs/            architecture, ADRs, benchmarks, roadmap
+docs/            architecture, system context, contract, configuration, API, operations,
+                 development guide, ADRs, benchmarks, roadmap
 ```
 
 ## Configuration
@@ -135,7 +169,10 @@ docs/            architecture, ADRs, benchmarks, roadmap
 | `OCC_API_URL`                                           | —                       | ops-command-center API; unset = alerts recorded, not delivered                      |
 | `OCC_TOKEN_URL` / `OCC_CLIENT_ID` / `OCC_CLIENT_SECRET` | —                       | Client credentials for the command center's Keycloak (ADR-0006); all three or none  |
 
-Invalid configuration stops the service at startup with a list of what is wrong.
+Also: `PORT` (3100), `MQTT_USERNAME` / `MQTT_PASSWORD`, `DELIVERY_INTERVAL_MS` (1000), `CONFIG_DIR`
+and `MIGRATE_ON_BOOT` (true). Invalid configuration stops the service at startup with a list of
+what is wrong. Every variable, plus the `devices.json` and `rules.json` formats, is documented in
+[docs/configuration.md](docs/configuration.md).
 
 ## Quality
 
@@ -147,6 +184,26 @@ pnpm test:e2e    # real PostgreSQL + real Mosquitto + a fake ops-command-center:
 ```
 
 CI runs all of it, validates the Kubernetes manifests with kubeconform, and builds the images.
+
+> The e2e suite recreates the `public` schema of the database in `DATABASE_URL` (default
+> `telemetry_test`). Point it only at a dedicated, disposable database
+> ([V1-T03](docs/tasks/v1/V1-T03-e2e-wipes-database.md)).
+
+## Documentation
+
+| Guide                                                                | For                                                          |
+| -------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Architecture](docs/architecture.md)                                 | Problem, data flow, data model, delivery guarantees, scaling |
+| [System context](docs/system-context.md)                             | How it fits with ops-command-center and platform-aws         |
+| [Telemetry contract](docs/telemetry-contract.md)                     | Topic, payload, rejections, onboarding a device              |
+| [Configuration](docs/configuration.md)                               | Environment variables, `devices.json`, `rules.json`          |
+| [HTTP API](docs/api.md)                                              | Devices, readings, alerts, probes, metrics                   |
+| [Operations](docs/operations.md)                                     | Metrics, alerts to set, outbox, failure modes, known limits  |
+| [Development guide](docs/development.md)                             | Setup, code layout, tests, common changes                    |
+| [Tasks: V1](docs/tasks/v1/README.md) · [V2](docs/tasks/v2/README.md) | Known risks and open decisions                               |
+| [Benchmarks](docs/benchmarks.md) · [Roadmap](docs/roadmap.md)        | Measured throughput · what is next                           |
+
+The full index is [docs/README.md](docs/README.md).
 
 ## License
 
