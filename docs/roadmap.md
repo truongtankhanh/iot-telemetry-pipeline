@@ -19,7 +19,7 @@
 
 | #      | Ticket                                                                                         |
 | ------ | ---------------------------------------------------------------------------------------------- |
-| ITP-11 | Backpressure: stop reading from the broker when the write buffer passes a ceiling              |
+| ITP-11 | ✅ Backpressure: stop reading from the broker when the write buffer passes a ceiling (V1-T02)  |
 | ITP-12 | Grafana dashboard and alert rules (gaps, lag, flush time, outbox age) shipped as code          |
 | ITP-13 | Multi-replica benchmark on a real cluster                                                      |
 | ITP-14 | ✅ Idempotency key on incident creation, one per alert                                         |

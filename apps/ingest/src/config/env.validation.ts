@@ -89,6 +89,16 @@ export class Env {
   FLUSH_MAX_READINGS = 1000;
 
   /**
+   * Readings held in memory (buffered or being written) before the consumer stops acknowledging
+   * messages, so the broker's queue absorbs a database outage instead of this process's memory.
+   */
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000)
+  BUFFER_MAX_READINGS = 20_000;
+
+  /**
    * How long a gap in a device's sequence numbers stays open before it counts as lost: replicas
    * flush on their own clocks, so a message can land after its successor. 0 counts at once.
    */
@@ -150,12 +160,21 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     ...errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`),
     ...tlsSettingsProblems(env),
     ...occCredentialProblems(env),
+    ...bufferProblems(env),
   ];
   if (problems.length > 0) {
     const details = problems.map((p) => `  - ${p}`).join('\n');
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
   return env;
+}
+
+/** Below one batch the ceiling would pause consumption before a flush is even due. */
+function bufferProblems(env: Env): string[] {
+  if (env.BUFFER_MAX_READINGS < env.FLUSH_MAX_READINGS * 2) {
+    return ['BUFFER_MAX_READINGS must be at least twice FLUSH_MAX_READINGS'];
+  }
+  return [];
 }
 
 function occCredentialProblems(env: Env): string[] {

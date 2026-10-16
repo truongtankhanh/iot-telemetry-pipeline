@@ -3,10 +3,21 @@ import { ConfigService } from '@nestjs/config';
 import type { PoolClient } from 'pg';
 import type { Env } from '../config/env.validation';
 import { Database } from '../database/database';
+import { isDataError } from '../database/errors';
+import { nextDelayMs } from '../delivery/backoff';
 import { Metrics } from '../metrics/metrics';
 import { RulesService } from '../rules/rules.service';
 import { type Reading, rollup } from './rollup';
 import { applySequences, type Hole, type SequenceObservation } from './sequence-ledger';
+
+/** Retries of a failed flush start at 250 ms and back off, with jitter, to this ceiling. */
+const RETRY_BASE_MS = 250;
+const RETRY_MAX_MS = 5_000;
+
+const halves = <T>(items: T[]): [T[], T[]] => {
+  const middle = items.length >>> 1;
+  return [items.slice(0, middle), items.slice(middle)];
+};
 
 /** A message attributable to a device, whatever became of its readings. */
 interface Observation extends SequenceObservation {
@@ -18,6 +29,12 @@ interface Observation extends SequenceObservation {
  * insert with ON CONFLICT DO NOTHING, then roll up only the rows that were actually inserted —
  * so a redelivered message can never inflate a count. The same transaction updates each touched
  * device's sequence ledger, which is how gaps are counted across replicas (V1-T01).
+ *
+ * A failed flush loses nothing the database is not to blame for (V1-T02): when the failure says
+ * nothing about the rows — connection refused, restart, deadlock — the batch stays in the buffer
+ * and is retried with backoff, and a full buffer makes the consumer hold back its acknowledgements
+ * so the broker queues instead of this process. When PostgreSQL rejects the rows themselves, the
+ * batch is written in halves until the offending rows stand alone; only those are dropped.
  */
 @Injectable()
 export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
@@ -26,6 +43,14 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
   private observed: Observation[] = [];
   private timer?: NodeJS.Timeout;
   private flushing: Promise<void> = Promise.resolve();
+  /** Readings (or messages) taken out of the buffer by a flush that has not finished yet. */
+  private inFlight = 0;
+  private failures = 0;
+  private retryAt = 0;
+  private draining = false;
+  private paused = false;
+  private waiting: Array<() => void> = [];
+  private readonly ceiling: number;
   private readonly maxReadings: number;
   private readonly intervalMs: number;
   private readonly graceMs: number;
@@ -36,6 +61,7 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
     private readonly rules: RulesService,
     config: ConfigService<Env, true>,
   ) {
+    this.ceiling = config.get('BUFFER_MAX_READINGS', { infer: true });
     this.maxReadings = config.get('FLUSH_MAX_READINGS', { infer: true });
     this.intervalMs = config.get('FLUSH_INTERVAL_MS', { infer: true });
     this.graceMs = config.get('SEQUENCE_GRACE_MS', { infer: true });
@@ -48,18 +74,35 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
   /** Nest calls this after the MQTT consumer has stopped — the buffer is drained before exit. */
   async onApplicationShutdown(): Promise<void> {
     clearInterval(this.timer);
-    await this.flush();
+    await this.drain();
   }
 
   add(readings: Reading[]): void {
     this.buffer.push(...readings);
     this.metrics.buffered.set(this.buffer.length);
-    if (this.buffer.length >= this.maxReadings) void this.flush();
+    if (this.buffer.length >= this.maxReadings && !this.backingOff) void this.flush();
   }
 
   /** Records a received message's sequence number: counted even when it is rejected later. */
   observe(deviceId: string, seq: number, ts: number): void {
     this.observed.push({ deviceId, seq, ts });
+  }
+
+  /**
+   * Resolves at once while the buffer has room. Once it holds `BUFFER_MAX_READINGS`, resolves only
+   * after it has drained to half of that: the consumer awaits this before acknowledging a message,
+   * which stops the broker connection from delivering more (ITP-11).
+   */
+  waitForRoom(): Promise<void> {
+    if (!this.paused && this.backlog >= this.ceiling) this.setPaused(true);
+    if (!this.paused) return Promise.resolve();
+    return new Promise((resolve) => this.waiting.push(resolve));
+  }
+
+  /** Lets every held acknowledgement through. For shutdown, where the buffer is drained next. */
+  release(): void {
+    this.setPaused(false);
+    for (const resolve of this.waiting.splice(0)) resolve();
   }
 
   /** Flushes serially: a slow flush delays the next one instead of racing it. */
@@ -68,17 +111,59 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
     return this.flushing;
   }
 
+  /**
+   * Writes what is buffered once more, for shutdown: no waiting out a backoff, no retry afterwards.
+   * Readings the database still refuses are counted as failed and logged — the process is leaving.
+   */
+  async drain(): Promise<void> {
+    this.draining = true;
+    this.release();
+    await this.flush();
+  }
+
+  /** Readings held in memory: waiting in the buffer, or taken out by a flush still running. */
+  private get backlog(): number {
+    return Math.max(this.buffer.length, this.observed.length) + this.inFlight;
+  }
+
+  private get backingOff(): boolean {
+    return !this.draining && Date.now() < this.retryAt;
+  }
+
+  private setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.metrics.consumptionPaused.set(paused ? 1 : 0);
+  }
+
   private async writeBuffer(): Promise<void> {
     if (this.buffer.length === 0 && this.observed.length === 0) return;
+    if (this.backingOff) return;
     const batch = this.buffer;
     const observed = this.observed;
     this.buffer = [];
     this.observed = [];
+    this.inFlight = Math.max(batch.length, observed.length);
     this.metrics.buffered.set(0);
 
-    const stopTimer = this.metrics.flushSeconds.startTimer();
     try {
-      const { stored, lost } = await this.db.transaction(async (client) => {
+      await this.commit(batch, observed);
+      this.failures = 0;
+    } catch (error) {
+      if (isDataError(error)) await this.isolate(batch, observed);
+      else this.retryOrDrop(batch, observed, error);
+    } finally {
+      this.inFlight = 0;
+      if (this.paused && this.backlog <= this.ceiling / 2) this.release();
+    }
+  }
+
+  /** One flush: a transaction, then the metrics and the rules for what it stored. Throws on failure. */
+  private async commit(batch: Reading[], observed: Observation[]): Promise<void> {
+    const stopTimer = this.metrics.flushSeconds.startTimer();
+    let stored: Reading[];
+    let lost: number;
+    try {
+      ({ stored, lost } = await this.db.transaction(async (client) => {
         const inserted = await client.query<{
           device_id: string;
           metric: string;
@@ -127,23 +212,86 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
         }
         const lost = await this.recordDevices(client, rows, observed);
         return { stored: rows, lost };
-      });
-
-      const now = Date.now();
-      if (batch.length > 0) this.metrics.batchSize.observe(batch.length);
-      this.metrics.readings.inc({ result: 'stored' }, stored.length);
-      this.metrics.readings.inc({ result: 'duplicate' }, batch.length - stored.length);
-      for (const r of stored) this.metrics.lagSeconds.observe((now - r.ts.getTime()) / 1000);
-      if (lost > 0) this.metrics.sequenceGaps.inc(lost);
-
+      }));
+    } finally {
       stopTimer();
-      await this.evaluateRules(stored);
-    } catch (error) {
-      stopTimer();
-      // The batch is dropped, not retried forever: a poison row must not block ingest.
-      this.metrics.readings.inc({ result: 'failed' }, batch.length);
-      this.logger.error(`Flush of ${batch.length} readings failed: ${(error as Error).message}`);
     }
+
+    const now = Date.now();
+    if (batch.length > 0) this.metrics.batchSize.observe(batch.length);
+    this.metrics.readings.inc({ result: 'stored' }, stored.length);
+    this.metrics.readings.inc({ result: 'duplicate' }, batch.length - stored.length);
+    for (const r of stored) this.metrics.lagSeconds.observe((now - r.ts.getTime()) / 1000);
+    if (lost > 0) this.metrics.sequenceGaps.inc(lost);
+
+    await this.evaluateRules(stored);
+  }
+
+  /**
+   * The database rejected something in the batch. The sequence numbers go in on their own first —
+   * they do not depend on the readings — then the readings are written in halves, recursively, until
+   * the rows PostgreSQL objects to are alone: they are dropped and counted, the rest is stored.
+   * If the database becomes unavailable on the way, whatever is not written yet is kept for a retry.
+   */
+  private async isolate(batch: Reading[], observed: Observation[]): Promise<void> {
+    // The whole batch just failed, so start from its halves. A single reading is tried alone: the
+    // fault may have been in the sequence numbers, which are written first.
+    const parts: Reading[][] = batch.length > 1 ? halves(batch) : batch.length === 1 ? [batch] : [];
+    let pendingObserved = observed;
+    try {
+      if (observed.length > 0) {
+        try {
+          await this.commit([], observed);
+        } catch (error) {
+          if (!isDataError(error)) throw error;
+          this.logger.error(
+            `Sequence numbers of ${observed.length} messages dropped: ${(error as Error).message}`,
+          );
+        }
+        pendingObserved = [];
+      }
+      while (parts.length > 0) {
+        const part = parts[0]!;
+        try {
+          await this.commit(part, []);
+          parts.shift();
+        } catch (error) {
+          if (!isDataError(error)) throw error;
+          parts.shift();
+          if (part.length > 1) {
+            parts.unshift(...halves(part));
+          } else {
+            this.drop(part, error);
+          }
+        }
+      }
+      this.failures = 0;
+    } catch (error) {
+      this.retryOrDrop(parts.flat(), pendingObserved, error);
+    }
+  }
+
+  /** Keeps a batch the database is not to blame for, to be tried again after a backoff. */
+  private retryOrDrop(batch: Reading[], observed: Observation[], error: unknown): void {
+    if (this.draining) return this.drop(batch, error);
+
+    this.failures++;
+    const delay = nextDelayMs(this.failures, Math.random, RETRY_BASE_MS, RETRY_MAX_MS);
+    this.retryAt = Date.now() + delay;
+    this.inFlight = 0;
+    this.buffer = batch.concat(this.buffer);
+    this.observed = observed.concat(this.observed);
+    this.metrics.buffered.set(this.buffer.length);
+    this.metrics.flushRetries.inc();
+    this.logger.warn(
+      `Flush of ${batch.length} readings failed (attempt ${this.failures}), retrying in ${delay} ms: ${(error as Error).message}`,
+    );
+  }
+
+  /** The only place readings are given up on. They were acknowledged, so this is data lost. */
+  private drop(batch: Reading[], error: unknown): void {
+    this.metrics.readings.inc({ result: 'failed' }, batch.length);
+    this.logger.error(`Dropped ${batch.length} readings: ${(error as Error).message}`);
   }
 
   /**

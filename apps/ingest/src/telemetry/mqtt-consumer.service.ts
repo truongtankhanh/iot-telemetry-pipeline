@@ -27,7 +27,8 @@ const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 
 /**
  * Subscribes to device telemetry through an MQTT 5 shared subscription (ADR-0001), validates each
- * message, and hands accepted readings to the batch writer. Rejections are counted by reason.
+ * message, and hands accepted readings to the batch writer. Rejections are counted by reason. When
+ * the writer's buffer is full it stops acknowledging, which pauses delivery from the broker.
  */
 @Injectable()
 export class MqttConsumer implements OnApplicationBootstrap, BeforeApplicationShutdown {
@@ -72,6 +73,10 @@ export class MqttConsumer implements OnApplicationBootstrap, BeforeApplicationSh
       });
       client.on('error', (error) => this.logger.warn(`MQTT[${index}]: ${error.message}`));
       client.on('message', (topic, payload) => this.handle(topic, payload));
+      // The next message on this connection is processed, and this one acknowledged, only after
+      // the callback: holding it while the write buffer is full stops the broker's deliveries at
+      // the socket, so its queue absorbs a database outage (ITP-11, V1-T02).
+      client.handleMessage = (_packet, done) => void this.writer.waitForRoom().then(() => done());
       this.clients.push(client);
     }
   }
@@ -79,7 +84,7 @@ export class MqttConsumer implements OnApplicationBootstrap, BeforeApplicationSh
   /** Stop consuming on every connection, then drain the buffer (ADR-0002). */
   async beforeApplicationShutdown(): Promise<void> {
     await Promise.all(this.clients.map((client) => client.endAsync()));
-    await this.writer.flush();
+    await this.writer.drain();
   }
 
   /** Public for tests: the whole validation path without a broker. */

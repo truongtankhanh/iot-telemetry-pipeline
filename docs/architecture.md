@@ -84,6 +84,8 @@ maintenance job inside the service — no external cron.
 - **Broker → ingest:** the client acknowledges on receipt (see [ADR-0002](adr/0002-ack-on-receipt-with-bounded-loss.md)).
   If a pod is killed without warning, readings received in the last flush window (≤ 250 ms) can
   be lost. Graceful shutdown drains the buffer first, so rolling deploys lose nothing.
+- **Database outage:** a failed flush is kept and retried; a full buffer stops the acknowledgements so
+  the broker queues. Only readings PostgreSQL rejects are dropped (counted as `failed`).
 - **Gaps are measured.** Devices send a sequence number; the service keeps a per-device ledger in
   PostgreSQL, shared by every replica, and exports `telemetry_sequence_gaps_total`. Data completeness is a number on a dashboard, not an
   assumption.

@@ -29,12 +29,13 @@ service refuses to start and prints every problem at once.
 
 ### Write path and retention
 
-| Variable             | Default | Notes                                                                                                                                                                                      |
-| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `FLUSH_INTERVAL_MS`  | `250`   | 10–5000. Upper bound on how long a reading waits in memory — and on the loss window of a hard crash ([ADR-0002](adr/0002-ack-on-receipt-with-bounded-loss.md)).                            |
-| `FLUSH_MAX_READINGS` | `1000`  | 1–20 000. Flush early when this many readings are buffered.                                                                                                                                |
-| `SEQUENCE_GRACE_MS`  | `30000` | 0–3 600 000. How long a gap in a device's sequence numbers stays open before `telemetry_sequence_gaps_total` counts it. Must exceed the spread of replicas' flush times; 0 counts at once. |
-| `RETENTION_DAYS`     | `30`    | Raw readings (whole-day partitions) and rollups older than this are dropped hourly.                                                                                                        |
+| Variable              | Default | Notes                                                                                                                                                                                                                                                |
+| --------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FLUSH_INTERVAL_MS`   | `250`   | 10–5000. Upper bound on how long a reading waits in memory — and on the loss window of a hard crash ([ADR-0002](adr/0002-ack-on-receipt-with-bounded-loss.md)).                                                                                      |
+| `FLUSH_MAX_READINGS`  | `1000`  | 1–20 000. Flush early when this many readings are buffered.                                                                                                                                                                                          |
+| `BUFFER_MAX_READINGS` | `20000` | 1–1 000 000, at least twice `FLUSH_MAX_READINGS`. Readings held in memory (buffered or being written) before the consumer stops acknowledging messages, so the broker queues during a database outage. Resumes at half. About 200 bytes per reading. |
+| `SEQUENCE_GRACE_MS`   | `30000` | 0–3 600 000. How long a gap in a device's sequence numbers stays open before `telemetry_sequence_gaps_total` counts it. Must exceed the spread of replicas' flush times; 0 counts at once.                                                           |
+| `RETENTION_DAYS`      | `30`    | Raw readings (whole-day partitions) and rollups older than this are dropped hourly.                                                                                                                                                                  |
 
 ### Delivery to ops-command-center
 

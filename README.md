@@ -179,6 +179,7 @@ docs/            architecture, system context, contract, configuration, API, ope
 | `MQTT_CA_PEM` / `MQTT_CERT_PEM` / `MQTT_KEY_PEM`        | —                       | Mutual TLS from PEM text (AWS IoT Core); cert and key go together                   |
 | `MQTT_CLIENT_ID_PREFIX`                                 | `ingest`                | Client ids are `<prefix>-<instance>-<n>`, so a broker policy can allow `<prefix>-*` |
 | `FLUSH_INTERVAL_MS` / `FLUSH_MAX_READINGS`              | `250` / `1000`          | Batch triggers — bound the loss window on a hard crash                              |
+| `BUFFER_MAX_READINGS`                                   | `20000`                 | Readings in memory before consumption pauses (database outage: the broker queues)   |
 | `SEQUENCE_GRACE_MS`                                     | `30000`                 | How long a sequence gap stays open before it counts as lost                         |
 | `RETENTION_DAYS`                                        | `30`                    | Raw readings and rollups kept                                                       |
 | `OCC_API_URL`                                           | —                       | ops-command-center API; unset = alerts recorded, not delivered                      |

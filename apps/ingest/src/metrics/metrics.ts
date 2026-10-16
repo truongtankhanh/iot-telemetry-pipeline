@@ -25,7 +25,7 @@ export class Metrics {
 
   readonly readings = new Counter({
     name: 'telemetry_readings_total',
-    help: 'Readings written, by result (stored or duplicate)',
+    help: 'Readings written, by result (stored, duplicate, or failed = dropped and lost)',
     labelNames: ['result'] as const,
     registers: [this.registry],
   });
@@ -60,6 +60,18 @@ export class Metrics {
   readonly buffered = new Gauge({
     name: 'telemetry_buffered_readings',
     help: 'Readings waiting for the next flush',
+    registers: [this.registry],
+  });
+
+  readonly flushRetries = new Counter({
+    name: 'telemetry_flush_retries_total',
+    help: 'Flushes that failed for a reason other than the data and were kept for another attempt',
+    registers: [this.registry],
+  });
+
+  readonly consumptionPaused = new Gauge({
+    name: 'telemetry_consumption_paused',
+    help: '1 while the consumer holds back acknowledgements because the write buffer is full',
     registers: [this.registry],
   });
 

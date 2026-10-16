@@ -22,7 +22,12 @@ export class Database implements OnModuleInit, OnApplicationShutdown {
     this.pool = new Pool({
       connectionString: config.get('DATABASE_URL', { infer: true }),
       max: 10,
+      // Without it a connection attempt to an unreachable server waits for the OS to give up.
+      connectionTimeoutMillis: 5_000,
     });
+    // An idle connection dropped by a database restart is emitted as an error; with no listener
+    // that error would kill the process instead of letting the next query reconnect.
+    this.pool.on('error', (error) => this.logger.warn(`Idle connection lost: ${error.message}`));
   }
 
   async onModuleInit(): Promise<void> {

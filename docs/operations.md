@@ -36,12 +36,14 @@ cardinality does not grow with the fleet. Default Node.js process metrics are in
 | ---------------------------------- | --------- | ------------ | --------------------------------------------------------------------------------------- |
 | `telemetry_messages_total`         | counter   | `result`     | MQTT messages received: `accepted` or `rejected`                                        |
 | `telemetry_rejections_total`       | counter   | `reason`     | Rejections by reason ([list](telemetry-contract.md#6-rejections))                       |
-| `telemetry_readings_total`         | counter   | `result`     | Readings written: `stored`, `duplicate` (already present), `failed` (batch dropped)     |
+| `telemetry_readings_total`         | counter   | `result`     | Readings written: `stored`, `duplicate` (already present), `failed` (dropped, lost)     |
 | `telemetry_sequence_gaps_total`    | counter   | —            | Messages confirmed missing per device sequence numbers, across all replicas (see below) |
 | `telemetry_batch_size`             | histogram | —            | Readings per database flush                                                             |
 | `telemetry_flush_duration_seconds` | histogram | —            | Time to write one batch, including rollups                                              |
 | `telemetry_ingest_lag_seconds`     | histogram | —            | Measurement time → stored. Includes device clock error and any device-side buffering    |
-| `telemetry_buffered_readings`      | gauge     | —            | Readings waiting for the next flush                                                     |
+| `telemetry_buffered_readings`      | gauge     | —            | Readings waiting for the next flush (they pile up while flushes are retried)            |
+| `telemetry_flush_retries_total`    | counter   | —            | Flushes that failed for a reason unrelated to the data and were kept for a retry        |
+| `telemetry_consumption_paused`     | gauge     | —            | `1` while the write buffer is full and the consumer holds back acknowledgements         |
 | `alerts_transitions_total`         | counter   | `transition` | Alerts `opened` or `cleared`                                                            |
 | `alert_deliveries_total`           | counter   | `result`     | Outbox attempts: `delivered`, `skipped`, `retry`, `failed`                              |
 
@@ -51,12 +53,14 @@ Not shipped as code yet ([ITP-12](roadmap.md)). Starting points, to tune per sit
 
 | Condition (PromQL)                                                                                | Why it matters                                                                                   |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `increase(telemetry_readings_total{result="failed"}[5m]) > 0`                                     | A batch was **dropped** — database trouble. Data is lost                                         |
+| `increase(telemetry_readings_total{result="failed"}[5m]) > 0`                                     | Readings were **dropped** — rejected by the database, or given up on at shutdown. Data is lost   |
+| `increase(telemetry_flush_retries_total[5m]) > 0`                                                 | The database is failing; writes are being retried and nothing is lost yet                        |
+| `max_over_time(telemetry_consumption_paused[5m]) == 1`                                            | The buffer filled up: the broker is queueing. Data is at risk if the queue overflows             |
 | `rate(telemetry_sequence_gaps_total[5m]) > 0`                                                     | Messages lost before or inside the service, including a dropped batch                            |
 | `rate(telemetry_messages_total[5m]) == 0`                                                         | Nothing is arriving: broker, devices or subscription                                             |
 | `histogram_quantile(0.99, sum by (le) (rate(telemetry_ingest_lag_seconds_bucket[5m]))) > 5`       | Ingest falling behind (or device clocks drifting)                                                |
 | `histogram_quantile(0.99, sum by (le) (rate(telemetry_flush_duration_seconds_bucket[5m]))) > 0.5` | Database is slow; the buffer will grow                                                           |
-| `telemetry_buffered_readings > 5000`                                                              | The buffer is growing faster than it drains (no backpressure yet)                                |
+| `telemetry_buffered_readings > 5000`                                                              | The buffer is growing faster than it drains (consumption pauses at `BUFFER_MAX_READINGS`)        |
 | `increase(alert_deliveries_total{result="failed"}[15m]) > 0`                                      | An alert gave up being delivered — needs a human                                                 |
 | `rate(telemetry_rejections_total[5m]) > 0` by `reason`                                            | Misconfigured or unknown devices; `unknown_device` after onboarding means the registry is behind |
 
@@ -67,16 +71,17 @@ Throughput reference: ≈ 10 000 messages/s on one replica ([benchmarks](benchma
 
 Standard NestJS logging to stdout. The lines worth knowing:
 
-| Logger                 | Line                                                                                        | Means                          |
-| ---------------------- | ------------------------------------------------------------------------------------------- | ------------------------------ |
-| `Bootstrap`            | `Ingest API on http://localhost:3100/api`                                                   | Started                        |
-| `Database`             | `Applied migration 001_initial_schema.sql`                                                  | Migration ran                  |
-| `DevicesService`       | `Registered N devices from …`                                                               | Registry loaded                |
-| `RulesService`         | `Loaded N rules from …`; `<title> — <device> <metric>=<value>` (warn)                       | Rules loaded; an alert opened  |
-| `MqttConsumer`         | `Connection i subscribed to $share/ingest/campus/+/+/telemetry`; `MQTT[i]: …` (warn)        | Subscribed; a connection error |
-| `BatchWriter`          | `Flush of N readings failed: …` (error)                                                     | **A batch was dropped**        |
-| `DeliveryWorker`       | `Alert sink: ops-command-center` (or `none`); `Delivery <id> (<event>) attempt n: …` (warn) | Which sink; a failed attempt   |
-| `PartitionMaintenance` | `Partitions created: […] dropped: […]`                                                      | Daily partition rollover       |
+| Logger                 | Line                                                                                        | Means                           |
+| ---------------------- | ------------------------------------------------------------------------------------------- | ------------------------------- |
+| `Bootstrap`            | `Ingest API on http://localhost:3100/api`                                                   | Started                         |
+| `Database`             | `Applied migration 001_initial_schema.sql`                                                  | Migration ran                   |
+| `DevicesService`       | `Registered N devices from …`                                                               | Registry loaded                 |
+| `RulesService`         | `Loaded N rules from …`; `<title> — <device> <metric>=<value>` (warn)                       | Rules loaded; an alert opened   |
+| `MqttConsumer`         | `Connection i subscribed to $share/ingest/campus/+/+/telemetry`; `MQTT[i]: …` (warn)        | Subscribed; a connection error  |
+| `BatchWriter`          | `Flush of N readings failed (attempt n), retrying in X ms: …` (warn)                        | Database trouble; kept, retried |
+| `BatchWriter`          | `Dropped N readings: …` (error)                                                             | **Readings were lost**          |
+| `DeliveryWorker`       | `Alert sink: ops-command-center` (or `none`); `Delivery <id> (<event>) attempt n: …` (warn) | Which sink; a failed attempt    |
+| `PartitionMaintenance` | `Partitions created: […] dropped: […]`                                                      | Daily partition rollover        |
 
 ## Deploys and shutdown
 
@@ -184,17 +189,17 @@ Common `last_error` values:
 
 ## Failure modes
 
-| Situation                          | What happens                                                                                                     | What you see                                                                                                                     |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Rolling deploy / `SIGTERM`         | Consumption stops, buffer is flushed, then exit                                                                  | Nothing lost                                                                                                                     |
-| Process killed (OOM, node failure) | Up to one flush window (≤ 250 ms or 1 000 readings) of received readings is lost                                 | Possibly a gap                                                                                                                   |
-| **PostgreSQL unavailable**         | Each flush fails; its batch is **dropped** (not retried) while messages keep being acknowledged. Readiness fails | `telemetry_readings_total{result="failed"}`, `Flush … failed` logs, 503 on `/api/ready`. Also gaps, once the device next reports |
-| Broker unavailable                 | Connections retry every 2 s and resubscribe on connect; readiness reports `broker: down` once all are down       | `/api/ready` 503; message rate drops to zero                                                                                     |
-| Broker drops messages (queue full) | QoS 1 messages above the broker's queue limit vanish silently                                                    | `telemetry_sequence_gaps_total` — see [benchmarks](benchmarks.md#what-the-gap-metric-caught)                                     |
-| Command center / Keycloak down     | Alerts are recorded; delivery retries with backoff                                                               | `alert_deliveries_total{result="retry"}`; `failed` after ~18–37 min                                                              |
-| Poison reading                     | Fails its batch (all readings in that flush are dropped) and is logged                                           | `result="failed"`, error log with the database message                                                                           |
-| Replica added/removed              | Devices move between replicas; rule streaks restart, open/closed alert state is rebuilt from the database        | At worst an alert opens a few readings later                                                                                     |
-| Duplicate delivery from the broker | Hits the primary key; counted, not stored twice, rollups unchanged                                               | `telemetry_readings_total{result="duplicate"}`                                                                                   |
+| Situation                          | What happens                                                                                                                                                                             | What you see                                                                                                                                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rolling deploy / `SIGTERM`         | Consumption stops, buffer is flushed, then exit                                                                                                                                          | Nothing lost                                                                                                                                                                                |
+| Process killed (OOM, node failure) | Up to one flush window (≤ 250 ms or 1 000 readings) of received readings is lost                                                                                                         | Possibly a gap                                                                                                                                                                              |
+| **PostgreSQL unavailable**         | Flushes fail and are **retried** with backoff (250 ms – 5 s); the batch stays buffered. At `BUFFER_MAX_READINGS` the consumer stops acknowledging and the broker queues. Readiness fails | `telemetry_flush_retries_total`, `Flush … retrying` logs, `telemetry_consumption_paused`, 503 on `/api/ready`. Lost only if the broker queue overflows (gaps) or the process dies meanwhile |
+| Broker unavailable                 | Connections retry every 2 s and resubscribe on connect; readiness reports `broker: down` once all are down                                                                               | `/api/ready` 503; message rate drops to zero                                                                                                                                                |
+| Broker drops messages (queue full) | QoS 1 messages above the broker's queue limit vanish silently                                                                                                                            | `telemetry_sequence_gaps_total` — see [benchmarks](benchmarks.md#what-the-gap-metric-caught)                                                                                                |
+| Command center / Keycloak down     | Alerts are recorded; delivery retries with backoff                                                                                                                                       | `alert_deliveries_total{result="retry"}`; `failed` after ~18–37 min                                                                                                                         |
+| Poison reading                     | The batch is written in halves until the bad reading stands alone; only it is dropped and logged                                                                                         | `result="failed"` (one per bad reading), `Dropped … readings` error log with the database message                                                                                           |
+| Replica added/removed              | Devices move between replicas; rule streaks restart, open/closed alert state is rebuilt from the database                                                                                | At worst an alert opens a few readings later                                                                                                                                                |
+| Duplicate delivery from the broker | Hits the primary key; counted, not stored twice, rollups unchanged                                                                                                                       | `telemetry_readings_total{result="duplicate"}`                                                                                                                                              |
 
 ## Security posture
 
@@ -229,13 +234,15 @@ roadmap item, not an oversight in the docs. The ones that need work are tracked 
    silent right after a loss shows it only when it comes back. Alert on silence separately
    (`last_seen`, or the message rate). A device that restarts its counter closes its open gaps as
    lost.
-2. **A failed flush drops its batch.** The messages were already acknowledged, and retrying a
-   batch forever would let one bad row block ingest. During a database outage data is lost. The
-   loss is visible in `telemetry_readings_total{result="failed"}` and the logs, and — because the
-   dropped messages' sequence numbers never reached the ledger — as gaps once the device reports
-   again.
-3. **No backpressure.** The write buffer is unbounded; a slow database grows memory until the
-   container limit (512 Mi in the manifests). Tracked as [ITP-11](roadmap.md).
+2. **A database outage is survived, not free.** A failed flush is kept and retried
+   ([V1-T02](tasks/v1/V1-T02-failed-flush-drops-batch.md), [ADR-0002](adr/0002-ack-on-receipt-with-bounded-loss.md#amendment-2026-10-16-a-failing-database)).
+   Readings are still lost if the process is killed while the backlog is held (up to
+   `BUFFER_MAX_READINGS`, not one flush window), if the broker's queue overflows while consumption is
+   paused (size `max_queued_messages` for the longest outage you expect), or if the database is still
+   down at shutdown. Only data errors are dropped, and only the offending reading.
+3. **Backpressure is per connection and coarse.** Consumption pauses at `BUFFER_MAX_READINGS` and resumes
+   at half of it; each connection can hold one message past the ceiling. A failure that retries forever
+   (a missing table) halts consumption instead of dropping data.
 4. **Rule streaks are per replica and in memory** ([ADR-0004](adr/0004-rules-with-hysteresis.md)).
 5. **Configuration is read at boot.** Changes to `devices.json` or `rules.json` need a restart or a
    rolling deploy.
