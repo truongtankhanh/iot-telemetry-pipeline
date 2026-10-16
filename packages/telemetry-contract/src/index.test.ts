@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parsePayload, parseTopic, telemetryTopic, withShareGroup } from './index';
+import {
+  METRIC_NAMES,
+  METRICS,
+  parsePayload,
+  parseTopic,
+  telemetryTopic,
+  withShareGroup,
+} from './index';
 
 describe('topics', () => {
   it('builds and parses the telemetry topic', () => {
@@ -40,10 +47,36 @@ describe('parsePayload', () => {
     ['bad timestamp', { ...valid, ts: 'yesterday' }, 'ts'],
     ['no metrics', { ...valid, metrics: {} }, 'empty'],
     ['unknown metric', { ...valid, metrics: { pressure_hpa: 1000 } }, 'metric'],
+    [
+      'metric named like Object.prototype.constructor',
+      { ...valid, metrics: { constructor: 1 } },
+      'metric',
+    ],
+    [
+      'metric named like Object.prototype.toString',
+      { ...valid, metrics: { toString: 1 } },
+      'metric',
+    ],
+    [
+      'metric named like Object.prototype.hasOwnProperty',
+      { ...valid, metrics: { hasOwnProperty: 1 } },
+      'metric',
+    ],
+    // Raw text: an object literal with `__proto__` would set the prototype and serialise to `{}`.
+    [
+      'metric named __proto__',
+      '{"seq":1,"ts":"2026-10-01T08:00:00Z","metrics":{"__proto__":1}}',
+      'metric',
+    ],
     ['non-numeric value', { ...valid, metrics: { temperature_c: '24' } }, 'value'],
     ['out of range', { ...valid, metrics: { humidity_pct: 140 } }, 'range'],
   ])('rejects %s with reason %s', (_, input, reason) => {
     const raw = typeof input === 'string' ? input : JSON.stringify(input);
     expect(parsePayload(new TextEncoder().encode(raw))).toEqual({ ok: false, reason });
+  });
+
+  it.each(METRIC_NAMES)('still accepts the known metric %s at its minimum', (name) => {
+    const payload = { ...valid, metrics: { [name]: METRICS[name].min } };
+    expect(parsePayload(JSON.stringify(payload))).toMatchObject({ ok: true });
   });
 });
