@@ -140,8 +140,11 @@ and [ADR-0003](https://github.com/truongtankhanh/platform-aws/blob/main/docs/adr
 
 ## 3. Values that must agree across repositories
 
-Nothing enforces these at build time; a mismatch shows up at runtime (a rejected message, a failed
-delivery, a denied connection). Change them together.
+A mismatch shows up at runtime (a rejected message, a failed delivery, a denied connection), so change
+them together. Two of the sides are checked by tests in this repository: platform-aws's values by a
+parity test ([ADR-0010](adr/0010-parity-test-against-platform-aws.md)) and the command center's API by
+a contract test ([ADR-0009](adr/0009-contract-check-against-command-center-openapi.md)); the rest, such
+as zone codes and the image name, are checked only by people.
 
 | Value                     | Defined in                                             | Must match                                                                                  |
 | ------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |

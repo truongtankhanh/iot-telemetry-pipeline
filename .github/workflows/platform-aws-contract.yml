@@ -1,0 +1,31 @@
+name: platform-aws contract
+
+# Runs the pipeline's parity test against platform-aws's CURRENT telemetry stack (V1-T07, ADR-0010),
+# so a renamed share group, client id prefix, port or metric there is noticed here without waiting
+# for a pipeline PR. Separate from the pull-request workflow: it depends on another repository.
+on:
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    name: Parity test against platform-aws main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Fetch platform-aws's telemetry stack
+        run: curl -fsSL https://raw.githubusercontent.com/truongtankhanh/platform-aws/main/lib/stacks/telemetry.ts -o "$RUNNER_TEMP/telemetry.ts"
+      - name: Build what the tests import
+        run: pnpm --filter @itp/telemetry-contract build
+      - name: Parity test
+        run: pnpm --filter @itp/ingest exec jest --runInBand src/platform-aws.contract.spec.ts
+        env:
+          NODE_OPTIONS: --experimental-vm-modules
+          PLATFORM_AWS_TELEMETRY_PATH: ${{ runner.temp }}/telemetry.ts

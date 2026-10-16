@@ -253,10 +253,14 @@ a zone code unknown to the command center, a role that cannot resolve the incide
 ### Pipeline and platform-aws
 
 platform-aws is never run against this repository. The contract between them is a set of values
-that exist in both places and are only checked by people: the topic filter, share group and client id
-prefix, the image name and tag, the port and probe paths, and the metric names its CloudWatch
-selectors read. When you change any of them here, open the matching construct in platform-aws and run
-its `npm test` (see the table in [system-context.md](system-context.md#6-changing-things-safely)).
+that exist in both places. A parity test checks most of them
+([ADR-0010](adr/0010-parity-test-against-platform-aws.md)): the topic filter, share group, client id
+prefix, port and health route, Keycloak client id, the environment variables platform-aws sets, and the
+metric names and labels its CloudWatch selectors read. It reads a snapshot of platform-aws's telemetry
+stack in `apps/ingest/test/contract`; refresh it with `scripts/sync-platform-aws.sh` after a change
+there, and a daily workflow tests platform-aws's current `main`. Still checked only by people: the
+image name and tag. Open the matching construct in platform-aws and run its `npm test` when you change
+any of them (see the table in [system-context.md](system-context.md#6-changing-things-safely)).
 
 ### Known gaps in this workflow
 
@@ -267,8 +271,10 @@ its `npm test` (see the table in [system-context.md](system-context.md#6-changin
   window and Keycloak still rely on the manual check above. The snapshot in
   `apps/ingest/test/contract` is refreshed with `scripts/sync-occ-openapi.sh`, and a daily workflow
   tests the command center's current `main`.
-- **No test ties platform-aws to this repository's constants.** (Tracked as [V1-T07](tasks/v1/V1-T07-aws-constants-not-tied-to-pipeline.md).) Keeping them equal relies on the
-  table in [system-context.md](system-context.md#3-values-that-must-agree-across-repositories).
+- **platform-aws is checked by name, not by behaviour.** ([V1-T07](tasks/v1/V1-T07-aws-constants-not-tied-to-pipeline.md),
+  [ADR-0010](adr/0010-parity-test-against-platform-aws.md).) The parity test compares the values both
+  sides hard-code; whether AWS IoT Core accepts the policy or CloudWatch receives the metrics still
+  needs a deployed environment, and the image name and tag are not compared.
 - Both repositories' e2e suites refuse to run unless the database name ends in `_test`; keep it that
   way ([V1-T03](tasks/v1/V1-T03-e2e-wipes-database.md)).
 
