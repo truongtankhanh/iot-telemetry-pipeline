@@ -85,8 +85,10 @@ export function parsePayload(raw: Uint8Array | string): ParseResult<TelemetryPay
   const entries = Object.entries(metrics);
   if (entries.length === 0) return { ok: false, reason: 'empty' };
   for (const [name, value] of entries) {
+    // Own properties only: `METRICS` inherits from Object.prototype, so a bare lookup would accept
+    // `constructor`, `toString` or `__proto__` as metrics (and then skip the range check).
+    if (!Object.hasOwn(METRICS, name)) return { ok: false, reason: 'metric' };
     const spec = METRICS[name as MetricName];
-    if (!spec) return { ok: false, reason: 'metric' };
     if (typeof value !== 'number' || !Number.isFinite(value)) return { ok: false, reason: 'value' };
     if (value < spec.min || value > spec.max) return { ok: false, reason: 'range' };
   }
