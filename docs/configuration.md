@@ -9,12 +9,13 @@ service refuses to start and prints every problem at once.
 
 ### Service and database
 
-| Variable          | Default  | Notes                                                                                                                 |
-| ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `PORT`            | `3100`   | HTTP port for the API, probes and `/metrics`. 1–65535.                                                                |
-| `DATABASE_URL`    | —        | **Required.** PostgreSQL 14+ (CI and Compose run 17). Without a password in the URL, `pg` falls back to `PGPASSWORD`. |
-| `MIGRATE_ON_BOOT` | `true`   | Apply `src/database/migrations/*.sql` on start, under an advisory lock so several replicas can boot together.         |
-| `CONFIG_DIR`      | `config` | Directory holding `devices.json` and `rules.json`. The image sets `/app/config`.                                      |
+| Variable           | Default  | Notes                                                                                                                                                                                                              |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PORT`             | `3100`   | HTTP port for the API, probes and `/metrics`. 1–65535.                                                                                                                                                             |
+| `DATABASE_URL`     | —        | **Required.** PostgreSQL 14+ (CI and Compose run 17). Without a password in the URL, `pg` falls back to `PGPASSWORD`.                                                                                              |
+| `API_DOCS_ENABLED` | `false`  | Serve the OpenAPI UI at `/api/docs` and `/api/docs-json`. Off by default; on in `.env.example` and the Compose demo, off in the Kubernetes base ([ADR-0008](adr/0008-api-docs-switch-and-network-only-access.md)). |
+| `MIGRATE_ON_BOOT`  | `true`   | Apply `src/database/migrations/*.sql` on start, under an advisory lock so several replicas can boot together.                                                                                                      |
+| `CONFIG_DIR`       | `config` | Directory holding `devices.json` and `rules.json`. The image sets `/app/config`.                                                                                                                                   |
 
 ### MQTT
 

@@ -4,7 +4,8 @@ A small **read-only** API for dashboards and operators, plus the probe and metri
 service listens on `PORT` (default `3100`). Everything is under `/api` except `/metrics`.
 
 An interactive OpenAPI document is served at `/api/docs` (for example
-<http://localhost:3100/api/docs>).
+<http://localhost:3100/api/docs>) when `API_DOCS_ENABLED=true`. It is on in local development and
+the Compose demo and off by default elsewhere, including the Kubernetes base.
 
 > **There is no authentication on this API.** It is meant to be reached from inside the platform's
 > network only. See [operations.md](operations.md#security-posture) before exposing it anywhere.

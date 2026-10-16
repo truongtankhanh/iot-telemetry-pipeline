@@ -110,7 +110,7 @@ and leaves PostgreSQL and Mosquitto running; `pnpm docker:down` removes everythi
 curl localhost:3100/api/alerts                    # opens ~25 s after start, clears about a minute later
 curl "localhost:3100/api/devices/dc-env-01/readings?metric=temperature_c"
 curl localhost:3100/metrics | grep telemetry_     # throughput, rejections, gaps, lag
-open http://localhost:3100/api/docs               # OpenAPI
+open http://localhost:3100/api/docs               # OpenAPI (API_DOCS_ENABLED, on in the demo)
 ```
 
 Compose publishes PostgreSQL on `:5433` and Mosquitto on `:1883`. If either is taken on your

@@ -27,6 +27,7 @@
 | [0005](adr/0005-alert-outbox.md)                             | Deliver alerts through a transactional outbox                                               |
 | [0006](adr/0006-client-credentials-to-the-command-center.md) | Authenticate to the command center with client credentials                                  |
 | [0007](adr/0007-pipeline-as-the-single-telemetry-source.md)  | The pipeline becomes the platform's single telemetry source; the command center consumes it |
+| [0008](adr/0008-api-docs-switch-and-network-only-access.md)  | OpenAPI UI behind a switch (off by default); the API stays network-only for V1              |
 
 ## Conventions for these documents
 

@@ -38,6 +38,7 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/telemetry
       MQTT_URL: mqtt://mosquitto:1883
+      API_DOCS_ENABLED: 'true' # the demo points readers at /api/docs
       OCC_API_URL: ${OCC_API_URL:-}
       OCC_TOKEN_URL: ${OCC_TOKEN_URL:-}
       OCC_CLIENT_ID: ${OCC_CLIENT_ID:-}

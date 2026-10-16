@@ -38,7 +38,7 @@ on `PORT` (3100):
 | `GET /api/alerts`                   | Alerts and the state of their delivery         |
 | `GET /api/health`, `GET /api/ready` | Liveness, readiness (database and broker)      |
 | `GET /metrics`                      | Prometheus metrics (outside the `/api` prefix) |
-| `/api/docs`                         | OpenAPI UI                                     |
+| `/api/docs`                         | OpenAPI UI, only if `API_DOCS_ENABLED=true`    |
 
 ## Configuration
 

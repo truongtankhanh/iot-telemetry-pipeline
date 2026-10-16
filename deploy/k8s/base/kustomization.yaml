@@ -22,3 +22,4 @@ configMapGenerator:
       - FLUSH_INTERVAL_MS=250
       - FLUSH_MAX_READINGS=1000
       - RETENTION_DAYS=30
+      - API_DOCS_ENABLED=false

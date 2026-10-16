@@ -151,6 +151,14 @@ export class Env {
   @Transform(toBoolean)
   @IsBoolean()
   MIGRATE_ON_BOOT = true;
+
+  /**
+   * Serves the OpenAPI UI at /api/docs (and its JSON). Off unless asked for: local development and
+   * the demo stack turn it on, the Kubernetes base leaves it off (V1-T04).
+   */
+  @Transform(toBoolean)
+  @IsBoolean()
+  API_DOCS_ENABLED = false;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
