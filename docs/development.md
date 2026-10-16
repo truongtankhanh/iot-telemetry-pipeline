@@ -108,7 +108,7 @@ Design choices worth knowing before you edit:
 | `pnpm typecheck`                                          | `tsc --noEmit` across workspaces                                                                                     |
 | `pnpm format` / `pnpm format:check`                       | Prettier (single quotes, trailing commas, 100 columns) over the whole repo                                           |
 | `pnpm test`                                               | Unit tests (Jest for ingest, Vitest for the contract, `node --test` for the simulator)                               |
-| `pnpm test:e2e`                                           | End-to-end suite — see the warning below                                                                             |
+| `pnpm test:e2e`                                           | End-to-end suite — wipes `TEST_DATABASE_URL`, see below                                                              |
 | `pnpm docker:up` / `docker:down` / `docker:restart`       | PostgreSQL and Mosquitto from Compose, shared by development and the e2e suite                                       |
 | `pnpm docker:demo`                                        | The whole demo in containers: also builds the ingest service and starts a simulator (foreground)                     |
 | `pnpm docker:demo:down`                                   | Removes the demo's ingest and simulator containers; PostgreSQL and Mosquitto keep running                            |
@@ -133,11 +133,12 @@ validates the Kubernetes manifests with kubeconform and builds the Compose image
   → resolve, sequence gaps, the read API, and draining the buffer on shutdown. It uses two MQTT
   connections in one shared group, and flushes and ticks the outbox explicitly.
 
-> ⚠️ **The e2e suite wipes the database it connects to.** It starts with
-> `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` on `DATABASE_URL`. Its default is
-> `postgres://postgres:postgres@localhost:5432/telemetry_test`. Never point it at a database whose
-> data you want to keep — use a dedicated one, as CI does. `pnpm e2e:ingest` does this for you: it
-> runs against a separate `telemetry_test` database inside the Compose PostgreSQL.
+The e2e suite recreates the `public` schema of its database on every run, so it is guarded
+([V1-T03](tasks/v1/V1-T03-e2e-wipes-database.md)). It reads `TEST_DATABASE_URL` (default
+`postgres://postgres:postgres@localhost:5432/telemetry_test`) and **never** `DATABASE_URL`, and it
+aborts before connecting unless the database name ends in `_test`; once connected it checks
+`current_database()` again before the first `DROP`. `pnpm e2e:ingest` points it at `telemetry_test`
+inside the Compose PostgreSQL, and CI sets the variable for its service container.
 
 The e2e run is heavier than unit tests (it starts a Nest application and two MQTT connections and
 runs serially with `--runInBand`). Run it on its own, not alongside builds or watchers.
@@ -265,9 +266,8 @@ its `npm test` (see the table in [system-context.md](system-context.md#6-changin
   `docs/api/openapi.json` would close it cheaply.
 - **No test ties platform-aws to this repository's constants.** (Tracked as [V1-T07](tasks/v1/V1-T07-aws-constants-not-tied-to-pipeline.md).) Keeping them equal relies on the
   table in [system-context.md](system-context.md#3-values-that-must-agree-across-repositories).
-- The command center's e2e suite refuses to run unless the database name ends in `_test`. This
-  repository's does not ([V1-T03](tasks/v1/V1-T03-e2e-wipes-database.md)); follow the same pattern when
-  that task is done.
+- Both repositories' e2e suites refuse to run unless the database name ends in `_test`; keep it that
+  way ([V1-T03](tasks/v1/V1-T03-e2e-wipes-database.md)).
 
 ## Conventions
 

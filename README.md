@@ -202,9 +202,9 @@ pnpm e2e:ingest   # real PostgreSQL + real Mosquitto (pnpm docker:up) + a fake o
 
 CI runs all of it, validates the Kubernetes manifests with kubeconform, and builds the images.
 
-> The e2e suite recreates the `public` schema of the database in `DATABASE_URL` (default
-> `telemetry_test`). `pnpm e2e:ingest` points it at `telemetry_test` inside the Compose PostgreSQL;
-> with `pnpm test:e2e` directly, point it only at a dedicated, disposable database
+> The e2e suite recreates the `public` schema of `TEST_DATABASE_URL` (default `telemetry_test`), never
+> of `DATABASE_URL`, and refuses to run unless the database name ends in `_test`. `pnpm e2e:ingest`
+> points it at `telemetry_test` inside the Compose PostgreSQL
 > ([V1-T03](docs/tasks/v1/V1-T03-e2e-wipes-database.md)).
 
 ## Documentation

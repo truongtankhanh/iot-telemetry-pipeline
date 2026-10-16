@@ -108,6 +108,11 @@ describe('Telemetry pipeline (e2e)', () => {
 
   beforeAll(async () => {
     db = new Pool({ connectionString: DATABASE_URL });
+    // Second line of defence behind e2e-env.js: the name the server reports, not the one in the URL.
+    const { rows } = await db.query<{ name: string }>('SELECT current_database() AS name');
+    if (!rows[0]!.name.endsWith('_test')) {
+      throw new Error(`Refusing to wipe "${rows[0]!.name}": its name does not end in "_test"`);
+    }
     await db.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     occ = await fakeCommandCenter();
 

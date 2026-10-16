@@ -63,8 +63,9 @@ Run from the repository root; the root scripts build the contract package first.
 
 The e2e suite ([`test/pipeline.e2e-spec.ts`](test/pipeline.e2e-spec.ts)) boots the real application
 against a real PostgreSQL and Mosquitto, with a fake command center and identity provider. It
-**wipes the `public` schema** of the database it connects to, which is why `pnpm e2e:ingest` gives it
-its own `telemetry_test` ([V1-T03](../../docs/tasks/v1/V1-T03-e2e-wipes-database.md)). It runs serially; run it on its own.
+**wipes the `public` schema** of `TEST_DATABASE_URL`, and refuses to run unless that database's name
+ends in `_test`; it never reads `DATABASE_URL`. `pnpm e2e:ingest` gives it its own `telemetry_test`
+([V1-T03](../../docs/tasks/v1/V1-T03-e2e-wipes-database.md)). It runs serially; run it on its own.
 
 ## Layout
 

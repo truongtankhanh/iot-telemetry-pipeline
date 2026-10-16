@@ -14,6 +14,6 @@ pg_port="$(host_port postgres 5432)"
 mqtt_port="$(host_port mosquitto 1883)"
 
 # Builds the contract package first (turbo).
-DATABASE_URL="postgres://postgres:postgres@localhost:${pg_port}/telemetry_test" \
+TEST_DATABASE_URL="postgres://postgres:postgres@localhost:${pg_port}/telemetry_test" \
 MQTT_URL="mqtt://localhost:${mqtt_port}" \
   pnpm test:e2e
