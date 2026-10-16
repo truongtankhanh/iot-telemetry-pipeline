@@ -23,7 +23,7 @@
 | ITP-12 | Grafana dashboard and alert rules (gaps, lag, flush time, outbox age) shipped as code          |
 | ITP-13 | Multi-replica benchmark on a real cluster                                                      |
 | ITP-14 | ✅ Idempotency key on incident creation, one per alert                                         |
-| ITP-15 | Mark telemetry-raised incidents with their own source in ops-command-center                    |
+| ITP-15 | Mark telemetry-raised incidents with their own source in ops-command-center (see V1-T05)       |
 | ITP-20 | ✅ Client credentials to the command center's Keycloak; token cache, renewal on 401 (ADR-0006) |
 | ITP-19 | ✅ Run against AWS IoT Core: mutual TLS from PEM secrets, several connections per replica      |
 

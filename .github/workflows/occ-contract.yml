@@ -1,0 +1,29 @@
+name: Command center contract
+
+# Runs the pipeline's contract test against the command center's CURRENT published OpenAPI document
+# (V1-T06, ADR-0009), so a breaking change there is noticed here without waiting for a pipeline PR.
+# Not part of the pull-request workflow: it depends on another repository and on the network.
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    name: Contract test against ops-command-center main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Fetch the command center's OpenAPI document
+        run: curl -fsSL https://raw.githubusercontent.com/truongtankhanh/ops-command-center/main/docs/api/openapi.json -o "$RUNNER_TEMP/occ-openapi.json"
+      - name: Contract test
+        run: pnpm --filter @itp/ingest exec jest --runInBand src/delivery/ops-command-center.contract.spec.ts
+        env:
+          NODE_OPTIONS: --experimental-vm-modules
+          OCC_OPENAPI_PATH: ${{ runner.temp }}/occ-openapi.json

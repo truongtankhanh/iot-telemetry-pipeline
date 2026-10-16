@@ -96,6 +96,9 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       jest:
         specifier: ^30.5.2
         version: 30.5.2(@types/node@24.19.0)(ts-node@10.9.2(@types/node@24.19.0)(typescript@5.9.3))

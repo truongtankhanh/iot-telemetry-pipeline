@@ -213,13 +213,13 @@ and run the test suites on their own.
 
 ### Which checks for which change
 
-| You changed…                                                                | Run, in order                                                                                                                                   |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pipeline logic (rules, batch writer, parser, delivery internals)            | `pnpm test` here; add `pnpm test:e2e` if it touches the end-to-end path                                                                         |
-| `telemetry-contract` or `devices.json`                                      | Tests here, then the platform-aws values below (topic filter, share group, thing attribute `zone`)                                              |
-| How the pipeline calls the command center (incident payload, auth, key)     | Tests here, then the **manual integration check** below                                                                                         |
-| The command center's incident API, roles or the `telemetry-pipeline` client | Its own tests, then the manual integration check. The e2e suite here uses a fake command center, so it cannot catch this                        |
-| Environment variables, IoT policy or secrets in platform-aws                | `npm test` and `npm run synth` there; compare with [the values that must agree](system-context.md#3-values-that-must-agree-across-repositories) |
+| You changed…                                                                | Run, in order                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipeline logic (rules, batch writer, parser, delivery internals)            | `pnpm test` here; add `pnpm test:e2e` if it touches the end-to-end path                                                                                                                                       |
+| `telemetry-contract` or `devices.json`                                      | Tests here, then the platform-aws values below (topic filter, share group, thing attribute `zone`)                                                                                                            |
+| How the pipeline calls the command center (incident payload, auth, key)     | Tests here (the contract test checks the calls against the command center's OpenAPI), then the **manual integration check** below                                                                             |
+| The command center's incident API, roles or the `telemetry-pipeline` client | Its own tests; here `scripts/sync-occ-openapi.sh` and `pnpm test:ingest` to see the contract test react; then the manual integration check. The e2e suite uses a fake command center, so it cannot catch this |
+| Environment variables, IoT policy or secrets in platform-aws                | `npm test` and `npm run synth` there; compare with [the values that must agree](system-context.md#3-values-that-must-agree-across-repositories)                                                               |
 
 ### Manual integration check: pipeline and command center
 
@@ -260,10 +260,13 @@ its `npm test` (see the table in [system-context.md](system-context.md#6-changin
 
 ### Known gaps in this workflow
 
-- **No automated contract test between the pipeline and the command center.** (Tracked as [V1-T06](tasks/v1/V1-T06-no-contract-test-with-command-center.md).) The fake command
-  center in the e2e suite is written in this repository, so a change in the real API leaves both
-  sides green. The manual check above is the safety net. Making the fake follow the command center's
-  `docs/api/openapi.json` would close it cheaply.
+- **The contract with the command center is checked against its OpenAPI document, not against its
+  behaviour.** ([V1-T06](tasks/v1/V1-T06-no-contract-test-with-command-center.md),
+  [ADR-0009](adr/0009-contract-check-against-command-center-openapi.md).) The contract test catches
+  paths, fields, enums and headers; the role of the `telemetry-pipeline` client, the 24 h idempotency
+  window and Keycloak still rely on the manual check above. The snapshot in
+  `apps/ingest/test/contract` is refreshed with `scripts/sync-occ-openapi.sh`, and a daily workflow
+  tests the command center's current `main`.
 - **No test ties platform-aws to this repository's constants.** (Tracked as [V1-T07](tasks/v1/V1-T07-aws-constants-not-tied-to-pipeline.md).) Keeping them equal relies on the
   table in [system-context.md](system-context.md#3-values-that-must-agree-across-repositories).
 - Both repositories' e2e suites refuse to run unless the database name ends in `_test`; keep it that

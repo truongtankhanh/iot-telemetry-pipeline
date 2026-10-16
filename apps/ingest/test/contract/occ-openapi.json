@@ -1,0 +1,2275 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/zones": {
+      "get": {
+        "operationId": "ZonesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ZoneDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "All zones of the campus with their outlines.",
+        "tags": ["zones"]
+      }
+    },
+    "/api/site-plan": {
+      "get": {
+        "operationId": "SitesController_getPlan",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitePlanDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No site plan has been set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What to draw under the zones: the site boundary, roads and field markings.",
+        "tags": ["site-plan"]
+      }
+    },
+    "/api/cameras": {
+      "get": {
+        "operationId": "CamerasController_list",
+        "parameters": [
+          {
+            "name": "zoneId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CameraDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed zoneId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cameras, optionally filtered by zone.",
+        "tags": ["cameras"]
+      }
+    },
+    "/api/cameras/{id}/stream": {
+      "get": {
+        "operationId": "CamerasController_stream",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shape depends on `kind`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/MockStreamDescriptorDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HlsStreamDescriptorDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WebRtcStreamDescriptorDto"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "mock": "#/components/schemas/MockStreamDescriptorDto",
+                      "hls": "#/components/schemas/HlsStreamDescriptorDto",
+                      "webrtc": "#/components/schemas/WebRtcStreamDescriptorDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Camera does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "How to render this camera: an HLS or WebRTC stream URL, or a seed for a synthetic feed.",
+        "tags": ["cameras"]
+      }
+    },
+    "/api/assets": {
+      "get": {
+        "operationId": "AssetsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssetDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every asset ordered by code, with its class, position and headline points.",
+        "tags": ["assets"]
+      }
+    },
+    "/api/assets/{code}": {
+      "get": {
+        "operationId": "AssetsController_get",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "description": "The operators' tag, case-sensitive",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2,4}-[A-Z0-9]{2,6}$",
+              "example": "CT-01"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed asset code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One asset by its code, with all the points of its class and the rules that apply to it.",
+        "tags": ["assets"]
+      }
+    },
+    "/api/assets/{code}/telemetry": {
+      "get": {
+        "operationId": "AssetsController_history",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "description": "The operators' tag, case-sensitive",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2,4}-[A-Z0-9]{2,6}$",
+              "example": "CT-01"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Start of the range, inclusive: ISO 8601 with a time and a zone. Defaults to `to` minus 15 minutes. `to − from` is at most 1 hour (720 buckets of 5 seconds).",
+            "schema": {
+              "example": "2026-10-14T08:00:00Z",
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "End of the range, exclusive: ISO 8601 with a time and a zone. Defaults to now. A time in the future is valid and returns what exists.",
+            "schema": {
+              "example": "2026-10-14T08:15:00Z",
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetTelemetryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed asset code, a `from` or `to` that is not ISO 8601 with a zone, `to` before `from`, or a range over 1 hour (720 buckets)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "An asset's reading history in `[from, to)`: 5 s buckets, at most 1 hour per call. The range is\nresolved here, after the global pipe has validated the query and before the lookup, so a bad\nrange is `400` even for an asset that does not exist.",
+        "tags": ["assets"]
+      }
+    },
+    "/api/incidents": {
+      "get": {
+        "operationId": "IncidentsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Only these statuses. Comma-separated (`open,acknowledged`) or repeated\n(`status=open&status=acknowledged`).",
+            "schema": {
+              "example": ["open", "acknowledged"],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["open", "acknowledged", "resolved"]
+              }
+            }
+          },
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "description": "Only these severities: comma-separated or repeated, like `status`.",
+            "schema": {
+              "example": ["high", "critical"],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              }
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum number of incidents returned.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IncidentDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access, or the role lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Incidents ordered for an operator: unresolved first, then by severity, then newest.",
+        "tags": ["incidents"]
+      },
+      "post": {
+        "operationId": "IncidentsController_report",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Makes the request safe to retry for 24 h: the same key and body return the first response instead of creating another incident. Keys are per user. Use a new random value (e.g. a UUID) per submission.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportIncidentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body or Idempotency-Key, or position outside the zone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access, or the role lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Zone does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Idempotency-Key reused with a different body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Report a new incident on behalf of an operator. A retry by the same user with the same\n`Idempotency-Key` and body returns the first response and creates nothing (ADR-0009).",
+        "tags": ["incidents"]
+      }
+    },
+    "/api/incidents/{id}": {
+      "get": {
+        "operationId": "IncidentsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access, or the role lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Incident does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One incident with its full timeline.",
+        "tags": ["incidents"]
+      }
+    },
+    "/api/incidents/{id}/acknowledge": {
+      "post": {
+        "operationId": "IncidentsController_acknowledge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionIncidentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed id or invalid body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access, the role lacks the permission, or the incident's category is outside the role's scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Incident does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Incident is not open",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark an open incident as being handled.",
+        "tags": ["incidents"]
+      }
+    },
+    "/api/incidents/{id}/resolve": {
+      "post": {
+        "operationId": "IncidentsController_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionIncidentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed id or invalid body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No role grants access, the role lacks the permission, or the incident's category is outside the role's scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Incident does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Incident is already resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close an incident, optionally with a resolution note.",
+        "tags": ["incidents"]
+      }
+    }
+  },
+  "info": {
+    "title": "Ops Command Center API",
+    "description": "Incidents, zones, the site plan, cameras and assets. Live updates on the `/events` Socket.IO namespace and telemetry readings on `/telemetry`. Every endpoint needs an OIDC access token as `Authorization: Bearer <token>`; `/events` and `/telemetry` take the same token in the handshake as `auth.token`. Writes need the `operator`, `supervisor` or `technician` role; a `technician` acknowledges and resolves only Facilities and Environment incidents. A token with none of `operator`, `supervisor`, `technician` and `viewer` gets 403.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "ApiErrorDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 404
+          },
+          "error": {
+            "type": "string",
+            "description": "HTTP status name",
+            "example": "NOT_FOUND"
+          },
+          "message": {
+            "description": "What went wrong. Validation failures list every problem as an array.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "example": "Incident 00000000-0000-0000-0000-000000000000 was not found"
+          },
+          "path": {
+            "type": "string",
+            "example": "/api/incidents/00000000-0000-0000-0000-000000000000"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["statusCode", "error", "message", "path", "timestamp"]
+      },
+      "ZoneDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Zone id.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "BLD-LIB"
+          },
+          "name": {
+            "type": "string",
+            "example": "Library"
+          },
+          "kind": {
+            "description": "What kind of area this is: a `building`, `parking` lot, campus `gate`, `outdoor` space,\n`sports` ground, `utility` area or `water`.",
+            "enum": ["building", "parking", "gate", "outdoor", "sports", "utility", "water"],
+            "type": "string"
+          },
+          "use": {
+            "nullable": true,
+            "description": "What a building is used for (ADR-0021). `null` for every other kind, and for a building whose\nuse is not set. Drives report-form suggestions only; restricts nothing.",
+            "enum": [
+              "academic",
+              "library",
+              "laboratory",
+              "residential",
+              "dining",
+              "healthcare",
+              "sports_hall",
+              "administration",
+              "data_center",
+              "security_post",
+              "utility_plant"
+            ],
+            "type": "string"
+          },
+          "heightM": {
+            "type": "number",
+            "nullable": true,
+            "description": "Metres above ground of a building's 3D shell (> 0). `null` when not set: clients draw their\ndefault.",
+            "minimum": 0,
+            "example": 18
+          },
+          "polygon": {
+            "type": "array",
+            "description": "Closed ring of [lng, lat] points",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "center": {
+            "description": "Centre as [lng, lat]. Used as the position of incidents reported without one.",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": ["id", "code", "name", "kind", "use", "heightM", "polygon", "center"]
+      },
+      "SitePolygonDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": ["Polygon"],
+            "type": "string"
+          },
+          "coordinates": {
+            "type": "array",
+            "description": "Closed rings of [lng, lat] points, outer ring first",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        "required": ["type", "coordinates"]
+      },
+      "SiteLineStringDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": ["LineString"],
+            "type": "string"
+          },
+          "coordinates": {
+            "type": "array",
+            "description": "[lng, lat] points, in order",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
+        "required": ["type", "coordinates"]
+      },
+      "SiteFeatureDto": {
+        "type": "object",
+        "properties": {
+          "part": {
+            "description": "What this feature draws: the site `boundary`, a `road`, or a sports-`field` marking.",
+            "enum": ["boundary", "road", "field"],
+            "type": "string"
+          },
+          "geometry": {
+            "description": "Shape depends on `type`",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SitePolygonDto"
+              },
+              {
+                "$ref": "#/components/schemas/SiteLineStringDto"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "Polygon": "#/components/schemas/SitePolygonDto",
+                "LineString": "#/components/schemas/SiteLineStringDto"
+              }
+            }
+          }
+        },
+        "required": ["part", "geometry"]
+      },
+      "SitePlanDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Site id.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "LANGBIANG"
+          },
+          "name": {
+            "type": "string",
+            "example": "Langbiang Tech Campus"
+          },
+          "center": {
+            "description": "Centre of the site as [lng, lat]: where a map opens",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "features": {
+            "description": "Drawn under the zones, in drawing order. Building footprints and parking rows are not here: clients derive them from the zones.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteFeatureDto"
+            }
+          }
+        },
+        "required": ["id", "code", "name", "center", "features"]
+      },
+      "MockStreamDescriptorDto": {
+        "type": "object",
+        "properties": {
+          "cameraId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "example": "CAM-L01 · Library entrance"
+          },
+          "kind": {
+            "enum": ["mock"],
+            "type": "string"
+          },
+          "seed": {
+            "type": "number",
+            "description": "Seed for the synthetic feed. A camera always gets the same seed, so its scene is stable."
+          }
+        },
+        "required": ["cameraId", "label", "kind", "seed"]
+      },
+      "HlsStreamDescriptorDto": {
+        "type": "object",
+        "properties": {
+          "cameraId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "example": "CAM-L01 · Library entrance"
+          },
+          "kind": {
+            "enum": ["hls"],
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "HLS playlist URL",
+            "example": "https://media.example.com/cam-l01/index.m3u8"
+          }
+        },
+        "required": ["cameraId", "label", "kind", "url"]
+      },
+      "WebRtcStreamDescriptorDto": {
+        "type": "object",
+        "properties": {
+          "cameraId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "example": "CAM-L01 · Library entrance"
+          },
+          "kind": {
+            "enum": ["webrtc"],
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "WHEP endpoint URL",
+            "example": "https://media.example.com/cam-l01/whep"
+          }
+        },
+        "required": ["cameraId", "label", "kind", "url"]
+      },
+      "CameraFieldOfViewDto": {
+        "type": "object",
+        "properties": {
+          "heading": {
+            "type": "number",
+            "description": "Centre line of the view, in degrees clockwise from true north (0 ≤ heading < 360)",
+            "minimum": 0,
+            "maximum": 360,
+            "example": 90
+          },
+          "angle": {
+            "type": "number",
+            "description": "Width of the view, in degrees (0 < angle ≤ 360)",
+            "minimum": 0,
+            "maximum": 360,
+            "example": 90
+          },
+          "range": {
+            "type": "number",
+            "description": "How far the camera sees, in metres (> 0)",
+            "minimum": 0,
+            "example": 40
+          }
+        },
+        "required": ["heading", "angle", "range"]
+      },
+      "CameraDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Camera id.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "CAM-L01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Library entrance"
+          },
+          "zoneId": {
+            "type": "string",
+            "description": "Zone the camera is mounted in.",
+            "format": "uuid"
+          },
+          "position": {
+            "description": "Mounting point as [lng, lat]",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "online": {
+            "type": "boolean",
+            "description": "Whether the camera is currently online."
+          },
+          "fieldOfView": {
+            "nullable": true,
+            "description": "`null` when the orientation is not known; clients then draw no view",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CameraFieldOfViewDto"
+              }
+            ]
+          }
+        },
+        "required": ["id", "code", "name", "zoneId", "position", "online", "fieldOfView"]
+      },
+      "AssetFootprintDto": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number",
+            "description": "Metres, > 0",
+            "minimum": 0,
+            "example": 4
+          },
+          "depth": {
+            "type": "number",
+            "description": "Metres, > 0",
+            "minimum": 0,
+            "example": 4
+          },
+          "height": {
+            "type": "number",
+            "description": "Metres, > 0",
+            "minimum": 0,
+            "example": 5
+          }
+        },
+        "required": ["width", "depth", "height"]
+      },
+      "AssetClassDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Asset class id.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Lower snake case",
+            "example": "cooling_tower"
+          },
+          "name": {
+            "type": "string",
+            "example": "Cooling tower"
+          },
+          "modelUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "`/models/<model_key>` of the class's 3D model file. `null` when the class has no model: clients then draw a neutral box from `footprintM`.",
+            "example": "/models/cooling_tower.glb"
+          },
+          "footprintM": {
+            "description": "The box a neutral placeholder is drawn from",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssetFootprintDto"
+              }
+            ]
+          }
+        },
+        "required": ["id", "code", "name", "modelUrl", "footprintM"]
+      },
+      "TelemetryPointDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "camelCase and unique within the asset class",
+            "example": "motorTempC"
+          },
+          "label": {
+            "type": "string",
+            "example": "Motor temperature"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true,
+            "description": "`null` for a point with no unit (a boolean or an enum)",
+            "example": "°C"
+          },
+          "kind": {
+            "enum": ["number", "boolean", "enum"],
+            "type": "string"
+          },
+          "min": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest valid value of a `number` point. `null` when there is no lower bound, and for booleans and enums. A reading outside `min`/`max` is dropped, never clamped.",
+            "example": -20
+          },
+          "max": {
+            "type": "number",
+            "nullable": true,
+            "description": "Highest valid value of a `number` point. `null` when there is no upper bound, and as `min`.",
+            "example": 150
+          },
+          "enumValues": {
+            "nullable": true,
+            "description": "The values an `enum` point can take. `null` for every other kind.",
+            "example": ["off", "auto", "hand"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expectedIntervalS": {
+            "type": "number",
+            "description": "How often a device sends this point, in seconds (> 0). A client judges freshness against it.",
+            "minimum": 0,
+            "example": 5
+          },
+          "headline": {
+            "nullable": true,
+            "description": "Rank among the class's headline points. `null` when the point is not a headline, so it appears in neither the tooltip nor the Assets list.",
+            "example": 2,
+            "enum": [1, 2],
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "unit",
+          "kind",
+          "min",
+          "max",
+          "enumValues",
+          "expectedIntervalS",
+          "headline"
+        ]
+      },
+      "AssetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Asset id.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "The operators' tag",
+            "example": "CT-01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Cooling tower 1"
+          },
+          "class": {
+            "$ref": "#/components/schemas/AssetClassDto"
+          },
+          "zoneId": {
+            "type": "string",
+            "description": "Zone the asset stands in.",
+            "format": "uuid"
+          },
+          "position": {
+            "description": "Position as [lng, lat]",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "elevationM": {
+            "type": "number",
+            "description": "Metres of the asset's base above ground (≥ 0). A roof is the building's height.",
+            "minimum": 0,
+            "example": 14
+          },
+          "headingDeg": {
+            "type": "number",
+            "description": "Degrees clockwise from true north (0 ≤ heading < 360); for a model, the direction its front faces",
+            "minimum": 0,
+            "maximum": 360,
+            "example": 0
+          },
+          "headline": {
+            "description": "The class's headline points, ordered by `headline` rank: at most two",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryPointDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "class",
+          "zoneId",
+          "position",
+          "elevationM",
+          "headingDeg",
+          "headline"
+        ]
+      },
+      "TelemetryRuleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Motor over-temperature"
+          },
+          "key": {
+            "type": "string",
+            "description": "The `key` of one of the asset's points",
+            "example": "motorTempC"
+          },
+          "comparator": {
+            "description": "Which side of `limit` is a breach",
+            "enum": ["above", "below"],
+            "type": "string"
+          },
+          "limit": {
+            "type": "number",
+            "description": "The reading that is a breach once passed. A boolean point uses 0.5.",
+            "example": 85
+          },
+          "clear": {
+            "type": "number",
+            "description": "The level a reading must pass back before the rule can raise again, on the safe side of `limit`: `clear` ≤ `limit` for `above`, `clear` ≥ `limit` for `below`",
+            "example": 80
+          },
+          "forS": {
+            "type": "number",
+            "description": "Seconds a breach must last before it raises an incident (≥ 0)",
+            "minimum": 0,
+            "example": 60
+          },
+          "severity": {
+            "enum": ["low", "medium", "high", "critical"],
+            "type": "string"
+          },
+          "incidentType": {
+            "description": "A `facilities` or `environment` type of the incident a sustained breach raises",
+            "enum": [
+              "intrusion",
+              "fire_alarm",
+              "equipment_fault",
+              "medical",
+              "crowding",
+              "suspicious_object",
+              "theft",
+              "vandalism",
+              "suspicious_person",
+              "assault",
+              "fire",
+              "gas_leak",
+              "hazmat_spill",
+              "injury",
+              "power_outage",
+              "water_leak",
+              "lift_entrapment",
+              "hvac_fault",
+              "network_outage",
+              "severe_weather",
+              "flooding",
+              "fallen_tree",
+              "traffic_accident",
+              "blocked_access"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "key",
+          "comparator",
+          "limit",
+          "clear",
+          "forS",
+          "severity",
+          "incidentType"
+        ]
+      },
+      "AssetDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Asset id.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "The operators' tag",
+            "example": "CT-01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Cooling tower 1"
+          },
+          "class": {
+            "$ref": "#/components/schemas/AssetClassDto"
+          },
+          "zoneId": {
+            "type": "string",
+            "description": "Zone the asset stands in.",
+            "format": "uuid"
+          },
+          "position": {
+            "description": "Position as [lng, lat]",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "elevationM": {
+            "type": "number",
+            "description": "Metres of the asset's base above ground (≥ 0). A roof is the building's height.",
+            "minimum": 0,
+            "example": 14
+          },
+          "headingDeg": {
+            "type": "number",
+            "description": "Degrees clockwise from true north (0 ≤ heading < 360); for a model, the direction its front faces",
+            "minimum": 0,
+            "maximum": 360,
+            "example": 0
+          },
+          "headline": {
+            "description": "The class's headline points, ordered by `headline` rank: at most two",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryPointDto"
+            }
+          },
+          "points": {
+            "description": "Every point of the class, headline or not: the headline points by rank, then the rest by `key`",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryPointDto"
+            }
+          },
+          "rules": {
+            "description": "The enabled rules that apply to this asset, by `name`. An asset-level rule replaces the class rule of the same `name`; a disabled rule is left out, so a disabled asset-level rule turns that rule off for this asset only.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryRuleDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "class",
+          "zoneId",
+          "position",
+          "elevationM",
+          "headingDeg",
+          "headline",
+          "points",
+          "rules"
+        ]
+      },
+      "AssetTelemetryDto": {
+        "type": "object",
+        "properties": {
+          "assetCode": {
+            "type": "string",
+            "description": "The asset's tag, as in the path",
+            "example": "CT-01"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of the range served, inclusive: the request with its defaults applied.",
+            "example": "2026-10-14T08:00:00.000Z"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End of the range served, exclusive: the request with its defaults applied.",
+            "example": "2026-10-14T08:15:00.000Z"
+          },
+          "bucketS": {
+            "type": "number",
+            "description": "Width of one bucket, in seconds",
+            "example": 5
+          },
+          "samples": {
+            "description": "In ascending time. Empty, not an error, for an asset with no readings in the range and for a range outside the kept days.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetTelemetrySampleDto"
+            }
+          }
+        },
+        "required": ["assetCode", "from", "to", "bucketS", "samples"]
+      },
+      "AssetTelemetrySampleDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of the 5 second bucket, UTC: the API's clock when it received the reading, not the device's measurement time.",
+            "example": "2026-10-14T08:00:05.000Z"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The last value of each point key received in the bucket, by `key`. A key with no reading in the bucket is absent: it is not `null` and it is not zero.",
+            "example": {
+              "motorTempC": 61.5,
+              "running": true,
+              "switchState": "auto"
+            }
+          }
+        },
+        "required": ["at", "values"]
+      },
+      "IncidentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Incident id.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "INC-000042"
+          },
+          "type": {
+            "description": "What happened.",
+            "enum": [
+              "intrusion",
+              "fire_alarm",
+              "equipment_fault",
+              "medical",
+              "crowding",
+              "suspicious_object",
+              "theft",
+              "vandalism",
+              "suspicious_person",
+              "assault",
+              "fire",
+              "gas_leak",
+              "hazmat_spill",
+              "injury",
+              "power_outage",
+              "water_leak",
+              "lift_entrapment",
+              "hvac_fault",
+              "network_outage",
+              "severe_weather",
+              "flooding",
+              "fallen_tree",
+              "traffic_accident",
+              "blocked_access"
+            ],
+            "type": "string"
+          },
+          "severity": {
+            "description": "From least to most urgent: `low`, `medium`, `high`, `critical`.",
+            "enum": ["low", "medium", "high", "critical"],
+            "type": "string"
+          },
+          "status": {
+            "description": "`open`: not picked up yet. `acknowledged`: an operator is handling it. `resolved`: closed.",
+            "enum": ["open", "acknowledged", "resolved"],
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Door forced open — service corridor"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "zoneId": {
+            "type": "string",
+            "description": "Zone the incident is in.",
+            "format": "uuid"
+          },
+          "position": {
+            "description": "Location as [lng, lat]. The zone centre when none was given at report time.",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "source": {
+            "description": "`operator`: reported by a person. `simulator`: generated by the demo incident simulator.\n`telemetry`: raised by a telemetry rule.",
+            "enum": ["operator", "simulator", "telemetry"],
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The asset whose telemetry rule raised the incident. `null` for `operator` and `simulator`\nincidents.",
+            "format": "uuid"
+          },
+          "reportedAt": {
+            "type": "string",
+            "description": "When the incident was reported.",
+            "format": "date-time"
+          },
+          "acknowledgedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When an operator acknowledged it. `null` until then.",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When it was resolved. `null` until then.",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Starts at 1 and goes up by one on every change. Keep a cached copy unless this is higher.",
+            "minimum": 1,
+            "example": 3
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "type",
+          "severity",
+          "status",
+          "title",
+          "description",
+          "zoneId",
+          "position",
+          "source",
+          "assetId",
+          "reportedAt",
+          "acknowledgedAt",
+          "resolvedAt",
+          "version"
+        ]
+      },
+      "ActorDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "`user`: a signed-in person. `system`: the API itself (simulator, demo seed, older entries).",
+            "enum": ["user", "system"],
+            "type": "string"
+          },
+          "subject": {
+            "type": "string",
+            "description": "The identity provider's subject for a user; `simulator`, `seed`, `telemetry` or `system`\notherwise.",
+            "example": "f3b1c2d4-5e6f-4a1b-9c8d-7e6f5a4b3c2d"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Name to show, as it was when the entry was written.",
+            "example": "Demo Operator"
+          }
+        },
+        "required": ["kind", "subject", "displayName"]
+      },
+      "IncidentEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "description": "The state change this entry records: `reported`, `acknowledged` or `resolved`.",
+            "enum": ["reported", "acknowledged", "resolved"],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "description": "Who caused this entry.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ActorDto"
+              }
+            ]
+          }
+        },
+        "required": ["id", "kind", "note", "at", "actor"]
+      },
+      "IncidentDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Incident id.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "INC-000042"
+          },
+          "type": {
+            "description": "What happened.",
+            "enum": [
+              "intrusion",
+              "fire_alarm",
+              "equipment_fault",
+              "medical",
+              "crowding",
+              "suspicious_object",
+              "theft",
+              "vandalism",
+              "suspicious_person",
+              "assault",
+              "fire",
+              "gas_leak",
+              "hazmat_spill",
+              "injury",
+              "power_outage",
+              "water_leak",
+              "lift_entrapment",
+              "hvac_fault",
+              "network_outage",
+              "severe_weather",
+              "flooding",
+              "fallen_tree",
+              "traffic_accident",
+              "blocked_access"
+            ],
+            "type": "string"
+          },
+          "severity": {
+            "description": "From least to most urgent: `low`, `medium`, `high`, `critical`.",
+            "enum": ["low", "medium", "high", "critical"],
+            "type": "string"
+          },
+          "status": {
+            "description": "`open`: not picked up yet. `acknowledged`: an operator is handling it. `resolved`: closed.",
+            "enum": ["open", "acknowledged", "resolved"],
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Door forced open — service corridor"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "zoneId": {
+            "type": "string",
+            "description": "Zone the incident is in.",
+            "format": "uuid"
+          },
+          "position": {
+            "description": "Location as [lng, lat]. The zone centre when none was given at report time.",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "source": {
+            "description": "`operator`: reported by a person. `simulator`: generated by the demo incident simulator.\n`telemetry`: raised by a telemetry rule.",
+            "enum": ["operator", "simulator", "telemetry"],
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The asset whose telemetry rule raised the incident. `null` for `operator` and `simulator`\nincidents.",
+            "format": "uuid"
+          },
+          "reportedAt": {
+            "type": "string",
+            "description": "When the incident was reported.",
+            "format": "date-time"
+          },
+          "acknowledgedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When an operator acknowledged it. `null` until then.",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When it was resolved. `null` until then.",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Starts at 1 and goes up by one on every change. Keep a cached copy unless this is higher.",
+            "minimum": 1,
+            "example": 3
+          },
+          "timeline": {
+            "description": "Every state change, oldest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentEventDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "type",
+          "severity",
+          "status",
+          "title",
+          "description",
+          "zoneId",
+          "position",
+          "source",
+          "assetId",
+          "reportedAt",
+          "acknowledgedAt",
+          "resolvedAt",
+          "version",
+          "timeline"
+        ]
+      },
+      "ReportIncidentDto": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "description": "[lng, lat], longitude -180..180 and latitude -90..90, inside the zone's polygon or on its edge.\nDefaults to the zone centre.",
+            "minItems": 2,
+            "maxItems": 2,
+            "example": [108.4415, 11.953],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "type": {
+            "type": "string",
+            "description": "What happened.",
+            "example": "fire_alarm",
+            "enum": [
+              "intrusion",
+              "fire_alarm",
+              "equipment_fault",
+              "medical",
+              "crowding",
+              "suspicious_object",
+              "theft",
+              "vandalism",
+              "suspicious_person",
+              "assault",
+              "fire",
+              "gas_leak",
+              "hazmat_spill",
+              "injury",
+              "power_outage",
+              "water_leak",
+              "lift_entrapment",
+              "hvac_fault",
+              "network_outage",
+              "severe_weather",
+              "flooding",
+              "fallen_tree",
+              "traffic_accident",
+              "blocked_access"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "description": "How urgent it is. Higher severities sort first in the incident list.",
+            "example": "high",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "title": {
+            "type": "string",
+            "description": "One-line summary shown in the incident feed.",
+            "example": "Smoke in the east stairwell",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "description": "Free-text details for responders.",
+            "example": "Alarm panel shows level 3. Night guard on the way.",
+            "maxLength": 2000
+          },
+          "zoneId": {
+            "type": "string",
+            "description": "Zone the incident is in. Must exist (see `GET /api/zones`).",
+            "example": "00000000-0000-0000-0000-000000000000",
+            "format": "uuid"
+          }
+        },
+        "required": ["type", "severity", "title", "zoneId"]
+      },
+      "TransitionIncidentDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Optional operator note recorded on the timeline.",
+            "example": "Security team dispatched",
+            "maxLength": 1000
+          }
+        }
+      }
+    }
+  }
+}
