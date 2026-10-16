@@ -88,6 +88,16 @@ export class Env {
   @Max(20_000)
   FLUSH_MAX_READINGS = 1000;
 
+  /**
+   * How long a gap in a device's sequence numbers stays open before it counts as lost: replicas
+   * flush on their own clocks, so a message can land after its successor. 0 counts at once.
+   */
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(3_600_000)
+  SEQUENCE_GRACE_MS = 30_000;
+
   /** Days of raw readings kept; older daily partitions are dropped. */
   @Type(() => Number)
   @IsInt()

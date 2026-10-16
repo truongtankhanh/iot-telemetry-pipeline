@@ -6,28 +6,100 @@ import {
   requiredDays,
 } from '../maintenance/partitions';
 import { rollup } from './rollup';
-import { SequenceTracker } from './sequence-tracker';
+import { applySequences, type DeviceSequence, MAX_HOLES } from './sequence-ledger';
 
-describe('SequenceTracker', () => {
-  it('counts skipped sequence numbers', () => {
-    const t = new SequenceTracker();
-    expect([1, 2, 5, 6, 10].map((s) => t.observe('d', s))).toEqual([0, 0, 2, 0, 3]);
+describe('applySequences', () => {
+  const fresh: DeviceSequence = { last: null, lastTs: null, holes: [] };
+  /** Messages whose timestamp grows with the sequence number, as a device's clock does. */
+  const msgs = (...seqs: number[]) => seqs.map((seq) => ({ seq, ts: seq * 1000 }));
+
+  it('confirms skipped sequence numbers once, after the grace period', () => {
+    const first = applySequences(fresh, msgs(1, 2, 5, 6, 10), 0, 1000);
+    expect(first.lost).toBe(0);
+    expect(first.state.holes).toEqual([
+      [3, 4, 0],
+      [7, 9, 0],
+    ]);
+    const settled = applySequences(first.state, [], 1000, 1000);
+    expect(settled.lost).toBe(5);
+    expect(applySequences(settled.state, [], 5000, 1000).lost).toBe(0);
   });
 
-  it('ignores redeliveries and treats a large step back as a restart', () => {
-    const t = new SequenceTracker(100);
-    expect(t.observe('d', 500)).toBe(0);
-    expect(t.observe('d', 499)).toBe(0); // redelivery
-    expect(t.observe('d', 1)).toBe(0); // restart
-    expect(t.observe('d', 3)).toBe(1);
+  it('counts at once with no grace period', () => {
+    expect(applySequences(fresh, msgs(1, 2, 5, 6, 10), 0, 0).lost).toBe(5);
   });
 
-  it('tracks devices independently', () => {
-    const t = new SequenceTracker();
-    t.observe('a', 1);
-    t.observe('b', 7);
-    expect(t.observe('a', 3)).toBe(1);
-    expect(t.observe('b', 8)).toBe(0);
+  it('does not count a message that arrives after its successor, across flushes', () => {
+    // Two replicas share a device: B flushes seq 6 before A flushes seq 5.
+    const a = applySequences(fresh, msgs(1, 2, 3, 4), 0, 1000);
+    const b = applySequences(a.state, msgs(6), 100, 1000);
+    expect(b.state.holes).toEqual([[5, 5, 100]]);
+    const late = applySequences(b.state, msgs(5), 200, 1000);
+    expect(late.state.holes).toEqual([]);
+    expect(applySequences(late.state, msgs(7), 60_000, 1000).lost).toBe(0);
+  });
+
+  it('does not count a message that arrives out of order inside one batch', () => {
+    const { state, lost } = applySequences(fresh, msgs(1, 2, 4, 3, 5), 0, 0);
+    expect(lost).toBe(0);
+    expect(state).toMatchObject({ last: 5, holes: [] });
+  });
+
+  it('splits a hole when the late message falls in its middle', () => {
+    const jumped = applySequences({ last: 1, lastTs: 1000, holes: [] }, msgs(6), 0, 1000);
+    const { state, lost } = applySequences(jumped.state, msgs(4), 10, 1000);
+    expect(state.holes).toEqual([
+      [2, 3, 0],
+      [5, 5, 0],
+    ]);
+    expect(lost).toBe(0);
+    expect(applySequences(state, [], 1000, 1000).lost).toBe(3);
+  });
+
+  it('ignores a redelivery', () => {
+    const state = { last: 500, lastTs: 500_000, holes: [] };
+    const result = applySequences(state, msgs(499, 500), 0, 0);
+    expect(result.lost).toBe(0);
+    expect(result.state.last).toBe(500);
+  });
+
+  it('is not fooled by a late message far behind the newest one', () => {
+    // A lagging flush delivers messages thousands behind the newest: a late arrival, not a restart.
+    const jumped = applySequences(fresh, msgs(1, 2, 3, 5000), 0, 1000);
+    const late = applySequences(jumped.state, msgs(2, 2500), 10, 1000);
+    expect(late.lost).toBe(0);
+    expect(late.state.last).toBe(5000);
+    expect(late.state.holes).toEqual([
+      [4, 2499, 0],
+      [2501, 4999, 0],
+    ]);
+  });
+
+  it('treats a lower, newer message as a restart and closes the old holes as lost', () => {
+    const opened = applySequences(
+      { last: 2000, lastTs: 2_000_000, holes: [] },
+      msgs(2003),
+      0,
+      1000,
+    );
+    const restarted = applySequences(opened.state, [{ seq: 1, ts: 3_000_000 }], 10, 1000);
+    expect(restarted.lost).toBe(2);
+    expect(restarted.state).toEqual({ last: 1, lastTs: 3_000_000, holes: [] });
+    expect(applySequences(restarted.state, [{ seq: 3, ts: 3_002_000 }], 20, 0).lost).toBe(1);
+    const back = applySequences(
+      { last: 10, lastTs: 10_000, holes: [] },
+      [{ seq: 0, ts: 20_000 }],
+      0,
+      0,
+    );
+    expect(back.state.last).toBe(0);
+  });
+
+  it('bounds the holes it keeps by confirming the oldest early', () => {
+    const seqs = Array.from({ length: MAX_HOLES + 3 }, (_, i) => i * 2);
+    const { state, lost } = applySequences(fresh, msgs(...seqs), 0, 1000);
+    expect(state.holes).toHaveLength(MAX_HOLES);
+    expect(lost).toBe(2);
   });
 });
 

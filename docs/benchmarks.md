@@ -55,6 +55,21 @@ limit in `deploy/mosquitto/mosquitto.conf` removed the loss — runs above repor
 Lesson kept in the config file: QoS 1 is only as reliable as the broker's queue limits, and
 completeness has to be measured, not assumed. Alert on `rate(telemetry_sequence_gaps_total[5m]) > 0`.
 
+## Gap count across replicas
+
+[`deploy/bench/run-gap-check.sh`](../deploy/bench/run-gap-check.sh) starts two ingest replicas (two
+MQTT connections each) on one broker and one database, publishes a burst, and accounts for every
+message: accepted + gaps confirmed + gaps still open + messages lost at the end of a device's run
+must equal what was published ([V1-T01](tasks/v1/V1-T01-sequence-gap-metric-multi-replica.md)).
+
+```bash
+pnpm bench:gaps        # no loss: the gap count must stay at 0
+pnpm bench:gaps:loss   # lossy broker: every lost message counted exactly once
+pnpm bench:gaps:all    # both, one after the other
+```
+
+It builds the ingest image, wipes its own volumes and removes the stack on exit.
+
 ## Not measured yet
 
 - Multiple replicas against one broker (needs more cores than this machine has).

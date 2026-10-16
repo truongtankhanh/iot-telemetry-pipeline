@@ -10,6 +10,7 @@ Object.assign(process.env, {
   OCC_CLIENT_ID: 'telemetry-pipeline',
   OCC_CLIENT_SECRET: 'e2e-secret',
   FLUSH_INTERVAL_MS: '5000', // tests flush explicitly
+  SEQUENCE_GRACE_MS: '0', // a gap counts at once; the grace period is unit-tested
   DELIVERY_INTERVAL_MS: '60000', // tests tick the outbox explicitly
   CONFIG_DIR: `${__dirname}/../config`,
 });

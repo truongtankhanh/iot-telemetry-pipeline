@@ -52,8 +52,9 @@ the repositories, are in [docs/system-context.md](docs/system-context.md).
   rows actually inserted, so duplicates never inflate counts.
 - **Completeness is measured**: per-device sequence numbers expose every lost message as a
   metric. In the first benchmark that metric caught a broker silently dropping 10 % of a burst
-  under default settings — accounting for every one of 5 127 missing messages. (Exact with one
-  consumer, approximate across replicas — [known limitations](docs/operations.md#known-limitations).)
+  under default settings — accounting for every one of 5 127 missing messages. The ledger is kept
+  in PostgreSQL, so the count holds across replicas and connections; a gap is confirmed after a
+  short grace period (`SEQUENCE_GRACE_MS`) so a late message is not mistaken for a lost one.
 - **Alerts that don't flap**: consecutive-breach counts and separate clear thresholds.
 - **Reliable delivery** through a transactional outbox, `SKIP LOCKED` claiming and backoff.
 - **No extensions required**: plain PostgreSQL with daily partitions, retention by `DROP TABLE`,
@@ -98,11 +99,12 @@ Design and trade-offs: [architecture](docs/architecture.md) and seven ADRs —
 ## Run it
 
 ```bash
-docker compose --profile demo up --build
+pnpm docker:demo
 ```
 
 Brings up PostgreSQL, Mosquitto, the ingest service and a simulator running the
-`server-room-overheat` scenario. Then:
+`server-room-overheat` scenario. `pnpm docker:demo:down` removes the ingest and simulator containers
+and leaves PostgreSQL and Mosquitto running; `pnpm docker:down` removes everything. Then:
 
 ```bash
 curl localhost:3100/api/alerts                    # opens ~25 s after start, clears about a minute later
@@ -111,24 +113,36 @@ curl localhost:3100/metrics | grep telemetry_     # throughput, rejections, gaps
 open http://localhost:3100/api/docs               # OpenAPI
 ```
 
+Compose publishes PostgreSQL on `:5433` and Mosquitto on `:1883`. If either is taken on your
+machine (`address already in use`), copy [`.env.example`](.env.example) to `.env`, set
+`POSTGRES_HOST_PORT` / `MQTT_HOST_PORT` there, and use the same ports in the apps' own `.env`. Without the command center, alerts are recorded but not
+delivered (outbox rows `skipped`).
+
 **Together with ops-command-center:** its API requires a token from its Keycloak, which the
 pipeline gets with client credentials ([ADR-0006](docs/adr/0006-client-credentials-to-the-command-center.md)).
 Start the command center (`docker compose up --build` in that repo — console and Keycloak on
 `:18080`), then run ingest on the host so the token's issuer is the same `localhost:18080` the
-command center expects:
+command center expects. `start` runs the built service, so install and build first:
 
 ```bash
-docker compose up -d postgres mosquitto
-DATABASE_URL=postgres://postgres:postgres@localhost:5433/telemetry \
-OCC_API_URL=http://localhost:18080/api \
-OCC_TOKEN_URL=http://localhost:18080/auth/realms/occ/protocol/openid-connect/token \
-OCC_CLIENT_ID=telemetry-pipeline OCC_CLIENT_SECRET=<the client's secret in the occ realm> \
+# One `.env` per place: the root one (Compose ports) and one for each app
+for d in . apps/ingest apps/simulator; do cp -n "$d/.env.example" "$d/.env"; done
+# in apps/ingest/.env: uncomment OCC_* and set OCC_CLIENT_SECRET (the client's secret in the occ realm)
+pnpm install && pnpm build
+pnpm docker:up           # PostgreSQL and Mosquitto only
 pnpm --filter @itp/ingest start
 pnpm --filter @itp/simulator start -- --scenario server-room-overheat
 ```
 
-Alerts appear in its console as incidents, reported by `service-account-telemetry-pipeline`, and
-resolve themselves when values recover.
+Each app has its own README with its settings and commands: [ingest](apps/ingest/README.md),
+[simulator](apps/simulator/README.md). Alerts appear in its console as incidents, reported by
+`service-account-telemetry-pipeline`, and resolve themselves when values recover.
+
+**Several replicas:** `pnpm bench:gaps` starts two ingest replicas on one broker and database,
+publishes a burst and checks that the sequence-gap count stays at zero; `pnpm bench:gaps:loss` does
+the same with a deliberately lossy broker and checks that every lost message is counted once
+([benchmarks](docs/benchmarks.md#gap-count-across-replicas)). It builds an image and uses ports
+`3101`, `3102`, `5434` and `1884`.
 
 **Kubernetes (kind, k3d, minikube):**
 
@@ -165,6 +179,7 @@ docs/            architecture, system context, contract, configuration, API, ope
 | `MQTT_CA_PEM` / `MQTT_CERT_PEM` / `MQTT_KEY_PEM`        | —                       | Mutual TLS from PEM text (AWS IoT Core); cert and key go together                   |
 | `MQTT_CLIENT_ID_PREFIX`                                 | `ingest`                | Client ids are `<prefix>-<instance>-<n>`, so a broker policy can allow `<prefix>-*` |
 | `FLUSH_INTERVAL_MS` / `FLUSH_MAX_READINGS`              | `250` / `1000`          | Batch triggers — bound the loss window on a hard crash                              |
+| `SEQUENCE_GRACE_MS`                                     | `30000`                 | How long a sequence gap stays open before it counts as lost                         |
 | `RETENTION_DAYS`                                        | `30`                    | Raw readings and rollups kept                                                       |
 | `OCC_API_URL`                                           | —                       | ops-command-center API; unset = alerts recorded, not delivered                      |
 | `OCC_TOKEN_URL` / `OCC_CLIENT_ID` / `OCC_CLIENT_SECRET` | —                       | Client credentials for the command center's Keycloak (ADR-0006); all three or none  |
@@ -179,14 +194,16 @@ what is wrong. Every variable, plus the `devices.json` and `rules.json` formats,
 ```bash
 pnpm lint && pnpm typecheck
 pnpm test        # rules engine, sequence gaps, rollups, partitions, backoff, sink, contract, simulator
-pnpm test:e2e    # real PostgreSQL + real Mosquitto + a fake ops-command-center:
+                 # one package only: pnpm test:ingest, test:simulator, test:contract
+pnpm e2e:ingest   # real PostgreSQL + real Mosquitto (pnpm docker:up) + a fake ops-command-center:
                  # storage, duplicates, rejections, alert open/deliver/clear/resolve, gaps, drain on shutdown
 ```
 
 CI runs all of it, validates the Kubernetes manifests with kubeconform, and builds the images.
 
 > The e2e suite recreates the `public` schema of the database in `DATABASE_URL` (default
-> `telemetry_test`). Point it only at a dedicated, disposable database
+> `telemetry_test`). `pnpm e2e:ingest` points it at `telemetry_test` inside the Compose PostgreSQL;
+> with `pnpm test:e2e` directly, point it only at a dedicated, disposable database
 > ([V1-T03](docs/tasks/v1/V1-T03-e2e-wipes-database.md)).
 
 ## Documentation

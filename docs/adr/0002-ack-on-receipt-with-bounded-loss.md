@@ -31,7 +31,7 @@ Option 3, with the loss **bounded and measured**:
   `terminationGracePeriodSeconds` covers it. Planned restarts and rolling deploys lose nothing.
 - Devices include a monotonically increasing `seq`. The service exports
   `telemetry_sequence_gaps_total`, so any loss — in the network, the broker or here — shows up
-  as a number.
+  as a number, counted from a ledger in PostgreSQL so it holds across replicas.
 
 ## Consequences
 

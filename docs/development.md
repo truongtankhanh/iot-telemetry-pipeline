@@ -16,12 +16,17 @@ changes.
 ```bash
 corepack enable
 pnpm install
-docker compose up -d postgres mosquitto      # PostgreSQL on :5433, Mosquitto on :1883
-cp apps/ingest/.env.example apps/ingest/.env
+for d in . apps/ingest apps/simulator; do cp -n "$d/.env.example" "$d/.env"; done
+pnpm docker:up           # PostgreSQL on :5433, Mosquitto on :1883, and a `telemetry_test` database
 ```
 
-`apps/ingest/.env.example` points at PostgreSQL on port 5432; Compose publishes it on **5433**, so
-either edit `DATABASE_URL` in your `.env` to use `localhost:5433`, or run your own PostgreSQL on 5432.
+Three `.env` files, one per place: the root one holds the Compose host ports, `apps/ingest/.env` and
+`apps/simulator/.env` each hold that app's settings (see their READMEs:
+[ingest](../apps/ingest/README.md), [simulator](../apps/simulator/README.md)). The Compose stack is
+shared by both apps and by the e2e suite. `pnpm docker:down` stops it (the data volume is kept) and
+`pnpm docker:restart` does both. If a host port is already taken on your machine (`address already in
+use`), change `POSTGRES_HOST_PORT` / `MQTT_HOST_PORT` in the root `.env` and use the same ports in
+the apps' `.env`.
 
 Run the service and some traffic:
 
@@ -44,7 +49,7 @@ apps/
       app.module.ts       module wiring and the alert-sink factory
       config/             env.validation.ts — every environment variable, validated at boot
       database/           pg Pool wrapper, transactions, migration runner, migrations/*.sql
-      telemetry/          mqtt-consumer, batch-writer, rollup, sequence-tracker, mqtt-options
+      telemetry/          mqtt-consumer, batch-writer, rollup, sequence-ledger, mqtt-options
       rules/              rules-engine (pure), rules.service (state, alert rows, outbox rows)
       delivery/           delivery.worker (outbox), alert-sink, ops-command-center.sink,
                           client-credentials, backoff
@@ -88,23 +93,29 @@ Design choices worth knowing before you edit:
 - **No ORM.** The ingest path is bulk SQL (`unnest` inserts, upserts), so queries are written
   directly against `pg` and migrations are plain, reviewed `.sql` files.
 - **Pure logic is separated and unit-tested**: `evaluate`/`parseRules` (rules), `rollup`,
-  `SequenceTracker`, `nextDelayMs`, partition helpers, `mqttConnectOptions`, `parsePayload`.
+  `applySequences`, `nextDelayMs`, partition helpers, `mqttConnectOptions`, `parsePayload`.
 - **The alert sink is an interface** (`AlertSink`); the factory in `app.module.ts` chooses
   `OpsCommandCenterSink` or `NoopSink` from the environment.
-- **Every flush is one transaction** (insert → rollup → `last_seen`), and rules run after commit
+- **Every flush is one transaction** (insert → rollup → `last_seen` and sequence ledger), and rules run after commit
   on the rows that were actually inserted.
 
 ## Everyday commands
 
-| Command                                                   | What it does                                                                           |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `pnpm build`                                              | Builds every package through Turborepo (contract first)                                |
-| `pnpm lint`                                               | ESLint across workspaces                                                               |
-| `pnpm typecheck`                                          | `tsc --noEmit` across workspaces                                                       |
-| `pnpm format` / `pnpm format:check`                       | Prettier (single quotes, trailing commas, 100 columns) over the whole repo             |
-| `pnpm test`                                               | Unit tests (Jest for ingest, Vitest for the contract, `node --test` for the simulator) |
-| `pnpm test:e2e`                                           | End-to-end suite — see the warning below                                               |
-| `pnpm --filter @itp/simulator bench -- --messages 100000` | End-to-end throughput benchmark ([benchmarks](benchmarks.md))                          |
+| Command                                                   | What it does                                                                                                         |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build`                                              | Builds every package through Turborepo (contract first)                                                              |
+| `pnpm lint`                                               | ESLint across workspaces                                                                                             |
+| `pnpm typecheck`                                          | `tsc --noEmit` across workspaces                                                                                     |
+| `pnpm format` / `pnpm format:check`                       | Prettier (single quotes, trailing commas, 100 columns) over the whole repo                                           |
+| `pnpm test`                                               | Unit tests (Jest for ingest, Vitest for the contract, `node --test` for the simulator)                               |
+| `pnpm test:e2e`                                           | End-to-end suite — see the warning below                                                                             |
+| `pnpm docker:up` / `docker:down` / `docker:restart`       | PostgreSQL and Mosquitto from Compose, shared by development and the e2e suite                                       |
+| `pnpm docker:demo`                                        | The whole demo in containers: also builds the ingest service and starts a simulator (foreground)                     |
+| `pnpm docker:demo:down`                                   | Removes the demo's ingest and simulator containers; PostgreSQL and Mosquitto keep running                            |
+| `pnpm test:ingest` / `test:simulator` / `test:contract`   | Unit tests of one package (builds what it depends on first)                                                          |
+| `pnpm e2e:ingest`                                         | `docker:up`, then the ingest e2e suite against the `telemetry_test` database                                         |
+| `pnpm bench:gaps` / `pnpm bench:gaps:loss` / `…:all`      | Two-replica sequence-gap check, without and with broker loss ([benchmarks](benchmarks.md#gap-count-across-replicas)) |
+| `pnpm --filter @itp/simulator bench -- --messages 100000` | End-to-end throughput benchmark ([benchmarks](benchmarks.md))                                                        |
 
 Turborepo builds the contract package before anything that depends on it, so run `pnpm build` (or
 any of the above) after editing `packages/telemetry-contract`.
@@ -125,7 +136,8 @@ validates the Kubernetes manifests with kubeconform and builds the Compose image
 > ⚠️ **The e2e suite wipes the database it connects to.** It starts with
 > `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` on `DATABASE_URL`. Its default is
 > `postgres://postgres:postgres@localhost:5432/telemetry_test`. Never point it at a database whose
-> data you want to keep — use a dedicated one, as CI does.
+> data you want to keep — use a dedicated one, as CI does. `pnpm e2e:ingest` does this for you: it
+> runs against a separate `telemetry_test` database inside the Compose PostgreSQL.
 
 The e2e run is heavier than unit tests (it starts a Nest application and two MQTT connections and
 runs serially with `--runInBand`). Run it on its own, not alongside builds or watchers.
@@ -190,7 +202,7 @@ of them needs another repository running.
 
 | Repository             | Run locally                                                                                           | Test                                                                     | Needs another repo? |
 | ---------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------- |
-| iot-telemetry-pipeline | `docker compose up -d postgres mosquitto`, then `pnpm --filter @itp/ingest dev`                       | `pnpm test`, `pnpm test:e2e` (fake command center and identity provider) | No                  |
+| iot-telemetry-pipeline | `pnpm docker:up`, then `pnpm --filter @itp/ingest dev`                                                | `pnpm test`, `pnpm test:e2e` (fake command center and identity provider) | No                  |
 | ops-command-center     | `docker compose up --build` (console and Keycloak on `:18080`), or Postgres + Keycloak and `pnpm dev` | `pnpm test`, `pnpm test:e2e` (database name must end in `_test`)         | No                  |
 | platform-aws           | Not runnable locally                                                                                  | `npm test`, `npm run synth` (template assertions)                        | No                  |
 
@@ -215,16 +227,13 @@ center API, its Keycloak and the pipeline's client credentials.
 
 1. **Command center:** in its repository run `docker compose up --build`, and wait until the console
    and Keycloak answer on `http://localhost:18080`.
-2. **Pipeline infrastructure:** here, `docker compose up -d postgres mosquitto`.
+2. **Pipeline infrastructure:** here, `pnpm docker:up`.
 3. **Ingest on the host**, not in a container, so the token's issuer is the same `localhost:18080` the
-   command center expects. Take the `telemetry-pipeline` client's secret from the `occ` realm in
-   Keycloak:
+   command center expects. In `apps/ingest/.env`, uncomment the four `OCC_*` variables and set
+   `OCC_CLIENT_SECRET` to the `telemetry-pipeline` client's secret from the `occ` realm in
+   Keycloak, then:
 
    ```bash
-   DATABASE_URL=postgres://postgres:postgres@localhost:5433/telemetry \
-   OCC_API_URL=http://localhost:18080/api \
-   OCC_TOKEN_URL=http://localhost:18080/auth/realms/occ/protocol/openid-connect/token \
-   OCC_CLIENT_ID=telemetry-pipeline OCC_CLIENT_SECRET=<secret> \
    pnpm --filter @itp/ingest start
    ```
 
@@ -276,7 +285,7 @@ its `npm test` (see the table in [system-context.md](system-context.md#6-changin
 | Symptom                                         | Likely cause                                                                                                                    |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `Invalid environment configuration: …` at start | A variable is missing or malformed; the message lists all of them                                                               |
-| `ECONNREFUSED` to PostgreSQL                    | Compose publishes **5433**, the example `.env` says 5432                                                                        |
+| `ECONNREFUSED` to PostgreSQL                    | The stack is not running (`pnpm docker:up`), or an app's `.env` does not exist yet (see Setup)                                  |
 | `/api/ready` returns 503 with `broker: down`    | Mosquitto not running, or `MQTT_URL` wrong                                                                                      |
 | Messages arrive but nothing is stored           | Check `telemetry_rejections_total` by reason: probably `unknown_device` or `zone_mismatch`                                      |
 | Alerts open but never become incidents          | `OCC_API_URL` unset (outbox rows `skipped`), or see the error table in [operations.md](operations.md#alert-delivery-the-outbox) |

@@ -9,8 +9,8 @@
   ],
   "type": "module",
   "scripts": {
-    "start": "node src/main.ts",
-    "bench": "node src/bench.ts",
+    "start": "node --env-file-if-exists=.env src/main.ts",
+    "bench": "node --env-file-if-exists=.env src/bench.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "node --test src/*.test.ts"

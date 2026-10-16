@@ -29,7 +29,7 @@ EMQX both support it.
 - Scaling is `kubectl scale` (or the HPA); no reconfiguration.
 - A device's messages may land on different replicas, so **nothing may rely on per-device
   in-memory state being complete**. Writes are idempotent; the rules engine rebuilds state from
-  the database on a cache miss (ADR-0004); sequence-gap tracking is approximate across replicas
-  and documented as such.
+  the database on a cache miss (ADR-0004); sequence gaps are counted from a per-device ledger
+  in PostgreSQL, updated in the flush transaction, so they are exact across replicas.
 - No replay: once acknowledged, a message is gone from the broker. If replay becomes a
   requirement (reprocessing history through new rules), revisit option 4.

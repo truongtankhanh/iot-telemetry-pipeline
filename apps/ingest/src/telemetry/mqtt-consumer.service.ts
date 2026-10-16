@@ -21,7 +21,6 @@ import { acceptedWindow } from '../maintenance/partitions';
 import { BatchWriter } from './batch-writer.service';
 import type { Reading } from './rollup';
 import { mqttConnectOptions } from './mqtt-options';
-import { SequenceTracker } from './sequence-tracker';
 
 /** Readings may be at most this far in the future (device clock skew). */
 const MAX_CLOCK_SKEW_MS = 5 * 60_000;
@@ -33,7 +32,6 @@ const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 @Injectable()
 export class MqttConsumer implements OnApplicationBootstrap, BeforeApplicationShutdown {
   private readonly logger = new Logger(MqttConsumer.name);
-  private readonly sequences = new SequenceTracker();
   private clients: MqttClient[] = [];
 
   constructor(
@@ -101,12 +99,11 @@ export class MqttConsumer implements OnApplicationBootstrap, BeforeApplicationSh
     if (!parsed.ok) return reject(parsed.reason);
     const { seq, ts, metrics } = parsed.value;
 
-    // Counted as soon as the message is attributable to a device: a message rejected below was
-    // received, not lost, so it must not show up as a gap.
-    const gaps = this.sequences.observe(device.id, seq);
-    if (gaps > 0) this.metrics.sequenceGaps.inc(gaps);
-
+    // Recorded as soon as the message is attributable to a device: a message rejected below was
+    // received, not lost, so it must not show up as a gap. The writer counts the gaps (V1-T01).
     const time = new Date(ts);
+    this.writer.observe(device.id, seq, time.getTime());
+
     const now = Date.now();
     if (time.getTime() > now + MAX_CLOCK_SKEW_MS) return reject('future');
     const retention = this.config.get('RETENTION_DAYS', { infer: true });

@@ -231,11 +231,13 @@ than discovered. Items 1 and 3 are tracked as
 2. **Pipeline incidents cannot be told apart from manual ones.** They use ordinary facilities types;
    only the reporter (`service-account-telemetry-pipeline`) distinguishes them. Tracked as
    [ITP-15](roadmap.md).
-3. **Sequence-gap metric versus multiple replicas.** `telemetry_sequence_gaps_total` is exact only
-   when one process sees every message of a device. With several replicas or connections in a shared
-   group it over-counts (see [operations.md](operations.md#known-limitations)), while platform-aws
-   alarms on any increase. Expect the alarm to need a different signal before it can be trusted at
-   more than one task.
+3. **Sequence-gap metric versus multiple replicas — resolved in the pipeline.**
+   `telemetry_sequence_gaps_total` is now counted from a per-device ledger in PostgreSQL, so it
+   holds across replicas and connections (see [operations.md](operations.md#known-limitations)).
+   The metric keeps its name and meaning (a counter that rises when a message is confirmed lost),
+   so the platform-aws `SequenceGaps` alarm on any increase needs no change; it only sees a gap
+   `SEQUENCE_GRACE_MS` later (30 s by default). To verify in platform-aws: its alarm period is
+   longer than that delay.
 4. **Dashboards and alert rules as code** are not shipped ([ITP-12](roadmap.md)); on AWS the signals
    go to CloudWatch, on premises nothing is provisioned.
 5. **Device provisioning is manual** ([ITP-17](roadmap.md)): a new device is added to `devices.json`

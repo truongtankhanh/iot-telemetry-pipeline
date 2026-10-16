@@ -227,7 +227,13 @@ describe('Telemetry pipeline (e2e)', () => {
   it('measures gaps from sequence numbers', async () => {
     await publish(10, at(30), { temperature_c: 23, humidity_pct: 45 }); // 7, 8, 9 missing
     await until(received, (n) => n >= 11);
+    await writer.flush();
     expect(await counter('sequenceGaps')).toBe(3);
+    // The ledger is in the database, so every replica counts from the same state.
+    const { rows } = await db.query(
+      `SELECT last_seq, seq_holes FROM device WHERE id = 'dc-env-01'`,
+    );
+    expect(rows).toEqual([{ last_seq: '10', seq_holes: [] }]);
   });
 
   it('serves raw readings and per-minute rollups over HTTP', async () => {

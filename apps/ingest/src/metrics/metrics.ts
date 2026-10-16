@@ -32,7 +32,7 @@ export class Metrics {
 
   readonly sequenceGaps = new Counter({
     name: 'telemetry_sequence_gaps_total',
-    help: 'Messages missing according to per-device sequence numbers (approximate across replicas)',
+    help: 'Messages confirmed missing from per-device sequence numbers, across all replicas',
     registers: [this.registry],
   });
 

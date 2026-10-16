@@ -68,14 +68,18 @@ A metric must be both **known to the contract** (table above) and **listed for t
 `seq` is how the pipeline measures completeness.
 
 - Keep a counter **per device**, start it at 0 or 1 and add 1 for every message.
-- Persist it across reboots if you can. If the counter restarts at `0`, or falls back by more than
-  1 000, the service treats it as a device restart and starts counting from the new value without
-  reporting a gap.
-- A small step backwards is treated as a redelivery and ignored.
-- A jump forwards by _n_ is counted as _n − 1_ missing messages in `telemetry_sequence_gaps_total`.
+- Persist it across reboots if you can. A message whose `seq` is lower than the highest seen, that
+  fills no open gap, **and whose `ts` is newer than the message that carried that highest `seq`**
+  is a device restart: the service counts on from the new value without reporting a gap, and
+  closes the gaps still open for the previous run as lost. The size of the step back does not
+  matter. A device that restarts must therefore keep a `ts` that moves forward.
+- Any other step backwards (an older `ts`) is a redelivery, or a late message that fills an open gap.
+- A jump forwards by _n_ opens a gap of _n − 1_ messages. A gap still open after
+  `SEQUENCE_GRACE_MS` (30 s by default) is counted once in `telemetry_sequence_gaps_total`; a
+  message that arrives before then, out of order, closes it without being counted.
 
-Gaps are counted per process. The count is reliable with a single ingest process and approximate
-with several; see [operations.md](operations.md#known-limitations).
+Gaps are counted from a ledger in PostgreSQL, so the count does not depend on how many ingest
+processes share the subscription; see [operations.md](operations.md#known-limitations).
 
 ## 5. Timestamps and late data
 

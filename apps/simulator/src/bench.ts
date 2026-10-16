@@ -17,7 +17,7 @@ const { values } = parseArgs({
     broker: { type: 'string', default: process.env.MQTT_URL ?? 'mqtt://localhost:1883' },
     database: {
       type: 'string',
-      default: process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/telemetry',
+      default: process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/telemetry',
     },
     registry: {
       type: 'string',

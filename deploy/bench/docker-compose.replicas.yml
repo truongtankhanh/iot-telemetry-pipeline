@@ -1,0 +1,55 @@
+# Two ingest replicas on one broker and one database, to check the sequence-gap count across
+# replicas (V1-T01). Not part of the demo stack: run it through deploy/bench/run-gap-check.sh.
+# Host ports differ from the main stack's, so both can run side by side.
+name: itp-bench
+
+x-ingest: &ingest
+  build:
+    context: ../..
+    dockerfile: apps/ingest/Dockerfile
+  environment:
+    DATABASE_URL: postgres://postgres:postgres@postgres:5432/telemetry
+    MQTT_URL: mqtt://mosquitto:1883
+    # Several connections per replica, as on AWS: the other source of reordering.
+    MQTT_CONNECTIONS: '2'
+    # Shorter than the default; still well above the flush lag of a 15 000 messages/s burst.
+    SEQUENCE_GRACE_MS: '10000'
+  depends_on:
+    postgres:
+      condition: service_healthy
+    mosquitto:
+      condition: service_started
+  stop_grace_period: 30s
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: telemetry
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d telemetry']
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    ports:
+      - '5434:5432'
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    volumes:
+      # `ok` uses the repository's broker config; `loss` swaps in mosquitto-lossy.conf.
+      - ${MOSQUITTO_CONF:-../mosquitto/mosquitto.conf}:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - '1884:1883'
+
+  ingest-1:
+    <<: *ingest
+    ports:
+      - '3101:3100'
+
+  ingest-2:
+    <<: *ingest
+    ports:
+      - '3102:3100'
