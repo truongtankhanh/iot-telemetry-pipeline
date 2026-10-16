@@ -106,14 +106,17 @@ docs/            architecture, ADRs, benchmarks, roadmap
 
 ## Configuration
 
-| Variable                                   | Default                 | Purpose                                                        |
-| ------------------------------------------ | ----------------------- | -------------------------------------------------------------- |
-| `DATABASE_URL`                             | —                       | PostgreSQL 14+                                                 |
-| `MQTT_URL`                                 | `mqtt://localhost:1883` | Broker                                                         |
-| `MQTT_SHARE_GROUP`                         | `ingest`                | Shared-subscription group; empty disables sharing              |
-| `FLUSH_INTERVAL_MS` / `FLUSH_MAX_READINGS` | `250` / `1000`          | Batch triggers — bound the loss window on a hard crash         |
-| `RETENTION_DAYS`                           | `30`                    | Raw readings and rollups kept                                  |
-| `OCC_API_URL`                              | —                       | ops-command-center API; unset = alerts recorded, not delivered |
+| Variable                                         | Default                 | Purpose                                                                             |
+| ------------------------------------------------ | ----------------------- | ----------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                   | —                       | PostgreSQL 14+                                                                      |
+| `MQTT_URL`                                       | `mqtt://localhost:1883` | Broker                                                                              |
+| `MQTT_SHARE_GROUP`                               | `ingest`                | Shared-subscription group; empty disables sharing                                   |
+| `MQTT_CONNECTIONS`                               | `1`                     | Connections per replica in the group — for brokers that cap delivery per connection |
+| `MQTT_CA_PEM` / `MQTT_CERT_PEM` / `MQTT_KEY_PEM` | —                       | Mutual TLS from PEM text (AWS IoT Core); cert and key go together                   |
+| `MQTT_CLIENT_ID_PREFIX`                          | `ingest`                | Client ids are `<prefix>-<instance>-<n>`, so a broker policy can allow `<prefix>-*` |
+| `FLUSH_INTERVAL_MS` / `FLUSH_MAX_READINGS`       | `250` / `1000`          | Batch triggers — bound the loss window on a hard crash                              |
+| `RETENTION_DAYS`                                 | `30`                    | Raw readings and rollups kept                                                       |
+| `OCC_API_URL`                                    | —                       | ops-command-center API; unset = alerts recorded, not delivered                      |
 
 Invalid configuration stops the service at startup with a list of what is wrong.
 

@@ -9,6 +9,7 @@ import {
   Min,
   validateSync,
 } from 'class-validator';
+import { tlsSettingsProblems } from '../telemetry/mqtt-options';
 
 const toBoolean = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? ['true', '1', 'yes'].includes(value.toLowerCase()) : value;
@@ -42,6 +43,36 @@ export class Env {
   @IsOptional()
   @IsString()
   MQTT_PASSWORD?: string;
+
+  /** Client ids are `<prefix>-<instance>-<n>`; a broker policy can allow exactly `<prefix>-*`. */
+  @IsString()
+  MQTT_CLIENT_ID_PREFIX = 'ingest';
+
+  /**
+   * Connections this process opens into the shared-subscription group. Brokers that cap delivery
+   * per connection (AWS IoT Core: 100 messages/s by default) are scaled past the cap this way.
+   */
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(32)
+  MQTT_CONNECTIONS = 1;
+
+  /** Mutual TLS, as PEM text (real newlines or `\n`). Required by AWS IoT Core. */
+  @Transform(emptyToUndefined)
+  @IsOptional()
+  @IsString()
+  MQTT_CA_PEM?: string;
+
+  @Transform(emptyToUndefined)
+  @IsOptional()
+  @IsString()
+  MQTT_CERT_PEM?: string;
+
+  @Transform(emptyToUndefined)
+  @IsOptional()
+  @IsString()
+  MQTT_KEY_PEM?: string;
 
   /** Flush the write buffer at least this often (ms). Bounds the loss window — ADR-0002. */
   @Type(() => Number)
@@ -86,10 +117,12 @@ export class Env {
 export function validateEnv(raw: Record<string, unknown>): Env {
   const env = plainToInstance(Env, raw);
   const errors = validateSync(env);
-  if (errors.length > 0) {
-    const details = errors
-      .map((e) => `  - ${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`)
-      .join('\n');
+  const problems = [
+    ...errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`),
+    ...tlsSettingsProblems(env),
+  ];
+  if (problems.length > 0) {
+    const details = problems.map((p) => `  - ${p}`).join('\n');
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
   return env;

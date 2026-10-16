@@ -17,13 +17,14 @@
 
 ## M2 — Operate it
 
-| #      | Ticket                                                                                |
-| ------ | ------------------------------------------------------------------------------------- |
-| ITP-11 | Backpressure: stop reading from the broker when the write buffer passes a ceiling     |
-| ITP-12 | Grafana dashboard and alert rules (gaps, lag, flush time, outbox age) shipped as code |
-| ITP-13 | Multi-replica benchmark on a real cluster                                             |
-| ITP-14 | Idempotency key on incident creation (needs ops-command-center support)               |
-| ITP-15 | Mark telemetry-raised incidents with their own source in ops-command-center           |
+| #      | Ticket                                                                                    |
+| ------ | ----------------------------------------------------------------------------------------- |
+| ITP-11 | Backpressure: stop reading from the broker when the write buffer passes a ceiling         |
+| ITP-12 | Grafana dashboard and alert rules (gaps, lag, flush time, outbox age) shipped as code     |
+| ITP-13 | Multi-replica benchmark on a real cluster                                                 |
+| ITP-14 | Idempotency key on incident creation (needs ops-command-center support)                   |
+| ITP-15 | Mark telemetry-raised incidents with their own source in ops-command-center               |
+| ITP-19 | ✅ Run against AWS IoT Core: mutual TLS from PEM secrets, several connections per replica |
 
 ## M3 — Scale and history
 

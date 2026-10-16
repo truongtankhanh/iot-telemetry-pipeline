@@ -97,6 +97,10 @@ per device: the shared subscription is keyed per message, not per device, so the
 rebuilds a device's state from the database when it sees a device it has no state for
 ([ADR-0004](adr/0004-rules-with-hysteresis.md)).
 
+Some managed brokers cap delivery per connection — AWS IoT Core's default is 100 messages/s per
+connection — so a replica can open several connections into the same group (`MQTT_CONNECTIONS`).
+The deployment on AWS is described in [platform-aws](https://github.com/truongtankhanh/platform-aws).
+
 ## 7. Decisions
 
 | ADR                                                       | Decision                                                                                |

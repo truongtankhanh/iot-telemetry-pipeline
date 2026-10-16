@@ -4,6 +4,7 @@ process.env.DATABASE_URL ??= 'postgres://postgres:postgres@localhost:5432/teleme
 process.env.MQTT_URL ??= 'mqtt://localhost:1883';
 Object.assign(process.env, {
   MQTT_SHARE_GROUP: 'ingest-e2e',
+  MQTT_CONNECTIONS: '2', // exercises several connections in one shared group
   OCC_API_URL: 'http://127.0.0.1:3199/api', // the fake command center started by the test
   FLUSH_INTERVAL_MS: '5000', // tests flush explicitly
   DELIVERY_INTERVAL_MS: '60000', // tests tick the outbox explicitly

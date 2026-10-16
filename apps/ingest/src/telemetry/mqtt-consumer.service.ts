@@ -20,6 +20,7 @@ import { Metrics } from '../metrics/metrics';
 import { acceptedWindow } from '../maintenance/partitions';
 import { BatchWriter } from './batch-writer.service';
 import type { Reading } from './rollup';
+import { mqttConnectOptions } from './mqtt-options';
 import { SequenceTracker } from './sequence-tracker';
 
 /** Readings may be at most this far in the future (device clock skew). */
@@ -33,8 +34,7 @@ const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 export class MqttConsumer implements OnApplicationBootstrap, BeforeApplicationShutdown {
   private readonly logger = new Logger(MqttConsumer.name);
   private readonly sequences = new SequenceTracker();
-  private client?: MqttClient;
-  private connected = false;
+  private clients: MqttClient[] = [];
 
   constructor(
     private readonly config: ConfigService<Env, true>,
@@ -43,40 +43,44 @@ export class MqttConsumer implements OnApplicationBootstrap, BeforeApplicationSh
     private readonly metrics: Metrics,
   ) {}
 
+  /** Ready while at least one connection is up: the group keeps delivering to the others. */
   get isConnected(): boolean {
-    return this.connected;
+    return this.clients.some((client) => client.connected);
   }
 
   async onApplicationBootstrap(): Promise<void> {
     const group = this.config.get('MQTT_SHARE_GROUP', { infer: true }) || undefined;
     const filter = withShareGroup(TELEMETRY_FILTER, group);
+    const url = this.config.get('MQTT_URL', { infer: true });
+    const count = this.config.get('MQTT_CONNECTIONS', { infer: true });
+    const settings = {
+      MQTT_CLIENT_ID_PREFIX: this.config.get('MQTT_CLIENT_ID_PREFIX', { infer: true }),
+      MQTT_USERNAME: this.config.get('MQTT_USERNAME', { infer: true }),
+      MQTT_PASSWORD: this.config.get('MQTT_PASSWORD', { infer: true }),
+      MQTT_CA_PEM: this.config.get('MQTT_CA_PEM', { infer: true }),
+      MQTT_CERT_PEM: this.config.get('MQTT_CERT_PEM', { infer: true }),
+      MQTT_KEY_PEM: this.config.get('MQTT_KEY_PEM', { infer: true }),
+    };
+    const instance = `${hostname()}-${process.pid}`;
 
-    this.client = connect(this.config.get('MQTT_URL', { infer: true }), {
-      protocolVersion: 5,
-      clientId: `ingest-${hostname()}-${process.pid}`,
-      clean: true,
-      reconnectPeriod: 2000,
-      username: this.config.get('MQTT_USERNAME', { infer: true }),
-      password: this.config.get('MQTT_PASSWORD', { infer: true }),
-    });
-
-    this.client.on('connect', () => {
-      this.connected = true;
-      // Subscribing on every (re)connect: with a clean session the broker forgets subscriptions.
-      this.client!.subscribe(filter, { qos: 1 }, (error) => {
-        if (error) this.logger.error(`Subscribe to ${filter} failed: ${error.message}`);
-        else this.logger.log(`Subscribed to ${filter}`);
+    for (let index = 0; index < count; index++) {
+      const client = connect(url, mqttConnectOptions(settings, index, instance));
+      client.on('connect', () => {
+        // Subscribing on every (re)connect: with a clean session the broker forgets subscriptions.
+        client.subscribe(filter, { qos: 1 }, (error) => {
+          if (error) this.logger.error(`Subscribe to ${filter} failed: ${error.message}`);
+          else this.logger.log(`Connection ${index} subscribed to ${filter}`);
+        });
       });
-    });
-    this.client.on('close', () => (this.connected = false));
-    this.client.on('error', (error) => this.logger.warn(`MQTT: ${error.message}`));
-    this.client.on('message', (topic, payload) => this.handle(topic, payload));
+      client.on('error', (error) => this.logger.warn(`MQTT[${index}]: ${error.message}`));
+      client.on('message', (topic, payload) => this.handle(topic, payload));
+      this.clients.push(client);
+    }
   }
 
-  /** Stop consuming, then drain the buffer before the database pool closes (ADR-0002). */
+  /** Stop consuming on every connection, then drain the buffer (ADR-0002). */
   async beforeApplicationShutdown(): Promise<void> {
-    await this.client?.endAsync();
-    this.connected = false;
+    await Promise.all(this.clients.map((client) => client.endAsync()));
     await this.writer.flush();
   }
 
