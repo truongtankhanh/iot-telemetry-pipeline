@@ -26,15 +26,38 @@ interface Call {
   method: string;
   url: string;
   body: Record<string, unknown> | null;
+  headers: IncomingMessage['headers'];
 }
+
+/**
+ * Stands in for ops-command-center and its identity provider: issues a token for the pipeline's
+ * client credentials and refuses API calls without it, as the real API does (its ADR-0010).
+ */
 
 function fakeCommandCenter(): Promise<{ server: Server; calls: Call[] }> {
   const calls: Call[] = [];
   const server = createServer(async (req: IncomingMessage, res) => {
     let raw = '';
     for await (const chunk of req) raw += chunk;
-    calls.push({ method: req.method!, url: req.url!, body: raw ? JSON.parse(raw) : null });
     res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/token') {
+      const form = new URLSearchParams(raw);
+      const valid =
+        form.get('grant_type') === 'client_credentials' &&
+        form.get('client_id') === 'telemetry-pipeline' &&
+        form.get('client_secret') === 'e2e-secret';
+      if (!valid) return res.writeHead(401).end(JSON.stringify({ error: 'invalid_client' }));
+      return res.end(JSON.stringify({ access_token: 'e2e-token', expires_in: 300 }));
+    }
+    calls.push({
+      method: req.method!,
+      url: req.url!,
+      body: raw ? JSON.parse(raw) : null,
+      headers: req.headers,
+    });
+    if (req.headers.authorization !== 'Bearer e2e-token') {
+      return res.writeHead(401).end(JSON.stringify({ statusCode: 401 }));
+    }
     if (req.url === '/api/zones')
       return res.end(JSON.stringify([{ id: 'zone-dc', code: 'BLD-DC' }]));
     if (req.url === '/api/incidents')
@@ -172,7 +195,10 @@ describe('Telemetry pipeline (e2e)', () => {
       title: 'Server room temperature high',
       zoneId: 'zone-dc',
     });
-    const alert = await db.query(`SELECT external_ref FROM alert`);
+    // Authenticated with the client-credentials token, and idempotent per alert.
+    expect(create?.headers.authorization).toBe('Bearer e2e-token');
+    const alert = await db.query(`SELECT id, external_ref FROM alert`);
+    expect(create?.headers['idempotency-key']).toBe(`telemetry-alert-${alert.rows[0].id}`);
     expect(alert.rows[0].external_ref).toBe('incident-1');
   });
 

@@ -34,7 +34,7 @@
       "clear": 1000,
       "for": 3,
       "severity": "medium",
-      "incidentType": "crowding",
+      "incidentType": "hvac_fault",
       "title": "Poor air quality (CO₂)"
     },
     {

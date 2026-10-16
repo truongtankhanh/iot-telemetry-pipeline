@@ -100,6 +100,25 @@ export class Env {
   @IsUrl({ require_tld: false })
   OCC_API_URL?: string;
 
+  /**
+   * Client credentials for the command center's identity provider (ADR-0006): all three or none.
+   * Without them, requests carry no token — enough for a command center without sign-in.
+   */
+  @Transform(emptyToUndefined)
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  OCC_TOKEN_URL?: string;
+
+  @Transform(emptyToUndefined)
+  @IsOptional()
+  @IsString()
+  OCC_CLIENT_ID?: string;
+
+  @Transform(emptyToUndefined)
+  @IsOptional()
+  @IsString()
+  OCC_CLIENT_SECRET?: string;
+
   @Type(() => Number)
   @IsInt()
   @Min(100)
@@ -120,10 +139,21 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   const problems = [
     ...errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`),
     ...tlsSettingsProblems(env),
+    ...occCredentialProblems(env),
   ];
   if (problems.length > 0) {
     const details = problems.map((p) => `  - ${p}`).join('\n');
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
   return env;
+}
+
+function occCredentialProblems(env: Env): string[] {
+  const set = [env.OCC_TOKEN_URL, env.OCC_CLIENT_ID, env.OCC_CLIENT_SECRET].filter(Boolean).length;
+  if (set !== 0 && set !== 3) {
+    return ['OCC_TOKEN_URL, OCC_CLIENT_ID and OCC_CLIENT_SECRET must be set together'];
+  }
+  if (set === 3 && !env.OCC_API_URL)
+    return ['OCC client credentials are set but OCC_API_URL is not'];
+  return [];
 }

@@ -6,6 +6,9 @@ Object.assign(process.env, {
   MQTT_SHARE_GROUP: 'ingest-e2e',
   MQTT_CONNECTIONS: '2', // exercises several connections in one shared group
   OCC_API_URL: 'http://127.0.0.1:3199/api', // the fake command center started by the test
+  OCC_TOKEN_URL: 'http://127.0.0.1:3199/token', // …and its identity provider
+  OCC_CLIENT_ID: 'telemetry-pipeline',
+  OCC_CLIENT_SECRET: 'e2e-secret',
   FLUSH_INTERVAL_MS: '5000', // tests flush explicitly
   DELIVERY_INTERVAL_MS: '60000', // tests tick the outbox explicitly
   CONFIG_DIR: `${__dirname}/../config`,

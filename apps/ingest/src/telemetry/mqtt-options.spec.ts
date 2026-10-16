@@ -63,3 +63,32 @@ describe('TLS settings validation', () => {
     expect(env.MQTT_CERT_PEM).toBeUndefined();
   });
 });
+
+describe('command center credentials', () => {
+  it('must be complete, and need the API they are for', () => {
+    expect(() =>
+      validateEnv({
+        DATABASE_URL: 'postgres://x',
+        OCC_API_URL: 'http://occ/api',
+        OCC_CLIENT_ID: 'c',
+      }),
+    ).toThrow(/must be set together/);
+    expect(() =>
+      validateEnv({
+        DATABASE_URL: 'postgres://x',
+        OCC_TOKEN_URL: 'http://idp/token',
+        OCC_CLIENT_ID: 'c',
+        OCC_CLIENT_SECRET: 's',
+      }),
+    ).toThrow(/OCC_API_URL is not/);
+    expect(
+      validateEnv({
+        DATABASE_URL: 'postgres://x',
+        OCC_API_URL: 'http://occ/api',
+        OCC_TOKEN_URL: 'http://idp/token',
+        OCC_CLIENT_ID: 'c',
+        OCC_CLIENT_SECRET: 's',
+      }).OCC_CLIENT_ID,
+    ).toBe('c');
+  });
+});

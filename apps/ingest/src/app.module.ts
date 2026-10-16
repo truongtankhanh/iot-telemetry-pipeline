@@ -5,6 +5,7 @@ import { type Env, validateEnv } from './config/env.validation';
 import { Database } from './database/database';
 import { ALERT_SINK } from './delivery/alert-sink';
 import { DeliveryWorker } from './delivery/delivery.worker';
+import { ClientCredentials } from './delivery/client-credentials';
 import { NoopSink, OpsCommandCenterSink } from './delivery/ops-command-center.sink';
 import { DevicesController } from './devices/devices.controller';
 import { DevicesService } from './devices/devices.service';
@@ -46,7 +47,16 @@ export class MaintenanceModule {}
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => {
         const url = config.get('OCC_API_URL', { infer: true });
-        return url ? new OpsCommandCenterSink(url) : new NoopSink();
+        if (!url) return new NoopSink();
+        const tokenUrl = config.get('OCC_TOKEN_URL', { infer: true });
+        const tokens = tokenUrl
+          ? new ClientCredentials(
+              tokenUrl,
+              config.get('OCC_CLIENT_ID', { infer: true })!,
+              config.get('OCC_CLIENT_SECRET', { infer: true })!,
+            )
+          : undefined;
+        return new OpsCommandCenterSink(url, fetch, tokens);
       },
     },
   ],

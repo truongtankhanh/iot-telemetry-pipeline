@@ -1,6 +1,6 @@
 # Whole pipeline:  docker compose up --build
 # With demo traffic:  docker compose --profile demo up --build
-# Deliver alerts to a running ops-command-center:  OCC_API_URL=http://host.docker.internal:3000/api docker compose up
+# Delivering alerts to ops-command-center needs its Keycloak token: see the README.
 name: iot-telemetry-pipeline
 
 services:
@@ -35,6 +35,9 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/telemetry
       MQTT_URL: mqtt://mosquitto:1883
       OCC_API_URL: ${OCC_API_URL:-}
+      OCC_TOKEN_URL: ${OCC_TOKEN_URL:-}
+      OCC_CLIENT_ID: ${OCC_CLIENT_ID:-}
+      OCC_CLIENT_SECRET: ${OCC_CLIENT_SECRET:-}
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     depends_on:
