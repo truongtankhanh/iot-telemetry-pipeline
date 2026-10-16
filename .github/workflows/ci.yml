@@ -9,9 +9,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# CI can be switched off for the repository with the Actions variable CI_ENABLED=false
+# (`pnpm ci:off`, back with `pnpm ci:on`). Unset or any other value means it runs. A skipped job
+# counts as passed for a required check; `pnpm ci:local` runs the same steps on this machine.
 jobs:
   verify:
     name: Lint, typecheck, unit + e2e tests, build
+    if: ${{ vars.CI_ENABLED != 'false' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -50,6 +54,7 @@ jobs:
 
   manifests:
     name: Kubernetes manifests
+    if: ${{ vars.CI_ENABLED != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +69,7 @@ jobs:
 
   images:
     name: Docker images
+    if: ${{ vars.CI_ENABLED != 'false' }}
     runs-on: ubuntu-latest
     needs: verify
     steps:

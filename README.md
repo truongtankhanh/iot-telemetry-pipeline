@@ -201,6 +201,7 @@ pnpm e2e:ingest   # real PostgreSQL + real Mosquitto (pnpm docker:up) + a fake o
 ```
 
 CI runs all of it, validates the Kubernetes manifests with kubeconform, and builds the images.
+`pnpm ci:local` runs the same steps on your machine ([docs/development.md](docs/development.md#running-ci-on-your-machine)).
 
 > The e2e suite recreates the `public` schema of `TEST_DATABASE_URL` (default `telemetry_test`), never
 > of `DATABASE_URL`, and refuses to run unless the database name ends in `_test`. `pnpm e2e:ingest`

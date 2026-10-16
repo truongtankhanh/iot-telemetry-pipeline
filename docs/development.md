@@ -123,6 +123,82 @@ any of the above) after editing `packages/telemetry-contract`.
 CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck, unit tests, e2e and build, then
 validates the Kubernetes manifests with kubeconform and builds the Compose images.
 
+### Running CI on your machine
+
+`pnpm ci:local` runs the steps of `ci.yml` locally, in the same order, so a pull request does not
+have to wait for GitHub's runners. `scripts/ci-local.sh` is the source; when the workflow changes,
+change the script in the same pull request.
+
+```bash
+pnpm ci:local --fast          # format, lint, typecheck and unit tests only (Node and pnpm are enough)
+pnpm ci:local --skip-images   # everything except the image build (needs Docker for e2e)
+pnpm ci:local                 # the whole workflow: verify, manifests, images
+```
+
+| Option                                            | Effect                                                          |
+| ------------------------------------------------- | --------------------------------------------------------------- |
+| `--fast`                                          | No install, e2e, build, manifests or images                     |
+| `--only verify` / `manifests` / `images`          | One job                                                         |
+| `--skip-e2e`, `--skip-manifests`, `--skip-images` | Leave one part out                                              |
+| `--no-install`                                    | Skip `pnpm install --frozen-lockfile`                           |
+| `--jobs N`                                        | Turbo concurrency and Jest workers (default 2)                  |
+| `--keep-going`                                    | Run every step after a failure                                  |
+| `--keep`                                          | Leave the throwaway PostgreSQL and Mosquitto containers running |
+| `--fresh`                                         | Ignore Turborepo's cache (`--force`), as on a GitHub runner     |
+| `--clean`                                         | Afterwards delete `.turbo/cache` and the images the run built   |
+
+It ends with a table of every step, its time, the commit tested and whether the working tree was
+clean. What differs from GitHub, on purpose:
+
+- **e2e** runs against its own throwaway containers (`itp-ci-local-pg` on port 55433 with
+  `telemetry_test`, and `itp-ci-local-mqtt` on port 51883, the repository's `mosquitto.conf`),
+  through `TEST_DATABASE_URL` and `MQTT_URL`. It never touches the Compose stack of `pnpm docker:up`.
+  Set `CI_LOCAL_PG_PORT` / `CI_LOCAL_MQTT_PORT` if a port is taken; the suite's fake command center
+  always listens on 3199.
+- **Unit tests** run the ingest package with `--maxWorkers` set to `--jobs`, then the other
+  packages (only Jest accepts that flag).
+- **Manifests** need `kustomize` and `kubeconform` on the PATH (`brew install kustomize kubeconform`).
+  Without them the step is reported as `SKIP`, never as a pass, and the summary says so.
+- **Images** only build (`docker compose --profile demo build`), as in CI; nothing is started.
+
+Turborepo's cache (`.turbo/`, git-ignored) makes a repeat run fast: unchanged lint, typecheck, test
+and build steps say `cache hit`. GitHub's runner starts with no cache, so use `--fresh` for the last
+run before a merge. The e2e step is the heavy one; run it on its own, like `pnpm e2e:ingest`.
+
+**What a run leaves on your machine.** The throwaway PostgreSQL and Mosquitto containers and the
+script's temporary log folder are always removed (the logs are kept after a failure). The images
+are **kept** by default: `iot-telemetry-pipeline-ingest` and `-simulator` (about 600 MB together,
+the same ones `pnpm docker:demo` uses, so the next build is fast), plus the `postgres:17-alpine`
+and `eclipse-mosquitto:2.0.18` images that `pnpm docker:up` uses too. `--clean` removes the two
+images the run built and `.turbo/cache`; it never touches PostgreSQL, Mosquitto or the containers
+of `pnpm docker:up`. Older builds of the same images turn into dangling layers: `docker image prune`
+removes them, and `docker builder prune` clears Docker's build cache.
+
+### Switching GitHub's CI off and on
+
+All three jobs of `ci.yml` carry `if: ${{ vars.CI_ENABLED != 'false' }}`. The repository variable
+`CI_ENABLED` is the switch; unset means CI runs.
+
+```bash
+pnpm ci:off      # CI_ENABLED=false: every job of ci.yml is skipped
+pnpm ci:on       # CI_ENABLED=true
+pnpm ci:status
+```
+
+`scripts/ci-toggle.sh` sets the variable with the GitHub CLI (`brew install gh && gh auth login`)
+or, without it, with the REST API and `GH_TOKEN` / `GITHUB_TOKEN` (a token that may edit Actions
+variables). With neither it prints where to set it by hand: **Settings → Secrets and variables →
+Actions → Variables → `CI_ENABLED`**.
+
+- **The switch works only where the workflow file has the `if`.** A pull request runs the workflow
+  as it is on its own branch, so a branch cut before that change must merge or rebase `main` first.
+- **A skipped job counts as passed for a required status check**, so branch protection does not
+  block a merge while CI is off. Run `pnpm ci:local` (at least `--skip-images`) before merging, and
+  turn CI back on afterwards.
+- **Only `ci.yml` is switched.** The two scheduled contract workflows (`occ-contract.yml`,
+  `platform-aws-contract.yml`) keep running at their own times.
+- For one push only, put `[skip ci]` in the commit message; no variable is involved.
+
 ### Tests
 
 - **Unit** — `*.spec.ts` next to the code in `apps/ingest/src`; Vitest `*.test.ts` in the contract;
