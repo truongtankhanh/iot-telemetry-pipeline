@@ -27,6 +27,9 @@ maintain partitions, serve the API. There is no separate worker to deploy.
 Readiness does not stop a pod consuming from the broker: the MQTT subscription is independent of
 Kubernetes' view of the pod. It protects the API's callers, not the data path.
 
+`/api/ready` also reports `alertSink`. It does not affect readiness; `none` means no command center is
+configured, so alerts are recorded and marked `skipped`, never delivered.
+
 ## Metrics
 
 Served at `/metrics` (Prometheus text). Label values are small fixed sets, never device ids, so
@@ -85,7 +88,8 @@ Standard NestJS logging to stdout. The lines worth knowing:
 | `BatchWriter`                 | `Dropped N readings: …` (error)                                                                                                                                                        | **Readings were lost**                                                            |
 | `RulesService`                | `Rule evaluation deferred, N pending: …` (warn)                                                                                                                                        | Alert transitions wait on the database; retried on the next flush and at shutdown |
 | `RulesService`, `BatchWriter` | `Rule evaluation dropped, the database rejected it: …`; `Pending rule evaluations are full, dropped the oldest N`; `N rule evaluations still pending at shutdown, not applied` (error) | **Alert transitions were lost**                                                   |
-| `DeliveryWorker`              | `Alert sink: ops-command-center` (or `none`); `Delivery <id> (<event>) attempt n: …` (warn)                                                                                            | Which sink; a failed attempt                                                      |
+| `DeliveryWorker`              | `Alert sink: none — alerts are recorded and marked skipped, never delivered. Set OCC_API_URL to deliver them.` (warn)                                                                  | **No command center configured: alerts are skipped**                              |
+| `DeliveryWorker`              | `Alert sink: ops-command-center`; `Delivery <id> (<event>) attempt n: …` (warn)                                                                                                        | Which sink; a failed attempt                                                      |
 | `PartitionMaintenance`        | `Partitions created: […] dropped: […]`                                                                                                                                                 | Daily partition rollover                                                          |
 
 ## Deploys and shutdown

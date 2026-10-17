@@ -129,13 +129,17 @@ Ids are returned as strings (they are `bigint` in PostgreSQL).
 ```
 
 ```json
-{ "status": "ready", "database": "up", "broker": "up" }
+{ "status": "ready", "database": "up", "broker": "up", "alertSink": "ops-command-center" }
 ```
 
-`/api/ready` returns **503** with `{ "status": "not ready", "database": "up|down", "broker": "up|down" }`
+`/api/ready` returns **503** with
+`{ "status": "not ready", "database": "up|down", "broker": "up|down", "alertSink": "none|ops-command-center" }`
 when either dependency is down. The broker counts as up while **at least one** of the process's
-MQTT connections is connected. Kubernetes uses `/api/health` for liveness and startup and
-`/api/ready` for readiness; see [operations.md](operations.md#health-and-probes).
+MQTT connections is connected. `alertSink` is `none` when no command center is configured
+(`OCC_API_URL` unset: alerts are recorded and marked `skipped`, never delivered) and
+`ops-command-center` otherwise. It is informational: it never turns a response into a 503.
+Kubernetes uses `/api/health` for liveness and startup and `/api/ready` for readiness; see
+[operations.md](operations.md#health-and-probes).
 
 ### GET /metrics
 
