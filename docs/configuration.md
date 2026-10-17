@@ -40,13 +40,13 @@ service refuses to start and prints every problem at once.
 
 ### Delivery to ops-command-center
 
-| Variable               | Default | Notes                                                                                                                                    |
-| ---------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `OCC_API_URL`          | —       | Base URL of its API, e.g. `http://localhost:18080/api`. **Unset = alerts are recorded, never delivered** (outbox rows become `skipped`). |
-| `OCC_TOKEN_URL`        | —       | Keycloak token endpoint of the `occ` realm. Set with the next two, or none.                                                              |
-| `OCC_CLIENT_ID`        | —       | `telemetry-pipeline`.                                                                                                                    |
-| `OCC_CLIENT_SECRET`    | —       | The client's secret. Inject it from a secret store; never commit it.                                                                     |
-| `DELIVERY_INTERVAL_MS` | `1000`  | ≥ 100. How often the outbox worker looks for due rows.                                                                                   |
+| Variable               | Default | Notes                                                                                                                                                                                                                                            |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `OCC_API_URL`          | —       | Base URL of its API, e.g. `http://localhost:18080/api`. **Unset = alerts are recorded, never delivered** (outbox rows become `skipped`); the service logs a [warning at boot](operations.md#logs) and reports `alertSink: none` on `/api/ready`. |
+| `OCC_TOKEN_URL`        | —       | Keycloak token endpoint of the `occ` realm. Set with the next two, or none.                                                                                                                                                                      |
+| `OCC_CLIENT_ID`        | —       | `telemetry-pipeline`.                                                                                                                                                                                                                            |
+| `OCC_CLIENT_SECRET`    | —       | The client's secret. Inject it from a secret store; never commit it.                                                                                                                                                                             |
+| `DELIVERY_INTERVAL_MS` | `1000`  | ≥ 100. How often the outbox worker looks for due rows.                                                                                                                                                                                           |
 
 Cross-field checks at startup: the three `OCC_*` credentials are all-or-nothing, they require
 `OCC_API_URL`, and a certificate requires its key.

@@ -53,7 +53,15 @@ export class DeliveryWorker implements OnApplicationBootstrap, BeforeApplication
   ) {}
 
   onApplicationBootstrap(): void {
-    this.logger.log(`Alert sink: ${this.sink.name}`);
+    if (this.sink.name === 'none') {
+      // A warning, not a boot line: a deployment that lost OCC_API_URL otherwise looks like a demo,
+      // and its alerts are final (a skipped row is never retried).
+      this.logger.warn(
+        'Alert sink: none — alerts are recorded and marked skipped, never delivered. Set OCC_API_URL to deliver them.',
+      );
+    } else {
+      this.logger.log(`Alert sink: ${this.sink.name}`);
+    }
     const interval = this.config.get('DELIVERY_INTERVAL_MS', { infer: true });
     this.timer = setInterval(() => void this.tick(), interval);
   }
