@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { telemetryTopic } from '@itp/telemetry-contract';
 import { connectAsync, type MqttClient } from 'mqtt';
-import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { Pool } from 'pg';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
@@ -36,7 +36,7 @@ interface Call {
 
 function fakeCommandCenter(): Promise<{ server: Server; calls: Call[] }> {
   const calls: Call[] = [];
-  const server = createServer(async (req: IncomingMessage, res) => {
+  const handle = async (req: IncomingMessage, res: ServerResponse) => {
     let raw = '';
     for await (const chunk of req) raw += chunk;
     res.setHeader('Content-Type', 'application/json');
@@ -63,6 +63,14 @@ function fakeCommandCenter(): Promise<{ server: Server; calls: Call[] }> {
     if (req.url === '/api/incidents')
       return res.writeHead(201).end(JSON.stringify({ id: 'incident-1' }));
     return res.end('{}');
+  };
+  // The listener is not async: createServer ignores what it returns, so a rejection would go
+  // unhandled. A bug in this fake becomes a 500 that the test can see.
+  const server = createServer((req, res) => {
+    void handle(req, res).catch(() => {
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
   });
   return new Promise((resolve) => server.listen(FAKE_OCC_PORT, () => resolve({ server, calls })));
 }
