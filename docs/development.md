@@ -356,7 +356,11 @@ any of them (see the table in [system-context.md](system-context.md#6-changing-t
 
 ## Conventions
 
-- TypeScript strict; ESLint flat config (`eslint.config.mjs`) with Prettier.
+- TypeScript strict; ESLint flat config (`eslint.config.mjs`) with Prettier. The ingest package also
+  lints with type information (`no-floating-promises`, `no-misused-promises`), so its lint is slower
+  than the other packages; a deliberate fire-and-forget call is written `void promise`. Running
+  `pnpm --filter @itp/ingest lint` directly needs `@itp/telemetry-contract` built first (`pnpm lint`
+  and CI build it through Turborepo).
 - Comments explain _why_ (constraints, trade-offs, ADR references), not what the code says.
 - Validate at the edge (env, config files, MQTT input) and fail loudly at startup rather than
   half-working later.

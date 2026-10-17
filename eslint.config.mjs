@@ -26,5 +26,18 @@ export default tseslint.config(
     files: ['apps/ingest/**/*.ts'],
     rules: { '@typescript-eslint/consistent-type-imports': 'off' },
   },
+  {
+    // These two rules need type information, which makes linting slower, so only ingest pays for
+    // it; the simulator and the contract have their own lint scripts and tsconfigs. A deliberate
+    // fire-and-forget call is written `void promise`, which both rules accept.
+    files: ['apps/ingest/**/*.ts'],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+    },
+  },
   prettier,
 );
