@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_PAYLOAD_BYTES,
   METRIC_NAMES,
   METRICS,
   parsePayload,
@@ -44,6 +45,8 @@ describe('parsePayload', () => {
   it.each([
     ['not json', '{', 'json'],
     ['negative seq', { ...valid, seq: -1 }, 'seq'],
+    // Not valid JSON on purpose: the reason is `size`, not `json`, so the size check runs first.
+    ['payload over the size limit', 'x'.repeat(MAX_PAYLOAD_BYTES + 1), 'size'],
     ['bad timestamp', { ...valid, ts: 'yesterday' }, 'ts'],
     ['numeric timestamp', { ...valid, ts: 1_759_305_600_000 }, 'ts'],
     ['missing timestamp', { seq: 1, metrics: valid.metrics }, 'ts'],
@@ -141,6 +144,64 @@ describe('parsePayload', () => {
   it('normalises the Z form and the offset form of the same instant to the identical string', () => {
     const at = (ts: string) => parsePayload(JSON.stringify({ ...valid, ts }));
     expect(at('2026-10-01T15:00:00+07:00')).toEqual(at('2026-10-01T08:00:00Z'));
+  });
+
+  type Wrap = (text: string) => Uint8Array | string;
+  const encode: Wrap = (text) => new TextEncoder().encode(text);
+  const inputKinds: [string, Wrap][] = [
+    ['a Uint8Array', encode],
+    ['a string', (text) => text],
+  ];
+  // `valid` is ASCII, so its length in characters is its length in bytes.
+  const paddedTo = (length: number) => {
+    const json = JSON.stringify(valid);
+    return json + ' '.repeat(length - json.length);
+  };
+
+  it.each(inputKinds)(
+    'rejects %s one byte over the limit as size, before parsing it',
+    (_, wrap) => {
+      expect(parsePayload(wrap('x'.repeat(MAX_PAYLOAD_BYTES + 1)))).toEqual({
+        ok: false,
+        reason: 'size',
+      });
+    },
+  );
+
+  it.each(inputKinds)('does not reject %s of exactly the limit for its size', (_, wrap) => {
+    expect(parsePayload(wrap('x'.repeat(MAX_PAYLOAD_BYTES)))).toEqual({
+      ok: false,
+      reason: 'json',
+    });
+  });
+
+  it.each(inputKinds)('accepts a valid payload of exactly the limit as %s', (_, wrap) => {
+    expect(parsePayload(wrap(paddedTo(MAX_PAYLOAD_BYTES)))).toMatchObject({ ok: true });
+  });
+
+  it.each(inputKinds)('rejects a valid payload one byte over the limit as %s', (_, wrap) => {
+    expect(parsePayload(wrap(paddedTo(MAX_PAYLOAD_BYTES + 1)))).toEqual({
+      ok: false,
+      reason: 'size',
+    });
+  });
+
+  it('counts bytes for a Uint8Array and UTF-16 units for a string', () => {
+    // 2049 characters, 4098 bytes: over the limit as bytes, under it as a string length.
+    const text = 'é'.repeat(MAX_PAYLOAD_BYTES / 2 + 1);
+    expect(parsePayload(encode(text))).toEqual({ ok: false, reason: 'size' });
+    expect(parsePayload(text)).toEqual({ ok: false, reason: 'json' });
+  });
+
+  it('keeps the largest legitimate message far below the limit', () => {
+    const metrics = Object.fromEntries(METRIC_NAMES.map((name) => [name, METRICS[name].max / 3]));
+    const largest = JSON.stringify(
+      { seq: Number.MAX_SAFE_INTEGER, ts: '2026-10-01T08:00:00.123456789+07:00', metrics },
+      null,
+      4,
+    );
+    expect(parsePayload(largest)).toMatchObject({ ok: true });
+    expect(new TextEncoder().encode(largest).byteLength).toBeLessThan(MAX_PAYLOAD_BYTES / 10);
   });
 
   it.each(METRIC_NAMES)('still accepts the known metric %s at its minimum', (name) => {

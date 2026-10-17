@@ -41,6 +41,9 @@ UTF-8 JSON, one object per message:
 uppercase, the hour is 00 to 23 (`24:00:00` is rejected) and the date must exist in the calendar. Zone-less,
 date-only and space-separated values are rejected, never read as local time.
 
+A payload larger than 4096 bytes (`MAX_PAYLOAD_BYTES`) is rejected with the reason `size` before it is
+decoded. A legitimate message is a few hundred bytes.
+
 All metrics in one message share the message's `ts`. Send them together when they were sampled
 together; the pipeline stores one row per metric.
 
@@ -111,6 +114,7 @@ Every rejected message increments `telemetry_messages_total{result="rejected"}` 
 | Reason                  | Cause                                                            | Raised by      |
 | ----------------------- | ---------------------------------------------------------------- | -------------- |
 | `topic`                 | Wrong shape, wrong root/suffix, or a segment fails the pattern   | contract       |
+| `size`                  | Payload larger than 4096 bytes, checked before decoding          | contract       |
 | `json`                  | Payload is not valid JSON                                        | contract       |
 | `shape`                 | Payload (or `metrics`) is not an object                          | contract       |
 | `seq`                   | Missing, negative, non-integer or unsafe `seq`                   | contract       |
