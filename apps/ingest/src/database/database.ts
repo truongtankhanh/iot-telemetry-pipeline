@@ -42,19 +42,35 @@ export class Database implements OnModuleInit, OnApplicationShutdown {
     return this.pool.query<T>(sql, params);
   }
 
-  /** Runs `work` in a transaction; rolls back on any error. */
+  /**
+   * Runs `work` in a transaction; rolls back on any error and rethrows it. If the `ROLLBACK`
+   * itself fails, that is logged, the original error is still the one rethrown, and the
+   * connection is discarded instead of returned to the pool.
+   */
   async transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
+    let broken = false;
     try {
       await client.query('BEGIN');
       const result = await work(client);
       await client.query('COMMIT');
       return result;
     } catch (error) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        // A failed ROLLBACK usually means the connection is dead, and callers (BatchWriter's
+        // isDataError) classify on the error thrown here, so the original must survive it.
+        broken = true;
+        const reason =
+          rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+        this.logger.warn(`ROLLBACK failed, discarding the connection: ${reason}`);
+      }
       throw error;
     } finally {
-      client.release();
+      // release(true) makes the pool destroy the client instead of keeping it for reuse.
+      if (broken) client.release(true);
+      else client.release();
     }
   }
 
