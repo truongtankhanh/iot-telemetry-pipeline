@@ -45,6 +45,8 @@ cardinality does not grow with the fleet. Default Node.js process metrics are in
 | `telemetry_flush_retries_total`    | counter   | —            | Flushes that failed for a reason unrelated to the data and were kept for a retry        |
 | `telemetry_consumption_paused`     | gauge     | —            | `1` while the write buffer is full and the consumer holds back acknowledgements         |
 | `alerts_transitions_total`         | counter   | `transition` | Alerts `opened` or `cleared`                                                            |
+| `alerts_evaluation_pending`        | gauge     | —            | Rule evaluations waiting for the database (retried on the next flush); `0` when none    |
+| `alerts_evaluation_dropped_total`  | counter   | —            | Rule evaluations given up on: bad data, or the pending queue (10 000) was full          |
 | `alert_deliveries_total`           | counter   | `result`     | Outbox attempts: `delivered`, `skipped`, `retry`, `failed`                              |
 
 ### Suggested alerts
@@ -62,6 +64,7 @@ Not shipped as code yet ([ITP-12](roadmap.md)). Starting points, to tune per sit
 | `histogram_quantile(0.99, sum by (le) (rate(telemetry_flush_duration_seconds_bucket[5m]))) > 0.5` | Database is slow; the buffer will grow                                                           |
 | `telemetry_buffered_readings > 5000`                                                              | The buffer is growing faster than it drains (consumption pauses at `BUFFER_MAX_READINGS`)        |
 | `increase(alert_deliveries_total{result="failed"}[15m]) > 0`                                      | An alert gave up being delivered — needs a human                                                 |
+| `min_over_time(alerts_evaluation_pending[5m]) > 0`                                                | An alert transition waits on the database; the `alert` table does not show it yet                |
 | `rate(telemetry_rejections_total[5m]) > 0` by `reason`                                            | Misconfigured or unknown devices; `unknown_device` after onboarding means the registry is behind |
 
 Throughput reference: ≈ 10 000 messages/s on one replica ([benchmarks](benchmarks.md)). For scale,

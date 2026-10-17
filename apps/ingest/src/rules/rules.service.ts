@@ -4,12 +4,29 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Env } from '../config/env.validation';
 import { Database } from '../database/database';
+import { isDataError } from '../database/errors';
 import { DevicesService } from '../devices/devices.service';
 import { Metrics } from '../metrics/metrics';
 import type { Reading } from '../telemetry/rollup';
 import { evaluate, parseRules, type Rule, type RuleState } from './rules-engine';
 
 const key = (deviceId: string, ruleId: string) => `${deviceId}\u0000${ruleId}`;
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/**
+ * Safety valve for deferred evaluations, a count and not a setting. The queue only grows when
+ * readings commit but the alert transaction fails (a plain outage fails the flush first), and then
+ * by about one batch per flush. Like the write buffer, it is memory: a killed process loses it
+ * (ADR-0002).
+ */
+export const MAX_PENDING = 10_000;
+
+/** One reading against one rule: a reading that matches several rules is several items. */
+interface WorkItem {
+  reading: Reading;
+  rule: Rule;
+}
 
 /**
  * Applies threshold rules to stored readings and persists alert transitions with their outbox rows
@@ -21,6 +38,10 @@ export class RulesService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RulesService.name);
   private rulesByKindMetric?: Map<string, Rule[]>;
   private readonly state = new Map<string, RuleState>();
+  /** Evaluations the database could not take yet, oldest first; retried before anything newer. */
+  private pending: WorkItem[] = [];
+  /** Tail of the call chain: `process` runs one call at a time. */
+  private running: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly db: Database,
@@ -54,26 +75,102 @@ export class RulesService implements OnApplicationBootstrap {
     return byKindMetric;
   }
 
-  async process(readings: Reading[]): Promise<void> {
+  /**
+   * Applies the rules to readings that are already stored, after whatever is still pending. A
+   * transient database failure does not throw: the failing evaluation and everything after it are
+   * queued for the next call, because the readings have committed and the batch must not be redone.
+   * Calls are serialised so a retry cannot interleave with a flush over `pending` and `state`.
+   */
+  process(readings: Reading[]): Promise<void> {
+    const result = this.running.then(() => this.evaluateAll(readings));
+    this.running = result.catch(() => undefined);
+    return result;
+  }
+
+  /** Retries what is pending without new readings; returns how many items are still pending. */
+  async retryPending(): Promise<number> {
+    await this.process([]);
+    return this.pending.length;
+  }
+
+  private async evaluateAll(readings: Reading[]): Promise<void> {
+    const fresh = this.toWorkItems(readings);
+    const work = this.pending.length > 0 ? [...this.pending, ...fresh] : fresh;
+    if (work.length === 0) return;
+
+    try {
+      await this.loadMissingState(work.map((w) => [w.reading.deviceId, w.rule.id] as const));
+    } catch (error) {
+      this.defer(work, error);
+      return;
+    }
+
+    for (let i = 0; i < work.length; i++) {
+      const { reading, rule } = work[i]!;
+      const k = key(reading.deviceId, rule.id);
+      const { state, transition } = evaluate(rule, this.state.get(k)!, reading.value);
+      try {
+        if (transition === 'opened') await this.open(reading, rule);
+        if (transition === 'cleared') await this.clear(reading, rule);
+      } catch (error) {
+        if (!isDataError(error)) {
+          // Not the data's fault, so this item and every later one wait: applying a later reading
+          // of the same device first would count its breach twice once this one is retried.
+          this.defer(work.slice(i), error);
+          return;
+        }
+        this.drop(reading, rule, error);
+        continue;
+      }
+      // Only now, so the state never gets ahead of the `alert` table.
+      this.state.set(k, state);
+    }
+    this.setPending([]);
+  }
+
+  private toWorkItems(readings: Reading[]): WorkItem[] {
     const rules = this.load();
-    const work: { reading: Reading; rule: Rule }[] = [];
+    const items: WorkItem[] = [];
     for (const reading of readings) {
       const device = this.devices.get(reading.deviceId);
       if (!device) continue;
       for (const rule of rules.get(`${device.kind}\u0000${reading.metric}`) ?? []) {
-        work.push({ reading, rule });
+        items.push({ reading, rule });
       }
     }
-    if (work.length === 0) return;
+    return items;
+  }
 
-    await this.loadMissingState(work.map((w) => [w.reading.deviceId, w.rule.id] as const));
+  /** Queues `items` (oldest first), dropping the oldest ones past `MAX_PENDING`. */
+  private defer(items: WorkItem[], error: unknown): void {
+    const wasEmpty = this.pending.length === 0;
+    const excess = Math.max(0, items.length - MAX_PENDING);
+    if (excess > 0) {
+      this.metrics.evaluationDropped.inc(excess);
+      this.logger.error(`Pending rule evaluations are full, dropped the oldest ${excess}`);
+    }
+    this.setPending(excess > 0 ? items.slice(excess) : items);
+    if (wasEmpty) {
+      this.logger.warn(
+        `Rule evaluation deferred, ${this.pending.length} pending: ${messageOf(error)}`,
+      );
+    }
+  }
 
-    for (const { reading, rule } of work) {
-      const k = key(reading.deviceId, rule.id);
-      const { state, transition } = evaluate(rule, this.state.get(k)!, reading.value);
-      this.state.set(k, state);
-      if (transition === 'opened') await this.open(reading, rule);
-      if (transition === 'cleared') await this.clear(reading, rule);
+  /** The database rejected this item's data, so a retry would fail the same way: give it up. */
+  private drop(reading: Reading, rule: Rule, error: unknown): void {
+    this.metrics.evaluationDropped.inc();
+    this.logger.error(
+      `Rule evaluation dropped, the database rejected it: rule ${rule.id}, device ${reading.deviceId}: ${messageOf(error)}`,
+    );
+  }
+
+  private setPending(items: WorkItem[]): void {
+    const wasPending = this.pending.length > 0;
+    this.pending = items;
+    this.metrics.evaluationPending.set(items.length);
+    if (wasPending && items.length === 0) {
+      this.logger.log('Rule evaluation caught up, nothing is pending');
     }
   }
 
