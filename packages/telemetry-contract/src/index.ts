@@ -23,6 +23,12 @@ export const METRICS = {
 export type MetricName = keyof typeof METRICS;
 export const METRIC_NAMES = Object.keys(METRICS) as MetricName[];
 
+/**
+ * Largest accepted payload, in bytes. A legitimate message is a few hundred bytes (four metrics at
+ * most), so the cap bounds the decode and parse cost a single message can impose on the consumer.
+ */
+export const MAX_PAYLOAD_BYTES = 4096;
+
 export interface TelemetryPayload {
   /** Per-device counter, incremented on every message. Lets the receiver measure gaps. */
   seq: number;
@@ -88,10 +94,16 @@ export function parseTopic(topic: string): ParseResult<TopicParts> {
 }
 
 /**
- * Validates the payload shape and value ranges. Returns a short machine-friendly reason on failure,
- * used as a metrics label — so reasons are a small fixed set, never free text.
+ * Validates the payload size, shape and value ranges. Returns a short machine-friendly reason on
+ * failure, used as a metrics label — so reasons are a small fixed set, never free text.
  */
 export function parsePayload(raw: Uint8Array | string): ParseResult<TelemetryPayload> {
+  // Checked before decoding so an oversized payload costs nothing. For a string, `length` counts
+  // UTF-16 units, which is a lower bound on the UTF-8 bytes; MQTT delivers a Buffer, so the string
+  // path is for tests and other callers, and encoding just to count bytes would allocate per message.
+  const size = typeof raw === 'string' ? raw.length : raw.byteLength;
+  if (size > MAX_PAYLOAD_BYTES) return { ok: false, reason: 'size' };
+
   let data: unknown;
   try {
     data = JSON.parse(typeof raw === 'string' ? raw : decoder.decode(raw));
