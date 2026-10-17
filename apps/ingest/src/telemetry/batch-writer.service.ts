@@ -114,11 +114,31 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
   /**
    * Writes what is buffered once more, for shutdown: no waiting out a backoff, no retry afterwards.
    * Readings the database still refuses are counted as failed and logged — the process is leaving.
+   * Rule evaluations the database could not take earlier get a last attempt too; what is still
+   * pending is logged and lost with the process.
    */
   async drain(): Promise<void> {
     this.draining = true;
     this.release();
     await this.flush();
+    await this.retryRulesAtShutdown();
+  }
+
+  /**
+   * A flush evaluates rules only for the readings it stores, and returns early with nothing buffered,
+   * so deferred evaluations need their own call. Never throws: shutdown has to go on.
+   */
+  private async retryRulesAtShutdown(): Promise<void> {
+    try {
+      const pending = await this.rules.retryPending();
+      if (pending > 0) {
+        this.logger.error(`${pending} rule evaluations still pending at shutdown, not applied`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Retrying rule evaluations at shutdown failed: ${(error as Error).message}`,
+      );
+    }
   }
 
   /** Readings held in memory: waiting in the buffer, or taken out by a flush still running. */
@@ -363,13 +383,17 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
     return lost;
   }
 
-  /** Rules see each newly stored reading once, in measurement order. Never fails the write. */
+  /**
+   * Rules see each newly stored reading once, in measurement order. Never fails the write: the
+   * readings have committed. A transient database error does not arrive here (`RulesService`
+   * queues it), so what is caught is unexpected.
+   */
   private async evaluateRules(stored: Reading[]): Promise<void> {
     stored.sort((a, b) => a.ts.getTime() - b.ts.getTime());
     try {
       await this.rules.process(stored);
     } catch (error) {
-      this.logger.error(`Rule evaluation failed: ${(error as Error).message}`);
+      this.logger.error(`Rule evaluation failed unexpectedly: ${(error as Error).message}`);
     }
   }
 }

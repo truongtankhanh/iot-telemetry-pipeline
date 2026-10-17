@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { PoolClient } from 'pg';
 import type { Env } from '../config/env.validation';
@@ -94,8 +95,16 @@ function setup(overrides: Partial<Record<keyof Env, number>> = {}) {
   const db = new FakeDatabase();
   const metrics = new Metrics();
   const config = { get: (key: keyof Env) => settings[key] } as unknown as ConfigService<Env, true>;
-  const rules = { process: jest.fn().mockResolvedValue(undefined) } as unknown as RulesService;
-  const writer = new BatchWriter(db as unknown as Database, metrics, rules, config);
+  const rules = {
+    process: jest.fn().mockResolvedValue(undefined),
+    retryPending: jest.fn().mockResolvedValue(0),
+  };
+  const writer = new BatchWriter(
+    db as unknown as Database,
+    metrics,
+    rules as unknown as RulesService,
+    config,
+  );
 
   const value = async (metric: {
     get(): Promise<{ values: { value: number; labels: object }[] }>;
@@ -104,7 +113,7 @@ function setup(overrides: Partial<Record<keyof Env, number>> = {}) {
     (await metrics.readings.get()).values.find(
       (v) => (v.labels as Record<string, string>).result === result,
     )?.value ?? 0;
-  return { db, metrics, writer, value, readings };
+  return { db, metrics, writer, rules, value, readings };
 }
 
 const reading = (n: number, value = n): Reading => ({
@@ -216,5 +225,76 @@ describe('BatchWriter', () => {
     await writer.drain();
     await Promise.resolve();
     expect(released).toBe(true);
+  });
+
+  describe('rule evaluation at shutdown', () => {
+    let error: jest.SpyInstance;
+
+    beforeEach(() => {
+      error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it('retries the pending evaluations once, after the flush', async () => {
+      const { db, writer, rules } = setup();
+      let storedWhenCalled = -1;
+      rules.retryPending.mockImplementation(async () => {
+        storedWhenCalled = db.stored.length;
+        return 0;
+      });
+      writer.add([reading(1), reading(2)]);
+
+      await writer.drain();
+
+      expect(rules.retryPending).toHaveBeenCalledTimes(1);
+      expect(storedWhenCalled).toBe(2);
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it('logs how many evaluations are still pending', async () => {
+      const { writer, rules } = setup();
+      rules.retryPending.mockResolvedValue(3);
+
+      await writer.drain();
+
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('3 rule evaluations still pending at shutdown'),
+      );
+    });
+
+    it('does not let a failing retry stop the shutdown', async () => {
+      const { writer, rules } = setup();
+      rules.retryPending.mockRejectedValue(new Error('pool is closed'));
+
+      await expect(writer.drain()).resolves.toBeUndefined();
+
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('pool is closed'));
+    });
+
+    it('retries once per call and stays quiet when nothing is pending', async () => {
+      const { writer, rules, readings } = setup();
+      writer.add([reading(1)]);
+
+      await writer.drain();
+      await writer.drain();
+
+      expect(rules.retryPending).toHaveBeenCalledTimes(2);
+      expect(error).not.toHaveBeenCalled();
+      expect(await readings('stored')).toBe(1);
+    });
+
+    it('words an unexpected rule failure as such, and still keeps the readings', async () => {
+      const { db, writer, rules } = setup();
+      rules.process.mockRejectedValue(new Error('boom'));
+      writer.add([reading(1), reading(2)]);
+
+      await writer.flush();
+
+      expect(db.stored).toHaveLength(2);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('Rule evaluation failed unexpectedly: boom'),
+      );
+    });
   });
 });
