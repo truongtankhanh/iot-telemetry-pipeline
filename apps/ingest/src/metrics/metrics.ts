@@ -82,6 +82,18 @@ export class Metrics {
     registers: [this.registry],
   });
 
+  readonly evaluationPending = new Gauge({
+    name: 'alerts_evaluation_pending',
+    help: 'Rule evaluations waiting to be applied because the database failed',
+    registers: [this.registry],
+  });
+
+  readonly evaluationDropped = new Counter({
+    name: 'alerts_evaluation_dropped_total',
+    help: 'Rule evaluations given up on: a data error or a full pending queue',
+    registers: [this.registry],
+  });
+
   readonly deliveries = new Counter({
     name: 'alert_deliveries_total',
     help: 'Outbox delivery attempts, by result',
