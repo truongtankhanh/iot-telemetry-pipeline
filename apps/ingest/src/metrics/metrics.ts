@@ -94,6 +94,13 @@ export class Metrics {
     registers: [this.registry],
   });
 
+  readonly stateCorrections = new Counter({
+    name: 'alerts_state_corrections_total',
+    help: 'Cached alert states changed to match the alert table, by direction (to_open, to_closed)',
+    labelNames: ['direction'] as const,
+    registers: [this.registry],
+  });
+
   readonly deliveries = new Counter({
     name: 'alert_deliveries_total',
     help: 'Outbox delivery attempts, by result',

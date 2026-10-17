@@ -8,7 +8,7 @@ import type { Database } from '../database/database';
 import { parseDevices, type DevicesService } from '../devices/devices.service';
 import { Metrics } from '../metrics/metrics';
 import type { Reading } from '../telemetry/rollup';
-import { MAX_PENDING, RulesService } from './rules.service';
+import { MAX_PENDING, RECONCILE_INTERVAL_MS, RulesService } from './rules.service';
 
 const CONFIG_DIR = join(__dirname, '../../config');
 
@@ -31,11 +31,27 @@ class FakeDatabase {
   failure?: Error;
   /** While set, `query` (the state lookup) throws it. */
   queryFailure?: Error;
+  /** While set, the state lookup sees no open alert although the insert still conflicts with one. */
+  hideOpenFromLookup = false;
+  queries = 0;
+  transactions = 0;
   maxConcurrent = 0;
   private active = 0;
 
-  async query(_sql: string, params: unknown[]) {
+  /** Comparisons of the cached state with the table (the one query that takes no parameters). */
+  reconciles = 0;
+
+  async query(_sql: string, params?: unknown[]) {
+    this.queries++;
     if (this.queryFailure) throw this.queryFailure;
+    if (!params) {
+      this.reconciles++;
+      const rows = this.alerts
+        .filter((a) => a.status === 'open')
+        .map((a) => ({ device_id: a.device_id, rule_id: a.rule_id }));
+      return { rows };
+    }
+    if (this.hideOpenFromLookup) return { rows: [] };
     const [devices, rules] = params as [string[], string[]];
     const rows = this.alerts
       .filter(
@@ -48,6 +64,7 @@ class FakeDatabase {
   }
 
   async transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    this.transactions++;
     this.maxConcurrent = Math.max(this.maxConcurrent, ++this.active);
     try {
       await Promise.resolve(); // a real round trip lets a second caller interleave
@@ -90,7 +107,8 @@ class FakeDatabase {
   }
 }
 
-function setup() {
+/** One replica; pass another's `db` to share the table with it. */
+function setup(db = new FakeDatabase()) {
   const list = parseDevices(JSON.parse(readFileSync(join(CONFIG_DIR, 'devices.json'), 'utf8')));
   const devices = {
     all: () => list,
@@ -99,17 +117,17 @@ function setup() {
   const config = {
     get: (key: keyof Env) => (key === 'CONFIG_DIR' ? CONFIG_DIR : undefined),
   } as unknown as ConfigService<Env, true>;
-  const db = new FakeDatabase();
   const metrics = new Metrics();
   const service = new RulesService(db as unknown as Database, devices, metrics, config);
 
   let n = 0;
-  const reading = (value: number): Reading => ({
-    deviceId: 'dc-env-01',
-    metric: 'temperature_c',
+  const readingOf = (deviceId: string, metric: string, value: number): Reading => ({
+    deviceId,
+    metric,
     ts: new Date(1_000 * ++n),
     value,
   });
+  const reading = (value: number) => readingOf('dc-env-01', 'temperature_c', value);
   const sum = async (metric: { get(): Promise<{ values: { value: number }[] }> }) =>
     (await metric.get()).values.reduce((total, v) => total + v.value, 0);
   const transitions = async (transition: string) =>
@@ -119,12 +137,17 @@ function setup() {
   return {
     db,
     service,
+    readingOf,
     breach: () => reading(BREACH),
     inRange: () => reading(IN_RANGE),
     pending: () => sum(metrics.evaluationPending),
     dropped: () => sum(metrics.evaluationDropped),
     opened: () => transitions('opened'),
     cleared: () => transitions('cleared'),
+    corrections: async (direction: string) =>
+      (await metrics.stateCorrections.get()).values.find(
+        (v) => (v.labels as Record<string, string>).direction === direction,
+      )?.value ?? 0,
   };
 }
 
@@ -275,6 +298,175 @@ describe('RulesService', () => {
     expect(await t.pending()).toBe(MAX_PENDING);
     expect(await t.dropped()).toBe(queued - MAX_PENDING);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('full'));
+  });
+
+  describe('state and lookups', () => {
+    const openAlert = (): AlertRow => ({
+      id: 1,
+      device_id: 'dc-env-01',
+      rule_id: 'server-room-hot',
+      status: 'open',
+    });
+
+    it('rebuilds an open alert from the table on a cache miss, and clears it', async () => {
+      const t = setup();
+      t.db.alerts.push(openAlert());
+
+      await t.service.process([t.inRange()]);
+
+      expect(t.db.alerts[0]!.status).toBe('cleared');
+      expect(t.db.deliveries).toBe(1);
+      expect(await t.cleared()).toBe(1);
+      expect(await t.opened()).toBe(0);
+    });
+
+    it('opens nothing for breaches while the table already holds the open alert', async () => {
+      const t = setup();
+      t.db.alerts.push(openAlert());
+
+      await t.service.process([t.breach(), t.breach(), t.breach()]);
+
+      expect(t.db.alerts).toHaveLength(1);
+      expect(t.db.deliveries).toBe(0);
+      expect(await t.opened()).toBe(0);
+      expect(t.db.transactions).toBe(0);
+    });
+
+    it('writes no outbox row and counts nothing when another replica opened first', async () => {
+      const t = setup();
+      t.db.alerts.push(openAlert());
+      t.db.hideOpenFromLookup = true; // the lookup ran before the other replica's insert
+
+      await t.service.process([t.breach(), t.breach(), t.breach()]);
+
+      expect(t.db.alerts).toHaveLength(1);
+      expect(t.db.deliveries).toBe(0);
+      expect(await t.opened()).toBe(0);
+      expect(t.db.transactions).toBe(1);
+
+      // The state advanced to open, so the next breach does not try again.
+      await t.service.process([t.breach()]);
+      expect(t.db.transactions).toBe(1);
+    });
+
+    it('writes no outbox row and counts nothing when another replica cleared first', async () => {
+      const t = setup();
+      await t.service.process([t.breach(), t.breach(), t.breach()]);
+      expect(t.db.deliveries).toBe(1);
+      t.db.alerts[0]!.status = 'cleared'; // cleared elsewhere
+
+      await t.service.process([t.inRange()]);
+
+      expect(t.db.deliveries).toBe(1);
+      expect(await t.cleared()).toBe(0);
+
+      // The state is closed: three more breaches open a new alert.
+      await t.service.process([t.breach(), t.breach(), t.breach()]);
+      expect(t.db.alerts).toHaveLength(2);
+      expect(t.db.alerts[1]!.status).toBe('open');
+    });
+
+    it('ignores readings of an unregistered device and of a metric with no rule', async () => {
+      const t = setup();
+
+      await t.service.process([
+        t.readingOf('ghost-01', 'temperature_c', BREACH),
+        t.readingOf('lib-air-01', 'temperature_c', BREACH), // indoor_air has a rule for co2_ppm only
+      ]);
+
+      expect(t.db.queries).toBe(0);
+      expect(t.db.transactions).toBe(0);
+      expect(await t.pending()).toBe(0);
+    });
+
+    it('returns the incident type configured for a rule', () => {
+      const t = setup();
+
+      expect(t.service.incidentType('server-room-hot')).toBe('equipment_fault');
+      expect(t.service.incidentType('indoor-co2')).toBe('hvac_fault');
+      expect(t.service.incidentType('no-such-rule')).toBeUndefined();
+    });
+  });
+
+  describe('state that two replicas share only through the table', () => {
+    beforeEach(() => jest.useFakeTimers({ now: new Date('2026-10-17T10:00:00Z') }));
+    afterEach(() => jest.useRealTimers());
+    const later = () => jest.setSystemTime(Date.now() + RECONCILE_INTERVAL_MS);
+
+    it('clears an alert that another replica opened after this one cached it as closed', async () => {
+      const a = setup();
+      const b = setup(a.db);
+      await b.service.process([b.inRange()]); // b caches (dc-env-01, server-room-hot) as closed
+      await a.service.process([a.breach(), a.breach(), a.breach()]);
+      expect(a.db.alerts[0]!.status).toBe('open');
+
+      later();
+      await b.service.process([b.inRange(), b.inRange()]);
+
+      expect(a.db.alerts[0]!.status).toBe('cleared');
+      expect(await b.cleared()).toBe(1);
+      expect(await b.corrections('to_open')).toBe(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('1 now open'));
+    });
+
+    it('opens a new alert after another replica cleared the one this one cached as open', async () => {
+      const a = setup();
+      const b = setup(a.db);
+      await a.service.process([a.breach(), a.breach(), a.breach()]);
+      await b.service.process([b.breach()]); // b loads the open alert from the table
+      await a.service.process([a.inRange()]); // a clears it; b still caches it as open
+      expect(a.db.alerts[0]!.status).toBe('cleared');
+
+      later();
+      await b.service.process([b.breach(), b.breach(), b.breach()]);
+
+      expect(a.db.alerts).toHaveLength(2);
+      expect(a.db.alerts[1]!.status).toBe('open');
+      expect(await b.opened()).toBe(1);
+      expect(await b.corrections('to_closed')).toBe(1);
+    });
+
+    it('compares with the table at most once per interval', async () => {
+      const t = setup();
+      await t.service.process([t.inRange()]); // first sight: nothing cached yet, nothing to compare
+      expect(t.db.reconciles).toBe(0);
+
+      await t.service.process([t.inRange()]);
+      expect(t.db.reconciles).toBe(0);
+
+      later();
+      await t.service.process([t.inRange()]);
+      expect(t.db.reconciles).toBe(1);
+
+      await t.service.process([t.inRange()]);
+      expect(t.db.reconciles).toBe(1);
+    });
+
+    it('logs and counts nothing when the cached state already matches the table', async () => {
+      const t = setup();
+      await t.service.process([t.breach(), t.breach(), t.breach()]); // opens: cache and table agree
+
+      later();
+      await t.service.process([t.breach()]);
+
+      expect(t.db.reconciles).toBe(1);
+      expect(await t.corrections('to_open')).toBe(0);
+      expect(await t.corrections('to_closed')).toBe(0);
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('corrected'));
+    });
+
+    it('goes on evaluating with the cached state when the comparison fails', async () => {
+      const t = setup();
+      await t.service.process([t.breach(), t.breach()]); // streak 2, cached and closed
+      later();
+      t.db.queryFailure = connectionLost();
+
+      await t.service.process([t.breach()]); // the third breach
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('reconcile failed'));
+      expect(t.db.alerts).toHaveLength(1); // opened with the state it had
+      expect(await t.pending()).toBe(0);
+    });
   });
 
   it('runs concurrent calls one at a time', async () => {

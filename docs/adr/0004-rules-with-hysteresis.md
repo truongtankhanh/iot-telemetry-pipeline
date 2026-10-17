@@ -1,6 +1,6 @@
 # ADR-0004: Threshold rules with consecutive breaches and hysteresis
 
-- **Status:** Accepted; amended 2026-10-17 for a failing database (see the amendment below)
+- **Status:** Accepted; amended 2026-10-17 for a failing database and for state that drifts from the table (see the amendments below)
 - **Date:** 2026-10-01
 
 ## Context
@@ -66,3 +66,38 @@ or cleared until the process restarted. The only trace was one log line. The rea
 - Two replicas retrying the same transition cannot create two alerts: the partial unique index on open alerts still decides.
 - The multi-replica wording of the decision above (state rebuilt "the first time a replica sees a device", streaks per replica)
   is unchanged.
+
+## Amendment (2026-10-17): state that drifts from the table
+
+The decision above rebuilds the open/closed part of a rule's state from the `alert` table "the first time a replica sees a
+device". That is true of the first sight and says nothing about the sights after it, and replicas keep changing alerts that
+the others have cached. Reproduced with two replicas in the e2e suite: both cache a rule as closed, one opens the alert and
+then leaves (a scale-down, a lost pod), the device returns to normal and only the other replica hears it. That replica
+caches the rule as closed, so it never evaluates a clear: the alert stays open in the table until the process restarts.
+The mirror image is a missed alert: a replica that cached an alert as open, which another replica then cleared, waits for a
+clear that never comes and never opens the next one. A rolling deploy hides the problem (a new pod starts with an empty
+cache); a scale-down or a long-lived survivor shows it.
+
+**Options considered:** a query per reading (exact, and it puts a database round trip on the hottest path); a timer that
+reconciles in the background (a new lifecycle hook and a timer that fires for replicas that hear nothing); reconciling at the
+start of an evaluation, at most once per interval (chosen).
+
+**Decision:**
+
+- **Reconcile on use.** At the start of an evaluation, if more than `RECONCILE_INTERVAL_MS` (30 s, a constant in
+  `RulesService`, not a setting) have passed since the last comparison, a replica reads the open alerts once and sets the
+  cached state of every pair it holds to what the table says. The breach streak of a corrected pair restarts at zero, as
+  after a cache miss. Pairs it does not hold are loaded as before, on first sight.
+- **Bounded, not removed.** The cached state can be wrong for up to the interval. Nothing is done per reading.
+- **Visible.** A correction is counted in `alerts_state_corrections_total{direction}` (`to_open`, `to_closed`) and logged once
+  per comparison, never per pair. A comparison that fails is logged and skipped; the evaluation goes on with the state it
+  has.
+
+**Consequences:**
+
+- A survivor clears (or opens) alerts that a departed replica left in the other state within about 30 s of its next
+  evaluation. A replica that hears nothing does not compare, which costs nothing and changes nothing.
+- One cheap query per replica per interval while readings flow; open alerts are few and the partial index on open alerts
+  covers it.
+- The unique index on open alerts still decides a race between replicas, and the breach streak is still per replica
+  (Known limitation 4 in the operations guide). Both are unchanged.

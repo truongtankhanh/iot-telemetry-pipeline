@@ -208,6 +208,15 @@ Actions → Variables → `CI_ENABLED`**.
   schema and partitions, storage and duplicates, rejections by reason, alert open → deliver → clear
   → resolve, sequence gaps, the read API, and draining the buffer on shutdown. It uses two MQTT
   connections in one shared group, and flushes and ticks the outbox explicitly.
+  Its helpers (the fake command center, `until`, the metric reader and the database reset with its
+  `_test` guard) live in `apps/ingest/test/support/`.
+- **End to end, two replicas** — `apps/ingest/test/replicas.e2e-spec.ts` starts two applications in
+  one process (`test/support/replica.ts`), both in the same shared-subscription group, on one
+  database and one fake command center. It checks that one device's messages are spread over both,
+  that breaches seen by both open one alert per rule, and that two replicas polling the outbox at
+  once deliver each row once (the fake command center can hold its responses, so the passes overlap).
+  The replicas need distinct MQTT client ids, which `startReplica` gets by replacing `os.hostname`
+  while each one starts.
 
 The e2e suite recreates the `public` schema of its database on every run, so it is guarded
 ([V1-T03](tasks/v1/V1-T03-e2e-wipes-database.md)). It reads `TEST_DATABASE_URL` (default
@@ -216,8 +225,8 @@ aborts before connecting unless the database name ends in `_test`; once connecte
 `current_database()` again before the first `DROP`. `pnpm e2e:ingest` points it at `telemetry_test`
 inside the Compose PostgreSQL, and CI sets the variable for its service container.
 
-The e2e run is heavier than unit tests (it starts a Nest application and two MQTT connections and
-runs serially with `--runInBand`). Run it on its own, not alongside builds or watchers.
+The e2e run is heavier than unit tests (it starts Nest applications, up to two with four MQTT
+connections in all, and runs serially with `--runInBand`). Run it on its own, not alongside builds or watchers.
 
 ## Common changes
 

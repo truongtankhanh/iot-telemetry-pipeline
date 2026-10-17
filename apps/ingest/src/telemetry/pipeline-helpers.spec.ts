@@ -121,6 +121,27 @@ describe('rollup', () => {
     );
     expect(rows).toHaveLength(3);
   });
+
+  it('returns its rows sorted by device, metric and bucket, whatever the order of the readings', () => {
+    const reading = (deviceId: string, metric: string, minute: number) => ({
+      deviceId,
+      metric,
+      ts: new Date(minute * 60_000 + 5_000),
+      value: 1,
+    });
+    const keys = (rows: ReturnType<typeof rollup>) =>
+      rows.map((r) => `${r.deviceId}/${r.metric}/${r.bucket.getTime()}`);
+    const input = [
+      reading('d2', 't', 5),
+      reading('d1', 't', 9),
+      reading('d1', 'h', 2),
+      reading('d1', 't', 3),
+    ];
+    const expected = ['d1/h/120000', 'd1/t/180000', 'd1/t/540000', 'd2/t/300000'];
+
+    expect(keys(rollup(input))).toEqual(expected);
+    expect(keys(rollup([...input].reverse()))).toEqual(expected);
+  });
 });
 
 describe('partitions', () => {

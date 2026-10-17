@@ -189,7 +189,7 @@ sequenceDiagram
   I->>P: insert reading, update rollup (one transaction)
   Note over I: 3rd consecutive reading above 27 °C
   I->>P: INSERT alert + alert_delivery('opened') (one transaction)
-  I->>P: claim due outbox row (SKIP LOCKED)
+  I->>P: lease one due outbox row
   I->>K: client credentials → access token
   I->>O: GET /zones, POST /incidents (Idempotency-Key)
   O-->>C: incident appears in the console

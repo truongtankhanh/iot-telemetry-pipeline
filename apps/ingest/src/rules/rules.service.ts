@@ -22,6 +22,13 @@ const messageOf = (error: unknown) => (error instanceof Error ? error.message : 
  */
 export const MAX_PENDING = 10_000;
 
+/**
+ * How long a replica trusts its cached open/closed state before it compares it with the `alert`
+ * table again. Replicas come and go and each one changes alerts the others have cached (ADR-0004),
+ * so without this a cached state can stay wrong until the process restarts. A count, not a setting.
+ */
+export const RECONCILE_INTERVAL_MS = 30_000;
+
 /** One reading against one rule: a reading that matches several rules is several items. */
 interface WorkItem {
   reading: Reading;
@@ -40,6 +47,8 @@ export class RulesService implements OnApplicationBootstrap {
   private readonly state = new Map<string, RuleState>();
   /** Evaluations the database could not take yet, oldest first; retried before anything newer. */
   private pending: WorkItem[] = [];
+  /** When the cached state was last compared with the table; 0 until the first evaluation. */
+  private lastReconcile = 0;
   /** Tail of the call chain: `process` runs one call at a time. */
   private running: Promise<unknown> = Promise.resolve();
 
@@ -97,6 +106,8 @@ export class RulesService implements OnApplicationBootstrap {
     const fresh = this.toWorkItems(readings);
     const work = this.pending.length > 0 ? [...this.pending, ...fresh] : fresh;
     if (work.length === 0) return;
+
+    if (Date.now() - this.lastReconcile >= RECONCILE_INTERVAL_MS) await this.reconcile();
 
     try {
       await this.loadMissingState(work.map((w) => [w.reading.deviceId, w.rule.id] as const));
@@ -171,6 +182,43 @@ export class RulesService implements OnApplicationBootstrap {
     this.metrics.evaluationPending.set(items.length);
     if (wasPending && items.length === 0) {
       this.logger.log('Rule evaluation caught up, nothing is pending');
+    }
+  }
+
+  /**
+   * Brings every cached (device, rule) state in line with the open alerts in the table: another
+   * replica may have opened or cleared an alert since this one cached it, and may be gone now.
+   * Pairs not cached are left to `loadMissingState`. Runs inside the serialised `process` chain, so
+   * it never interleaves with a transition. A failure is logged and skipped: the evaluation goes on
+   * with the state it has, and the next interval tries again.
+   */
+  private async reconcile(): Promise<void> {
+    this.lastReconcile = Date.now();
+    if (this.state.size === 0) return;
+    try {
+      const { rows } = await this.db.query<{ device_id: string; rule_id: string }>(
+        `SELECT device_id, rule_id FROM alert WHERE status = 'open'`,
+      );
+      const open = new Set(rows.map((r) => key(r.device_id, r.rule_id)));
+      let toOpen = 0;
+      let toClosed = 0;
+      for (const [k, state] of this.state) {
+        if (state.open === open.has(k)) continue;
+        this.state.set(k, { open: !state.open, streak: 0 });
+        if (state.open) toClosed++;
+        else toOpen++;
+      }
+      if (toOpen > 0) this.metrics.stateCorrections.inc({ direction: 'to_open' }, toOpen);
+      if (toClosed > 0) this.metrics.stateCorrections.inc({ direction: 'to_closed' }, toClosed);
+      if (toOpen + toClosed > 0) {
+        this.logger.warn(
+          `Alert state corrected from the table: ${toOpen} now open, ${toClosed} now closed`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Alert state reconcile failed, keeping the cached state: ${messageOf(error)}`,
+      );
     }
   }
 

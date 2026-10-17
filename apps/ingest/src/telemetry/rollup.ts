@@ -17,7 +17,26 @@ export interface RollupRow {
 
 const MINUTE = 60_000;
 
-/** Aggregates stored readings into per-minute rows, ready to upsert into `rollup_1m`. */
+/**
+ * Plain `<` comparison, so every replica sorts the same way (it need not match PostgreSQL's collation).
+ */
+const byKey = (x: RollupRow, y: RollupRow): number =>
+  x.deviceId !== y.deviceId
+    ? x.deviceId < y.deviceId
+      ? -1
+      : 1
+    : x.metric !== y.metric
+      ? x.metric < y.metric
+        ? -1
+        : 1
+      : x.bucket.getTime() - y.bucket.getTime();
+
+/**
+ * Aggregates stored readings into per-minute rows, ready to upsert into `rollup_1m`. The rows come
+ * back sorted by device, metric and bucket: the upsert locks the rows it touches in the order it is
+ * given them, so two replicas that touch the same rows in different orders can each wait for the
+ * other and PostgreSQL aborts one with a deadlock. One order for everyone rules that out.
+ */
 export function rollup(readings: Reading[]): RollupRow[] {
   const rows = new Map<string, RollupRow>();
   for (const r of readings) {
@@ -41,5 +60,5 @@ export function rollup(readings: Reading[]): RollupRow[] {
       });
     }
   }
-  return [...rows.values()];
+  return [...rows.values()].sort(byKey);
 }

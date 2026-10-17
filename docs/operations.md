@@ -50,7 +50,8 @@ cardinality does not grow with the fleet. Default Node.js process metrics are in
 | `alerts_transitions_total`         | counter   | `transition` | Alerts `opened` or `cleared`                                                            |
 | `alerts_evaluation_pending`        | gauge     | —            | Rule evaluations waiting for the database (retried on the next flush); `0` when none    |
 | `alerts_evaluation_dropped_total`  | counter   | —            | Rule evaluations given up on: bad data, or the pending queue (10 000) was full          |
-| `alert_deliveries_total`           | counter   | `result`     | Outbox attempts: `delivered`, `skipped`, `retry`, `failed`                              |
+| `alerts_state_corrections_total`   | counter   | `direction`  | Cached alert state fixed from the `alert` table (`to_open`, `to_closed`); normally `0`  |
+| `alert_deliveries_total`           | counter   | `result`     | Outbox attempts: `delivered`, `skipped`, `retry`, `failed`, `waiting`                   |
 
 ### Suggested alerts
 
@@ -95,7 +96,7 @@ Standard NestJS logging to stdout. The lines worth knowing:
 ## Deploys and shutdown
 
 On `SIGTERM` the service stops consuming on every MQTT connection, flushes the write buffer, lets
-the delivery worker finish its pass, then closes the database pool. Planned restarts and rolling
+the delivery worker finish the row it is delivering (it takes no new one), then closes the database pool. Planned restarts and rolling
 deploys therefore lose nothing ([ADR-0002](adr/0002-ack-on-receipt-with-bounded-loss.md)).
 
 The grace period must cover that drain, and is set in each environment:
@@ -117,8 +118,8 @@ on a live, partitioned table.
 ## Scaling
 
 - **Add replicas.** They join the same shared subscription group; the broker spreads messages.
-  Writes are idempotent, outbox claiming uses `SKIP LOCKED`, and partition maintenance and
-  migrations take advisory locks, so replicas do not collide. The Kubernetes HPA targets 70 % CPU
+  Writes are idempotent, rollup rows are upserted in key order, outbox rows are leased,
+  and partition maintenance and migrations take advisory locks, so replicas do not collide. The Kubernetes HPA targets 70 % CPU
   between 2 and 6 replicas.
 - **Brokers that cap per connection** (AWS IoT Core, 100 messages/s): raise `MQTT_CONNECTIONS`.
   Capacity is replicas × connections × the cap.
@@ -154,8 +155,10 @@ WHERE p.relname = 'reading' ORDER BY 1;
 
 Each alert event (`opened`, `cleared`) is a row in `alert_delivery`, written in the same
 transaction as the alert ([ADR-0005](adr/0005-alert-outbox.md)). The worker polls every
-`DELIVERY_INTERVAL_MS`, claims up to 20 due rows with `FOR UPDATE SKIP LOCKED`, and calls the
-command center.
+`DELIVERY_INTERVAL_MS` and handles up to 20 due rows per pass, one at a time: it leases a row
+(`alert_delivery.locked_until`, 60 s), calls the command center with no transaction open, and then
+records the result. A replica that dies mid-call leaves its row leased; another replica takes it
+when the lease ends, at most a minute later.
 
 | Status      | Meaning                                                           |
 | ----------- | ----------------------------------------------------------------- |
@@ -165,8 +168,10 @@ command center.
 | `failed`    | Gave up after **12 attempts**; **never retried automatically**    |
 
 Backoff is exponential with jitter: about 2 s, 4 s, 8 s … capped at 10 min. A row therefore gives
-up after roughly **18–37 minutes** of continuous failure. A `cleared` event waits (as a retry) until
-its `opened` event has produced an incident id.
+up after roughly **18–37 minutes** of continuous failure. A `cleared` event waits, looking again
+every 5 s and **without using an attempt**, until its `opened` event has produced an incident id. If
+the `opened` event is settled without one (`failed` or `skipped`), the `cleared` event is settled the
+same way at once, since there will be no incident to resolve.
 
 ```sql
 -- How is delivery doing?
@@ -193,7 +198,7 @@ Common `last_error` values:
 | `POST /incidents → 401`                            | The token was refused twice (a fresh one was tried): wrong realm or issuer, or the client is disabled                           |
 | `… → 403`                                          | The service account's role may not report or resolve this incident type (`technician` is limited to Facilities and Environment) |
 | `zone <code> does not exist in ops-command-center` | The device's `zoneCode` has no zone there. Fix the zone or the registry                                                         |
-| `incident not created yet`                         | Normal for a `cleared` event waiting on its `opened` event                                                                      |
+| `incident not created yet`                         | Normal for a `cleared` event waiting on its `opened` event (`result="waiting"`, no attempt used)                                |
 | Connection / timeout errors (5 s timeout)          | Command center or Keycloak unreachable. Retried; no action unless it persists                                                   |
 
 ## Failure modes
@@ -207,7 +212,7 @@ Common `last_error` values:
 | Broker drops messages (queue full) | QoS 1 messages above the broker's queue limit vanish silently                                                                                                                                                                                                           | `telemetry_sequence_gaps_total` — see [benchmarks](benchmarks.md#what-the-gap-metric-caught)                                                                                                                                                              |
 | Command center / Keycloak down     | Alerts are recorded; delivery retries with backoff                                                                                                                                                                                                                      | `alert_deliveries_total{result="retry"}`; `failed` after ~18–37 min                                                                                                                                                                                       |
 | Poison reading                     | The batch is written in halves until the bad reading stands alone; only it is dropped and logged                                                                                                                                                                        | `result="failed"` (one per bad reading), `Dropped … readings` error log with the database message                                                                                                                                                         |
-| Replica added/removed              | Devices move between replicas; rule streaks restart, open/closed alert state is rebuilt from the database                                                                                                                                                               | At worst an alert opens a few readings later                                                                                                                                                                                                              |
+| Replica added/removed              | Devices move between replicas; rule streaks restart. Alert state is loaded from the database on first sight and compared with it every 30 s                                                                                                                             | At worst an alert opens a few readings later, or clears up to 30 s late; `alerts_state_corrections_total`                                                                                                                                                 |
 | Duplicate delivery from the broker | Hits the primary key; counted, not stored twice, rollups unchanged                                                                                                                                                                                                      | `telemetry_readings_total{result="duplicate"}`                                                                                                                                                                                                            |
 
 ## Security posture

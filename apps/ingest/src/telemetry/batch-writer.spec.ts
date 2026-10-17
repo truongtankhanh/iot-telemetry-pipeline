@@ -24,6 +24,8 @@ class FakeDatabase {
   transactions = 0;
   beforeTransaction?: (n: number) => void;
   readonly stored: Row[] = [];
+  /** The arrays each `rollup_1m` upsert was sent with. */
+  readonly rollups: { deviceIds: string[]; metrics: string[]; buckets: Date[] }[] = [];
   readonly ledger = new Map<string, number>();
 
   async transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -56,6 +58,11 @@ class FakeDatabase {
             .filter((r) => !known.has(key(r)));
           staged.push(...rows);
           return { rows };
+        }
+        if (sql.includes('INSERT INTO rollup_1m')) {
+          const [deviceIds, metrics, buckets] = params as [string[], string[], Date[]];
+          this.rollups.push({ deviceIds, metrics, buckets });
+          return { rows: [] };
         }
         if (sql.includes('FROM device')) {
           const ids = params[0] as string[];
@@ -296,5 +303,34 @@ describe('BatchWriter', () => {
         expect.stringContaining('Rule evaluation failed unexpectedly: boom'),
       );
     });
+  });
+
+  it('sends the rollup rows sorted by device, metric and minute, so replicas lock them in one order', async () => {
+    const { db, writer } = setup();
+    const at = (deviceId: string, metric: string, minute: number): Reading => ({
+      deviceId,
+      metric,
+      ts: new Date(minute * 60_000 + 5_000),
+      value: 1,
+    });
+    writer.add([
+      at('d2', 'temperature_c', 5),
+      at('d1', 'temperature_c', 9),
+      at('d1', 'humidity_pct', 2),
+      at('d1', 'temperature_c', 3),
+      at('d2', 'humidity_pct', 1),
+    ]);
+
+    await writer.flush();
+
+    expect(db.rollups).toHaveLength(1);
+    const { deviceIds, metrics, buckets } = db.rollups[0]!;
+    expect(deviceIds.map((d, i) => [d, metrics[i], buckets[i]!.getTime()])).toEqual([
+      ['d1', 'humidity_pct', 2 * 60_000],
+      ['d1', 'temperature_c', 3 * 60_000],
+      ['d1', 'temperature_c', 9 * 60_000],
+      ['d2', 'humidity_pct', 1 * 60_000],
+      ['d2', 'temperature_c', 5 * 60_000],
+    ]);
   });
 });

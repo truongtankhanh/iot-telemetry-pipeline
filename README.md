@@ -56,7 +56,7 @@ the repositories, are in [docs/system-context.md](docs/system-context.md).
   in PostgreSQL, so the count holds across replicas and connections; a gap is confirmed after a
   short grace period (`SEQUENCE_GRACE_MS`) so a late message is not mistaken for a lost one.
 - **Alerts that don't flap**: consecutive-breach counts and separate clear thresholds.
-- **Reliable delivery** through a transactional outbox, `SKIP LOCKED` claiming and backoff.
+- **Reliable delivery** through a transactional outbox, lease-based claiming and backoff.
 - **No extensions required**: plain PostgreSQL with daily partitions, retention by `DROP TABLE`,
   and a documented TimescaleDB upgrade path.
 - **Operable**: Prometheus metrics, liveness/readiness/startup probes, graceful drain on SIGTERM,

@@ -61,7 +61,7 @@ sequenceDiagram
   W->>DB: one transaction: insert readings ON CONFLICT DO NOTHING<br/>→ upsert 1-minute rollups for the rows actually inserted
   W->>R: newly stored readings, in time order
   R->>DB: open / clear alerts (+ outbox row)
-  O->>DB: claim due outbox rows (FOR UPDATE SKIP LOCKED)
+  O->>DB: lease one due outbox row at a time
   O->>occ: POST /api/incidents (retry with backoff)
 ```
 
@@ -97,9 +97,10 @@ maintenance job inside the service — no external cron.
 
 Replicas join the same MQTT **shared subscription** group, so the broker spreads messages across
 them ([ADR-0001](adr/0001-mqtt-shared-subscriptions.md)). Database writes are idempotent and
-outbox claiming uses `SKIP LOCKED`, so replicas never double-deliver an alert row. Rule state is
+outbox rows are taken with a lease, so replicas do not deliver the same alert row at the same time. Rule state is
 per device: the shared subscription is keyed per message, not per device, so the rules engine
-rebuilds a device's state from the database when it sees a device it has no state for
+loads a device's state from the database when it first sees it, and compares what it has cached with
+the `alert` table every 30 seconds, since other replicas change alerts too
 ([ADR-0004](adr/0004-rules-with-hysteresis.md)).
 
 Some managed brokers cap delivery per connection — AWS IoT Core's default is 100 messages/s per

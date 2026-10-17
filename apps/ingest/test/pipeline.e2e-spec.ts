@@ -2,7 +2,6 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { telemetryTopic } from '@itp/telemetry-contract';
 import { connectAsync, type MqttClient } from 'mqtt';
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { Pool } from 'pg';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
@@ -11,6 +10,10 @@ import { DeliveryWorker } from '../src/delivery/delivery.worker';
 import { Metrics } from '../src/metrics/metrics';
 import { BatchWriter } from '../src/telemetry/batch-writer.service';
 import { MqttConsumer } from '../src/telemetry/mqtt-consumer.service';
+import { fakeCommandCenter } from './support/fake-command-center';
+import { counterValue } from './support/metrics';
+import { resetTestDatabase } from './support/test-database';
+import { until } from './support/wait';
 
 /**
  * The real service against a real PostgreSQL (`DATABASE_URL`) and a real MQTT broker (`MQTT_URL`),
@@ -20,73 +23,6 @@ import { MqttConsumer } from '../src/telemetry/mqtt-consumer.service';
 // Environment is set in e2e-env.js, before AppModule is loaded.
 const DATABASE_URL = process.env.DATABASE_URL!;
 const MQTT_URL = process.env.MQTT_URL!;
-const FAKE_OCC_PORT = 3199;
-
-interface Call {
-  method: string;
-  url: string;
-  body: Record<string, unknown> | null;
-  headers: IncomingMessage['headers'];
-}
-
-/**
- * Stands in for ops-command-center and its identity provider: issues a token for the pipeline's
- * client credentials and refuses API calls without it, as the real API does (its ADR-0010).
- */
-
-function fakeCommandCenter(): Promise<{ server: Server; calls: Call[] }> {
-  const calls: Call[] = [];
-  const handle = async (req: IncomingMessage, res: ServerResponse) => {
-    let raw = '';
-    for await (const chunk of req) raw += chunk;
-    res.setHeader('Content-Type', 'application/json');
-    if (req.url === '/token') {
-      const form = new URLSearchParams(raw);
-      const valid =
-        form.get('grant_type') === 'client_credentials' &&
-        form.get('client_id') === 'telemetry-pipeline' &&
-        form.get('client_secret') === 'e2e-secret';
-      if (!valid) return res.writeHead(401).end(JSON.stringify({ error: 'invalid_client' }));
-      return res.end(JSON.stringify({ access_token: 'e2e-token', expires_in: 300 }));
-    }
-    calls.push({
-      method: req.method!,
-      url: req.url!,
-      body: raw ? JSON.parse(raw) : null,
-      headers: req.headers,
-    });
-    if (req.headers.authorization !== 'Bearer e2e-token') {
-      return res.writeHead(401).end(JSON.stringify({ statusCode: 401 }));
-    }
-    if (req.url === '/api/zones')
-      return res.end(JSON.stringify([{ id: 'zone-dc', code: 'BLD-DC' }]));
-    if (req.url === '/api/incidents')
-      return res.writeHead(201).end(JSON.stringify({ id: 'incident-1' }));
-    return res.end('{}');
-  };
-  // The listener is not async: createServer ignores what it returns, so a rejection would go
-  // unhandled. A bug in this fake becomes a 500 that the test can see.
-  const server = createServer((req, res) => {
-    void handle(req, res).catch(() => {
-      if (!res.headersSent) res.writeHead(500);
-      res.end();
-    });
-  });
-  return new Promise((resolve) => server.listen(FAKE_OCC_PORT, () => resolve({ server, calls })));
-}
-
-async function until<T>(
-  read: () => Promise<T>,
-  done: (value: T) => boolean,
-  ms = 5000,
-): Promise<T> {
-  const end = Date.now() + ms;
-  for (;;) {
-    const value = await read();
-    if (done(value) || Date.now() > end) return value;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
 
 describe('Telemetry pipeline (e2e)', () => {
   let app: INestApplication;
@@ -101,27 +37,14 @@ describe('Telemetry pipeline (e2e)', () => {
   const at = (s: number) => new Date(t0 + s * 1000).toISOString();
   const publish = (seq: number, ts: string, metrics: Record<string, number>, t = topic) =>
     publisher.publishAsync(t, JSON.stringify({ seq, ts, metrics }), { qos: 1 });
-  const counter = async (name: keyof Metrics, labels: Record<string, string> = {}) => {
-    const metric = await (
-      metrics[name] as { get(): Promise<{ values: { labels: object; value: number }[] }> }
-    ).get();
-    return metric.values
-      .filter((v) =>
-        Object.entries(labels).every(([k, l]) => (v.labels as Record<string, string>)[k] === l),
-      )
-      .reduce((sum, v) => sum + v.value, 0);
-  };
+  const counter = (name: keyof Metrics, labels: Record<string, string> = {}) =>
+    counterValue(metrics, name, labels);
   const received = () => counter('messages');
   const count = async (sql: string) => Number((await db.query(sql)).rows[0].count);
 
   beforeAll(async () => {
     db = new Pool({ connectionString: DATABASE_URL });
-    // Second line of defence behind e2e-env.js: the name the server reports, not the one in the URL.
-    const { rows } = await db.query<{ name: string }>('SELECT current_database() AS name');
-    if (!rows[0]!.name.endsWith('_test')) {
-      throw new Error(`Refusing to wipe "${rows[0]!.name}": its name does not end in "_test"`);
-    }
-    await db.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+    await resetTestDatabase(db);
     occ = await fakeCommandCenter();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -142,7 +65,7 @@ describe('Telemetry pipeline (e2e)', () => {
     await publisher?.endAsync();
     await app?.close();
     await db?.end();
-    occ?.server.close();
+    await occ?.close();
   });
 
   it('creates the schema and the daily partitions on boot', async () => {
