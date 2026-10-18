@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../config/env.validation';
-import { Database } from '../database/database';
+import { Database, EXEMPT_FROM_STATEMENT_TIMEOUT } from '../database/database';
 import { expiredPartitions, partitionName, requiredDays } from './partitions';
 
 const HOUR = 3_600_000;
@@ -42,6 +42,7 @@ export class PartitionMaintenance implements OnModuleInit, BeforeApplicationShut
   async run(now = new Date()): Promise<{ created: string[]; dropped: string[] }> {
     const retention = this.config.get('RETENTION_DAYS', { infer: true });
     return this.db.transaction(async (client) => {
+      await client.query(EXEMPT_FROM_STATEMENT_TIMEOUT);
       await client.query('SELECT pg_advisory_xact_lock($1)', [MAINTENANCE_LOCK]);
       const { rows } = await client.query<{ name: string }>(
         `SELECT c.relname AS name FROM pg_inherits i

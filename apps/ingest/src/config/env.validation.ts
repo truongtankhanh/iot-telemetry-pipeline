@@ -40,6 +40,17 @@ export class Env {
   @Max(100)
   DB_POOL_MAX = 10;
 
+  /**
+   * Cancels any statement that runs longer than this (ms) with SQLSTATE 57014. 0, the default, sets
+   * nothing and leaves the server's own setting alone. Migrations and partition maintenance exempt
+   * themselves. A value of a few hundred ms or less would cancel ordinary flushes.
+   */
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(3_600_000)
+  DB_STATEMENT_TIMEOUT_MS = 0;
+
   @IsString()
   MQTT_URL = 'mqtt://localhost:1883';
 

@@ -11,6 +11,12 @@ const MIGRATIONS_DIR = join(__dirname, 'migrations');
  * without an error, and `client_addr` already tells replicas apart.
  */
 const APPLICATION_NAME = 'telemetry-ingest';
+/**
+ * First statement of a transaction that must not be cut short by `DB_STATEMENT_TIMEOUT_MS`: the
+ * migration runner and the partition maintenance wait for an advisory lock another replica holds, and
+ * run DDL that takes `ACCESS EXCLUSIVE` locks. `SET LOCAL` ends with the transaction.
+ */
+export const EXEMPT_FROM_STATEMENT_TIMEOUT = 'SET LOCAL statement_timeout = 0';
 /** Arbitrary constant: serialises migrations when several replicas boot at once. */
 const MIGRATION_LOCK = 4_242_001;
 
@@ -24,10 +30,13 @@ export class Database implements OnModuleInit, OnApplicationShutdown {
   readonly pool: Pool;
 
   constructor(private readonly config: ConfigService<Env, true>) {
+    // pg sends the parameter only when it is truthy, so 0 leaves the server's setting in force.
+    const statementTimeoutMs = config.get('DB_STATEMENT_TIMEOUT_MS', { infer: true });
     this.pool = new Pool({
       connectionString: config.get('DATABASE_URL', { infer: true }),
       max: config.get('DB_POOL_MAX', { infer: true }),
       application_name: APPLICATION_NAME,
+      ...(statementTimeoutMs > 0 ? { statement_timeout: statementTimeoutMs } : {}),
       // Without it a connection attempt to an unreachable server waits for the OS to give up.
       connectionTimeoutMillis: 5_000,
     });
@@ -87,6 +96,7 @@ export class Database implements OnModuleInit, OnApplicationShutdown {
   async migrate(): Promise<void> {
     const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith('.sql')).sort();
     await this.transaction(async (client) => {
+      await client.query(EXEMPT_FROM_STATEMENT_TIMEOUT);
       await client.query('SELECT pg_advisory_xact_lock($1)', [MIGRATION_LOCK]);
       await client.query(
         `CREATE TABLE IF NOT EXISTS schema_migration (

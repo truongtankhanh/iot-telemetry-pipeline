@@ -60,12 +60,14 @@ describe('PartitionMaintenance', () => {
   });
 
   describe('run', () => {
-    it('takes the maintenance advisory lock before anything else', async () => {
+    it('exempts itself from the statement timeout and takes the advisory lock before anything else', async () => {
       const { db, service } = setup();
 
       await service.run(NOW);
 
-      expect(db.statements[0]).toEqual({
+      // The lock can wait for another replica, and DROP TABLE for readers: neither may be cancelled.
+      expect(db.statements[0]).toEqual({ sql: 'SET LOCAL statement_timeout = 0', params: [] });
+      expect(db.statements[1]).toEqual({
         sql: 'SELECT pg_advisory_xact_lock($1)',
         params: [4_242_002],
       });

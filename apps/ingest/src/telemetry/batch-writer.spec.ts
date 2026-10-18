@@ -21,6 +21,8 @@ interface Row {
 /** Just enough of PostgreSQL for the writer: readings with ON CONFLICT, and the sequence ledger. */
 class FakeDatabase {
   down = false;
+  /** While set, every transaction throws it, whatever its code. */
+  failure?: Error;
   transactions = 0;
   beforeTransaction?: (n: number) => void;
   readonly stored: Row[] = [];
@@ -31,6 +33,7 @@ class FakeDatabase {
   async transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
     this.beforeTransaction?.(++this.transactions);
     if (this.down) throw Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+    if (this.failure) throw this.failure;
 
     const staged: Row[] = [];
     const ledger = new Map(this.ledger);
@@ -158,6 +161,27 @@ describe('BatchWriter', () => {
     expect(await readings('stored')).toBe(3);
     expect(await readings('failed')).toBe(0);
     expect(db.ledger.get('d1')).toBe(1);
+  });
+
+  it('keeps and retries a batch whose statement was cancelled by the statement timeout (57014)', async () => {
+    const { db, writer, readings, value, metrics } = setup();
+    db.failure = Object.assign(new Error('canceling statement due to statement timeout'), {
+      code: '57014',
+    });
+    writer.add([reading(1), reading(2)]);
+    writer.observe('d1', 1, 1_000);
+    await writer.flush();
+
+    // Not the data's fault, so nothing is dropped: it waits for the next attempt.
+    expect(db.stored).toHaveLength(0);
+    expect(await readings('failed')).toBe(0);
+    expect(await value(metrics.flushRetries)).toBe(1);
+
+    db.failure = undefined;
+    jest.advanceTimersByTime(10_000);
+    await writer.flush();
+    expect(db.stored.map((r) => r.value)).toEqual([1, 2]);
+    expect(await readings('failed')).toBe(0);
   });
 
   it('drops only the reading PostgreSQL rejects and still records the sequence numbers', async () => {

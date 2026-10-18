@@ -130,6 +130,13 @@ on a live, partitioned table.
 - Each replica opens a pool of up to `DB_POOL_MAX` database connections (10 by default); size
   `max_connections` for replicas × `DB_POOL_MAX` plus other clients. The connections are named
   `telemetry-ingest` in `pg_stat_activity`.
+- **Statement timeout is off.** `DB_STATEMENT_TIMEOUT_MS` (0 by default, which sets nothing) cancels a
+  statement that runs longer, with SQLSTATE `57014`. Set it on every replica at once. A cancelled flush is
+  treated as a failure that says nothing about the rows: the batch stays in the buffer and is retried with
+  backoff (`telemetry_flush_retries_total`), and a statement that is always too slow fills the buffer until
+  consumption pauses (`telemetry_consumption_paused`); nothing is dropped. A cancelled API query answers
+  HTTP 500. Migrations and the hourly partition maintenance exempt themselves, because they wait for an
+  advisory lock and take locks that wait for readers.
 
 ## Data lifecycle
 

@@ -16,6 +16,7 @@ function setup(
   options: {
     migrateOnBoot?: boolean;
     poolMax?: number;
+    statementTimeoutMs?: number;
     /** Answers or fails a statement; return nothing to fall back to an empty result. */
     answer?: (sql: string, params?: unknown[]) => { rows: unknown[] } | undefined;
   } = {},
@@ -24,6 +25,7 @@ function setup(
     DATABASE_URL: 'postgresql://user:pass@localhost:5432/telemetry_test',
     MIGRATE_ON_BOOT: options.migrateOnBoot ?? false,
     DB_POOL_MAX: options.poolMax ?? 10,
+    DB_STATEMENT_TIMEOUT_MS: options.statementTimeoutMs ?? 0,
   };
   const config = { get: (key: keyof Env) => settings[key] } as unknown as ConfigService<Env, true>;
   const db = new Database(config);
@@ -52,6 +54,12 @@ describe('Database pool', () => {
 
   it('names its connections, so pg_stat_activity shows whose they are', () => {
     expect(setup().db.pool.options.application_name).toBe('telemetry-ingest');
+  });
+
+  it('sends no statement_timeout unless DB_STATEMENT_TIMEOUT_MS is above 0', () => {
+    expect(setup().db.pool.options.statement_timeout).toBeUndefined();
+    expect(setup({}, { statementTimeoutMs: 0 }).db.pool.options.statement_timeout).toBeUndefined();
+    expect(setup({}, { statementTimeoutMs: 1500 }).db.pool.options.statement_timeout).toBe(1500);
   });
 });
 
@@ -192,13 +200,15 @@ describe('Database.migrate', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it('takes the advisory lock first, inside one transaction', async () => {
+  it('exempts itself from the statement timeout, then takes the advisory lock, inside one transaction', async () => {
     const { db, calls, statements } = setup();
 
     await db.migrate();
 
+    // The lock can wait for another replica's migration, so the exemption comes before it.
     expect(calls[0]!.sql).toBe('BEGIN');
-    expect(calls[1]).toEqual({ sql: 'SELECT pg_advisory_xact_lock($1)', params: [4_242_001] });
+    expect(calls[1]!.sql).toBe('SET LOCAL statement_timeout = 0');
+    expect(calls[2]).toEqual({ sql: 'SELECT pg_advisory_xact_lock($1)', params: [4_242_001] });
     expect(statements.at(-1)).toBe('COMMIT');
   });
 
@@ -211,7 +221,7 @@ describe('Database.migrate', () => {
       s.includes('CREATE TABLE IF NOT EXISTS schema_migration'),
     );
     const read = statements.findIndex((s) => s.startsWith('SELECT name FROM schema_migration'));
-    expect(create).toBeGreaterThan(1); // after BEGIN and the lock
+    expect(create).toBeGreaterThan(2); // after BEGIN, the exemption and the lock
     expect(read).toBeGreaterThan(create);
   });
 
