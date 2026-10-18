@@ -44,6 +44,7 @@ interface WorkItem {
 export class RulesService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RulesService.name);
   private rulesByKindMetric?: Map<string, Rule[]>;
+  private rulesById?: Map<string, Rule>;
   private readonly state = new Map<string, RuleState>();
   /** Evaluations the database could not take yet, oldest first; retried before anything newer. */
   private pending: WorkItem[] = [];
@@ -81,6 +82,7 @@ export class RulesService implements OnApplicationBootstrap {
     }
     this.logger.log(`Loaded ${rules.length} rules from ${path}`);
     this.rulesByKindMetric = byKindMetric;
+    this.rulesById = new Map(rules.map((rule) => [rule.id, rule]));
     return byKindMetric;
   }
 
@@ -290,10 +292,7 @@ export class RulesService implements OnApplicationBootstrap {
 
   /** Incident type configured for a rule — used when delivering its alerts. */
   incidentType(ruleId: string): string | undefined {
-    for (const rules of this.load().values()) {
-      const rule = rules.find((r) => r.id === ruleId);
-      if (rule) return rule.incidentType;
-    }
-    return undefined;
+    this.load();
+    return this.rulesById!.get(ruleId)?.incidentType;
   }
 }

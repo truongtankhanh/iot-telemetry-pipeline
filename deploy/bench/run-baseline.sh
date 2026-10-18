@@ -8,6 +8,8 @@
 #   --connections <n>       MQTT_CONNECTIONS of the service          (default 1)
 #   --pg-setting name=val   ALTER DATABASE telemetry SET name = 'val' before the service starts;
 #                           repeatable (IMP-14.3 uses synchronous_commit=off)
+#   --service-env NAME=val  an environment variable of the service on top of the defaults below, e.g.
+#                           DB_POOL_MAX=5; repeatable (not PATH, HOME, PORT, DATABASE_URL, MQTT_URL, CONFIG_DIR)
 #   --profiler <mode>       cpu-prof (default): node --cpu-prof, a .cpuprofile written at exit
 #                           prof: node --prof, V8's tick log, summarised with --prof-process
 #                           (fallback if a signal-ended process writes no .cpuprofile)
@@ -40,6 +42,7 @@ profiler=cpu-prof
 out=""
 keep=0
 pg_settings=()
+service_extra=()
 
 usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//' >&2; }
 die() { echo "run-baseline: $*" >&2; exit 2; }
@@ -50,6 +53,7 @@ while [ $# -gt 0 ]; do
     --runs) runs="${2:?--runs needs a value}"; shift 2 ;;
     --connections) connections="${2:?--connections needs a value}"; shift 2 ;;
     --pg-setting) pg_settings+=("${2:?--pg-setting needs name=value}"); shift 2 ;;
+    --service-env) service_extra+=("${2:?--service-env needs NAME=value}"); shift 2 ;;
     --profiler) profiler="${2:?--profiler needs cpu-prof or prof}"; shift 2 ;;
     --out) out="${2:?--out needs a directory}"; shift 2 ;;
     --keep) keep=1; shift ;;
@@ -73,6 +77,12 @@ for setting in "${pg_settings[@]:-}"; do
   [[ "$setting" =~ ^[a-z_.]+=[A-Za-z0-9_.-]+$ ]] || die "--pg-setting takes name=value (letters, digits, _ . -): $setting"
 done
 
+for extra in "${service_extra[@]:-}"; do
+  [ -z "$extra" ] && continue
+  [[ "$extra" =~ ^[A-Z][A-Z0-9_]*=[A-Za-z0-9_.:/@-]*$ ]] || die "--service-env takes NAME=value (NAME in capitals; value letters, digits and _ . : / @ -): $extra"
+  case "${extra%%=*}" in PATH|HOME|PORT|DATABASE_URL|MQTT_URL|CONFIG_DIR) die "--service-env cannot set ${extra%%=*}" ;; esac
+done
+
 for tool in docker curl node; do
   command -v "$tool" > /dev/null || die "$tool is required"
 done
@@ -80,6 +90,15 @@ done
   || die "apps/ingest/dist/main.js is missing: build first (pnpm --filter @itp/telemetry-contract build && pnpm --filter @itp/ingest build)"
 [ -f "$root/packages/telemetry-contract/dist/index.cjs" ] \
   || die "the contract is not built: pnpm --filter @itp/telemetry-contract build"
+# A benchmark of a build older than the source measures the old code (a DB_POOL_MAX the build does not
+# know is silently ignored). nest build only writes the files that changed, so compare with the newest
+# file of dist, not with main.js.
+newest_dist="$(find "$root/apps/ingest/dist" -name '*.js' -type f -print0 | xargs -0 ls -t | head -n 1)"
+stale="$(find "$root/apps/ingest/src" "$root/packages/telemetry-contract/src" -name '*.ts' ! -name '*.spec.ts' \
+  -newer "$newest_dist" | head -n 1)"
+[ -z "$stale" ] || die "the build is older than the source ($stale): build first (pnpm --filter @itp/telemetry-contract build && pnpm --filter @itp/ingest build)"
+[ ! "$root/packages/telemetry-contract/src/index.ts" -nt "$root/packages/telemetry-contract/dist/index.cjs" ] \
+  || die "the contract build is older than its source: pnpm --filter @itp/telemetry-contract build"
 # Anything already answering on the service's port would pass the readiness wait below.
 if curl -s --max-time 2 -o /dev/null "http://localhost:$ingest_port/"; then
   die "something already listens on :$ingest_port"
@@ -128,7 +147,9 @@ sample_stats() {
 stop_sampler() {
   [ -n "$sampler_pid" ] || return 0
   pkill -P "$sampler_pid" 2> /dev/null || true
-  stop_sampler
+  kill "$sampler_pid" 2> /dev/null || true
+  wait "$sampler_pid" 2> /dev/null || true
+  sampler_pid=""
 }
 
 # Value of a metric in a /metrics scrape; labelled series of one name are added up.
@@ -159,6 +180,9 @@ service_env=(
   "MQTT_CONNECTIONS=$connections" "FLUSH_INTERVAL_MS=250" "FLUSH_MAX_READINGS=1000"
   "CONFIG_DIR=$root/apps/ingest/config"
 )
+for extra in "${service_extra[@]:-}"; do
+  [ -n "$extra" ] && service_env+=("$extra")
+done
 (cd "$out/profile" && exec env -i "${service_env[@]}" node "${node_flags[@]}" "$root/apps/ingest/dist/main.js") \
   > "$out/ingest.log" 2>&1 &
 ingest_pid=$!
@@ -210,14 +234,17 @@ for run in $(seq 1 "$runs"); do
     echo "Run $run did not store every reading." >&2
     fail=1
   fi
-  kill "$sampler_pid" 2> /dev/null || true
-  wait "$sampler_pid" 2> /dev/null || true
-  sampler_pid=""
+  stop_sampler
 
   [ -s "$line" ] && cat "$line" >> "$out/runs.jsonl"
   # Flushes and rule evaluation settle before the second scrape.
   sleep 2
   curl -fs "http://localhost:$ingest_port/metrics" > "$out/run-$run.metrics-after.txt"
+
+  # The connections the service holds right after the run (idle ones are closed after 10 s): how large
+  # the pool grew, by the name the service gives them.
+  psql -c "SELECT application_name, state, count(*) FROM pg_stat_activity WHERE datname = 'telemetry' AND backend_type = 'client backend' GROUP BY 1, 2 ORDER BY 1, 2" \
+    > "$out/run-$run.connections.txt"
 
   before="$out/run-$run.metrics-before.txt"
   after="$out/run-$run.metrics-after.txt"
@@ -232,7 +259,7 @@ for run in $(seq 1 "$runs"); do
     echo "sequence gaps:              $(delta telemetry_sequence_gaps_total)"
     echo "alert transitions:          $(delta alerts_transitions_total)"
   } > "$out/run-$run.metrics-summary.txt"
-  cat "$line" "$out/run-$run.metrics-summary.txt"
+  cat "$line" "$out/run-$run.metrics-summary.txt" "$out/run-$run.connections.txt"
 done
 
 # --- stop the service: SIGTERM, as Compose and Kubernetes do, so the shutdown hooks run ------------

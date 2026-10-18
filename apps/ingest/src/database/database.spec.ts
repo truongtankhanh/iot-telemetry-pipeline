@@ -15,6 +15,7 @@ function setup(
   failures: Partial<Record<Statement, Error>> = {},
   options: {
     migrateOnBoot?: boolean;
+    poolMax?: number;
     /** Answers or fails a statement; return nothing to fall back to an empty result. */
     answer?: (sql: string, params?: unknown[]) => { rows: unknown[] } | undefined;
   } = {},
@@ -22,6 +23,7 @@ function setup(
   const settings: Partial<Record<keyof Env, unknown>> = {
     DATABASE_URL: 'postgresql://user:pass@localhost:5432/telemetry_test',
     MIGRATE_ON_BOOT: options.migrateOnBoot ?? false,
+    DB_POOL_MAX: options.poolMax ?? 10,
   };
   const config = { get: (key: keyof Env) => settings[key] } as unknown as ConfigService<Env, true>;
   const db = new Database(config);
@@ -41,6 +43,17 @@ function setup(
   jest.spyOn(db.pool, 'connect').mockResolvedValue(client as unknown as never);
   return { db, client, statements, calls };
 }
+
+describe('Database pool', () => {
+  it('is as large as DB_POOL_MAX says', () => {
+    expect(setup({}, { poolMax: 4 }).db.pool.options.max).toBe(4);
+    expect(setup().db.pool.options.max).toBe(10);
+  });
+
+  it('names its connections, so pg_stat_activity shows whose they are', () => {
+    expect(setup().db.pool.options.application_name).toBe('telemetry-ingest');
+  });
+});
 
 describe('Database.transaction', () => {
   let warn: jest.SpyInstance;

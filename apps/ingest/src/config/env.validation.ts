@@ -28,6 +28,18 @@ export class Env {
   @IsString()
   DATABASE_URL: string;
 
+  /**
+   * Connections this process may hold open to PostgreSQL. A flush, the outbox worker, the API and the
+   * maintenance share them; the setting is a connection budget (replicas × this against the server's
+   * `max_connections`), not a throughput lever: one flush runs at a time. Below 2 a flush and any other
+   * statement would queue behind each other.
+   */
+  @Type(() => Number)
+  @IsInt()
+  @Min(2)
+  @Max(100)
+  DB_POOL_MAX = 10;
+
   @IsString()
   MQTT_URL = 'mqtt://localhost:1883';
 

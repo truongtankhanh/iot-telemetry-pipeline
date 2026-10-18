@@ -6,6 +6,11 @@ import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import type { Env } from '../config/env.validation';
 
 const MIGRATIONS_DIR = join(__dirname, 'migrations');
+/**
+ * Shown in `pg_stat_activity`. Fixed, not the pod name: PostgreSQL cuts the name at 63 characters
+ * without an error, and `client_addr` already tells replicas apart.
+ */
+const APPLICATION_NAME = 'telemetry-ingest';
 /** Arbitrary constant: serialises migrations when several replicas boot at once. */
 const MIGRATION_LOCK = 4_242_001;
 
@@ -21,7 +26,8 @@ export class Database implements OnModuleInit, OnApplicationShutdown {
   constructor(private readonly config: ConfigService<Env, true>) {
     this.pool = new Pool({
       connectionString: config.get('DATABASE_URL', { infer: true }),
-      max: 10,
+      max: config.get('DB_POOL_MAX', { infer: true }),
+      application_name: APPLICATION_NAME,
       // Without it a connection attempt to an unreachable server waits for the OS to give up.
       connectionTimeoutMillis: 5_000,
     });

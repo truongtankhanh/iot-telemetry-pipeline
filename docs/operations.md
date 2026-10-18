@@ -124,10 +124,12 @@ on a live, partitioned table.
 - **Brokers that cap per connection** (AWS IoT Core, 100 messages/s): raise `MQTT_CONNECTIONS`.
   Capacity is replicas × connections × the cap.
 - **The database is the next limit.** A flush averages ~93 ms for ~1 800 readings in the
-  benchmark, so one PostgreSQL instance carries several replicas; tuning notes (`synchronous_commit`,
-  WAL sizing) are listed as not yet measured in [benchmarks](benchmarks.md#not-measured-yet).
-- Each replica opens a pool of up to 10 database connections; size `max_connections` for
-  replicas × 10 plus other clients.
+  benchmark, so one PostgreSQL instance carries several replicas. `synchronous_commit` was
+  measured and showed no gain beyond the noise; WAL sizing is not measured yet
+  ([benchmarks](benchmarks.md#synchronous_commit)).
+- Each replica opens a pool of up to `DB_POOL_MAX` database connections (10 by default); size
+  `max_connections` for replicas × `DB_POOL_MAX` plus other clients. The connections are named
+  `telemetry-ingest` in `pg_stat_activity`.
 
 ## Data lifecycle
 
