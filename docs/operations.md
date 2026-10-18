@@ -269,6 +269,7 @@ roadmap item, not an oversight in the docs. The ones that need work are tracked 
 4. **Rule streaks are per replica and in memory** ([ADR-0004](adr/0004-rules-with-hysteresis.md)).
 5. **Configuration is read at boot.** Changes to `devices.json` or `rules.json` need a restart or a
    rolling deploy.
-6. **`/api/devices/:id/readings` silently caps raw results at 5 000 points**, oldest first.
+6. **`/api/devices/:id/readings` returns at most 5 000 raw points per request**, oldest first. The response says when it was cut
+   (`truncated`, `nextFrom`; [paging](api.md#paging-raw-readings)). A `resolution=1m` range is limited to 7 days.
 7. **Failed deliveries are final** until a human requeues them.
 8. **Alerts and outbox rows are never deleted.**

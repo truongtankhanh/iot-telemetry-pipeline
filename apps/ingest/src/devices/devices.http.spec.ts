@@ -81,11 +81,66 @@ describe('GET /api/devices/:id/readings (HTTP)', () => {
     });
 
     // Pinned as it is today. IMP-16.4 changes this: the pipe reads "from" with `new Date(value)`,
-    // so a loose string is accepted (confirmed in the first run, before the fix: 200).
+    // so a loose string is accepted (confirmed in the first run, before the fix: 200). It is a raw
+    // request because `from=1` is the year 2001, a range the 1m resolution refuses.
     it('accepts a loose "from" such as 1', async () => {
-      await readings('metric=temperature_c&from=1&to=2026-10-17T10:00:00Z').expect(200);
+      await readings('metric=temperature_c&resolution=raw&from=1&to=2026-10-17T10:00:00Z').expect(
+        200,
+      );
 
       expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a 1m range of more than 7 days, naming the limit, without querying', async () => {
+      const res = await readings('metric=temperature_c&from=2020-01-01T00:00:00Z').expect(400);
+
+      expect(res.body.message).toContain('at most 10080 minutes');
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('accepts a 1m range of exactly 7 days', async () => {
+      await readings(
+        'metric=temperature_c&from=2026-10-10T00:00:00Z&to=2026-10-17T00:00:00Z',
+      ).expect(200);
+
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not limit the range of raw readings', async () => {
+      await readings('metric=temperature_c&resolution=raw&from=2020-01-01T00:00:00Z').expect(200);
+
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('truncated raw readings', () => {
+    const raw =
+      'metric=temperature_c&resolution=raw&from=2026-10-17T00:00:00Z&to=2026-10-18T00:00:00Z';
+    const rows = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        ts: new Date(Date.UTC(2026, 9, 17) + i * 1000),
+        value: i,
+      }));
+
+    it('says so, and where to continue, when more than 5 000 readings match', async () => {
+      const all = rows(5001);
+      query.mockResolvedValue({ rows: all });
+
+      const res = await readings(raw).expect(200);
+
+      expect(res.body.points).toHaveLength(5000);
+      expect(res.body.truncated).toBe(true);
+      expect(res.body.nextFrom).toBe(all[5000]!.ts.toISOString());
+    });
+
+    it('says it is complete when everything fit', async () => {
+      query.mockResolvedValue({ rows: rows(3) });
+
+      const res = await readings(raw).expect(200);
+
+      expect(res.body.points).toHaveLength(3);
+      expect(res.body.truncated).toBe(false);
+      expect(res.body.nextFrom).toBeNull();
     });
   });
 

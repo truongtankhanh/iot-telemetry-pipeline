@@ -14,7 +14,13 @@ import { Database } from '../database/database';
 import { DevicesService } from './devices.service';
 
 const MAX_RAW_POINTS = 5000;
-const DEFAULT_RANGE_MS = 60 * 60_000;
+const MINUTE_MS = 60_000;
+/**
+ * Longest range `resolution=1m` accepts, in minutes. One bucket is one minute, so this is also the
+ * most buckets a response can hold (about a week of chart, around a megabyte of JSON).
+ */
+const MAX_ROLLUP_BUCKETS = 10_080;
+const DEFAULT_RANGE_MS = 60 * MINUTE_MS;
 
 export class ReadingsQueryDto {
   /** Metric to return, e.g. `temperature_c`. */
@@ -71,13 +77,32 @@ export class DevicesController {
     if (from >= to) throw new BadRequestException('"from" must be earlier than "to"');
 
     if (query.resolution === 'raw') {
+      // One row past the cap tells "exactly the cap" from "more than the cap". `from` is inclusive
+      // and (device, metric, ts) is unique, so that row's `ts` is where the next page starts.
       const { rows } = await this.db.query<{ ts: Date; value: number }>(
         `SELECT ts, value FROM reading
          WHERE device_id = $1 AND metric = $2 AND ts >= $3 AND ts < $4
          ORDER BY ts LIMIT $5`,
-        [id, query.metric, from, to, MAX_RAW_POINTS],
+        [id, query.metric, from, to, MAX_RAW_POINTS + 1],
       );
-      return { deviceId: id, metric: query.metric, resolution: 'raw', from, to, points: rows };
+      const truncated = rows.length > MAX_RAW_POINTS;
+      return {
+        deviceId: id,
+        metric: query.metric,
+        resolution: 'raw',
+        from,
+        to,
+        truncated,
+        nextFrom: truncated ? rows[MAX_RAW_POINTS].ts : null,
+        points: truncated ? rows.slice(0, MAX_RAW_POINTS) : rows,
+      };
+    }
+
+    if (to.getTime() - from.getTime() > MAX_ROLLUP_BUCKETS * MINUTE_MS) {
+      throw new BadRequestException(
+        `resolution=1m accepts a range of at most ${MAX_ROLLUP_BUCKETS} minutes ` +
+          `(${MAX_ROLLUP_BUCKETS / 1440} days); narrow "from" and "to"`,
+      );
     }
 
     const { rows } = await this.db.query<{
