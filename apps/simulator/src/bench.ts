@@ -25,8 +25,12 @@ const { values } = parseArgs({
     },
     messages: { type: 'string', default: '50000' },
     timeout: { type: 'string', default: '120' },
+    // One JSON line on stdout instead of the table, for scripts (deploy/bench/run-baseline.sh).
+    json: { type: 'boolean', default: false },
   },
 });
+// Progress text goes to stderr with --json, so stdout carries exactly the result line.
+const log = values.json ? console.error : console.log;
 
 const total = Number(values.messages);
 const devices = (JSON.parse(readFileSync(values.registry, 'utf8')) as { devices: DeviceSpec[] })
@@ -52,7 +56,7 @@ const countStored = async () =>
   );
 
 const before = await countStored();
-console.log(`Publishing ${total} messages (${expected} readings) from ${devices.length} devices…`);
+log(`Publishing ${total} messages (${expected} readings) from ${devices.length} devices…`);
 
 const started = performance.now();
 const seq = new Map<string, number>();
@@ -87,14 +91,32 @@ await db.end();
 
 const seconds = (ms: number) => (ms / 1000).toFixed(2);
 const rate = (n: number, ms: number) => Math.round(n / (ms / 1000)).toLocaleString('en-US');
-console.table({
-  'messages published': total,
-  'readings expected': expected,
-  'readings stored': stored - before,
-  'publish time (s)': seconds(published - started),
-  'end-to-end time (s)': seconds(persisted - started),
-  'messages/s end-to-end': rate(total, persisted - started),
-  'readings/s end-to-end': rate(stored - before, persisted - started),
-  machine: `${cpus().length} vCPU, Node ${process.versions.node}`,
-});
-process.exit(stored - before === expected ? 0 : 1);
+const complete = stored - before === expected;
+if (values.json) {
+  const elapsedMs = persisted - started;
+  const line = JSON.stringify({
+    messages: total,
+    readingsExpected: expected,
+    readingsStored: stored - before,
+    publishSeconds: Number(seconds(published - started)),
+    endToEndSeconds: Number(seconds(elapsedMs)),
+    messagesPerSecond: Math.round(total / (elapsedMs / 1000)),
+    readingsPerSecond: Math.round((stored - before) / (elapsedMs / 1000)),
+    vcpu: cpus().length,
+    node: process.versions.node,
+  });
+  // Exit only once the line is written: a pipe may not be flushed when the process ends.
+  process.stdout.write(`${line}\n`, () => process.exit(complete ? 0 : 1));
+} else {
+  console.table({
+    'messages published': total,
+    'readings expected': expected,
+    'readings stored': stored - before,
+    'publish time (s)': seconds(published - started),
+    'end-to-end time (s)': seconds(persisted - started),
+    'messages/s end-to-end': rate(total, persisted - started),
+    'readings/s end-to-end': rate(stored - before, persisted - started),
+    machine: `${cpus().length} vCPU, Node ${process.versions.node}`,
+  });
+  process.exit(complete ? 0 : 1);
+}
