@@ -160,7 +160,10 @@ clean. What differs from GitHub, on purpose:
   packages (only Jest accepts that flag).
 - **Manifests** need `kustomize` and `kubeconform` on the PATH (`brew install kustomize kubeconform`).
   Without them the step is reported as `SKIP`, never as a pass, and the summary says so.
-- **Images** only build (`docker compose --profile demo build`), as in CI; nothing is started.
+- **Images** only build (`docker compose --profile demo build`), as in CI; nothing is started. The two
+  Dockerfiles install dependencies from the package manifests before they copy any source, with the
+  pnpm store in a BuildKit cache mount, so a change to a source file does not reinstall anything. To
+  build from nothing, `docker builder prune` also empties that cache mount; `--no-cache` does not.
 
 Turborepo's cache (`.turbo/`, git-ignored) makes a repeat run fast: unchanged lint, typecheck, test
 and build steps say `cache hit`. GitHub's runner starts with no cache, so use `--fresh` for the last
