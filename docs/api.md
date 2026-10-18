@@ -11,7 +11,7 @@ the Compose demo and off by default elsewhere, including the Kubernetes base.
 > network only. See [operations.md](operations.md#security-posture) before exposing it anywhere.
 
 Requests are validated strictly: an unknown query parameter or a malformed value returns `400`
-with the validation messages.
+with the validation messages. Every error has the same envelope; see [Errors](#errors).
 
 ## Endpoints
 
@@ -44,12 +44,12 @@ stored for the device, or `null` if none yet).
 
 ### GET /api/devices/:id/readings
 
-| Query        | Required | Default       | Notes                                              |
-| ------------ | -------- | ------------- | -------------------------------------------------- |
-| `metric`     | yes      | —             | A metric the device reports, e.g. `temperature_c`. |
-| `from`       | no       | `to` − 1 hour | ISO 8601, inclusive.                               |
-| `to`         | no       | now           | ISO 8601, exclusive.                               |
-| `resolution` | no       | `1m`          | `1m` per-minute summaries, or `raw` readings.      |
+| Query        | Required | Default       | Notes                                                                                      |
+| ------------ | -------- | ------------- | ------------------------------------------------------------------------------------------ |
+| `metric`     | yes      | —             | One of `temperature_c`, `humidity_pct`, `co2_ppm`, `power_kw`, and one the device reports. |
+| `from`       | no       | `to` − 1 hour | ISO 8601, inclusive. Must be earlier than `to`.                                            |
+| `to`         | no       | now           | ISO 8601, exclusive.                                                                       |
+| `resolution` | no       | `1m`          | `1m` per-minute summaries, or `raw` readings.                                              |
 
 `resolution=1m` reads the rollup table (`count`, average, `min`, `max` per minute):
 
@@ -82,6 +82,8 @@ stored for the device, or `null` if none yet).
 - The cap is silent: if a range holds more than 5 000 readings you get the **earliest** 5 000.
   Narrow the range or use `1m`.
 - `1m` has no cap; a 30-day range is up to 43 200 buckets. Ask for what a chart can show.
+- `400` if `from` is not earlier than `to` (an empty or reversed range, or a `from` in the future when
+  `to` is left to default to now), or if `metric` is not one of the four names above.
 - `404` if the device is not registered, or the device does not report that metric.
 
 ### GET /api/alerts
@@ -145,6 +147,38 @@ Kubernetes uses `/api/health` for liveness and startup and `/api/ready` for read
 
 Prometheus text format, at the root (not under `/api`). Metric names and meanings:
 [operations.md](operations.md#metrics).
+
+## Errors
+
+Errors use Nest's standard body: `statusCode`, `error` (the status text) and `message`. The type of
+`message` depends on who refused the request:
+
+- **`400` from the validation of the query**: `message` is an **array** of strings, one per problem.
+
+  ```json
+  {
+    "message": [
+      "metric must be one of the following values: temperature_c, humidity_pct, co2_ppm, power_kw"
+    ],
+    "error": "Bad Request",
+    "statusCode": 400
+  }
+  ```
+
+- **`400` from a check the handler makes** (for example a range whose `from` is not earlier than
+  `to`): `message` is a **string**.
+
+  ```json
+  { "message": "\"from\" must be earlier than \"to\"", "error": "Bad Request", "statusCode": 400 }
+  ```
+
+- **`404`**: `message` is a string, for example `Device ghost-01 is not registered` or
+  `Device dc-env-01 does not report co2_ppm`.
+- **`503`** from `/api/ready`: the readiness body shown [above](#get-apihealth-and-apiready).
+
+A client should accept both forms of `message`. The validation runs before the handler, so a
+malformed query is `400` even for a device that is not registered; do not rely on which of two
+simultaneous problems is reported first.
 
 ## Examples
 
