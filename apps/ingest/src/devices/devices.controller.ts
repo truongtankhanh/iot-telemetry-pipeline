@@ -1,7 +1,15 @@
-import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { METRIC_NAMES, type MetricName } from '@itp/telemetry-contract';
 import { Type } from 'class-transformer';
-import { IsDate, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsDate, IsIn, IsOptional } from 'class-validator';
 import { Database } from '../database/database';
 import { DevicesService } from './devices.service';
 
@@ -10,8 +18,8 @@ const DEFAULT_RANGE_MS = 60 * 60_000;
 
 export class ReadingsQueryDto {
   /** Metric to return, e.g. `temperature_c`. */
-  @IsString()
-  metric: string;
+  @IsIn(METRIC_NAMES)
+  metric: MetricName;
 
   /** Start of the range (ISO 8601). Default: one hour before `to`. */
   @IsOptional()
@@ -54,11 +62,13 @@ export class DevicesController {
   async readings(@Param('id') id: string, @Query() query: ReadingsQueryDto) {
     const device = this.devices.get(id);
     if (!device) throw new NotFoundException(`Device ${id} is not registered`);
-    if (!device.metrics.includes(query.metric as never)) {
+    if (!device.metrics.includes(query.metric)) {
       throw new NotFoundException(`Device ${id} does not report ${query.metric}`);
     }
     const to = query.to ?? new Date();
     const from = query.from ?? new Date(to.getTime() - DEFAULT_RANGE_MS);
+    // Here, not in the DTO: each bound defaults from the other, so only now are both known.
+    if (from >= to) throw new BadRequestException('"from" must be earlier than "to"');
 
     if (query.resolution === 'raw') {
       const { rows } = await this.db.query<{ ts: Date; value: number }>(

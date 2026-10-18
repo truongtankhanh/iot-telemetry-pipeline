@@ -1,4 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import type { MetricName } from '@itp/telemetry-contract';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Database } from '../database/database';
@@ -28,7 +29,7 @@ function setup(rows: unknown[] = []) {
 }
 
 /** A query as the validation pipe leaves it: the class defaults are applied by constructing it. */
-const dto = (values: Partial<ReadingsQueryDto> & { metric: string }) =>
+const dto = (values: Partial<ReadingsQueryDto> & { metric: MetricName }) =>
   Object.assign(new ReadingsQueryDto(), values);
 
 describe('DevicesController.list', () => {
@@ -130,5 +131,30 @@ describe('DevicesController.readings', () => {
 
     expect(sent().params).toEqual(['dc-env-01', 'humidity_pct', from, to]);
     expect(result).toMatchObject({ from, to });
+  });
+
+  it.each([
+    ['ends before it starts', '2026-10-17T09:00:00Z', '2026-10-17T08:00:00Z'],
+    ['is empty', '2026-10-17T09:00:00Z', '2026-10-17T09:00:00Z'],
+  ])('refuses a range that %s, without querying', async (_name, fromText, toText) => {
+    const { controller, query } = setup();
+    const range = { from: new Date(fromText), to: new Date(toText) };
+
+    const rejection = controller.readings('dc-env-01', dto({ metric: 'temperature_c', ...range }));
+
+    await expect(rejection).rejects.toThrow(BadRequestException);
+    await expect(rejection).rejects.toThrow('"from" must be earlier than "to"');
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('refuses a "from" in the future when "to" defaults to now, without querying', async () => {
+    const { controller, query } = setup();
+    const from = new Date(NOW.getTime() + HOUR);
+
+    await expect(
+      controller.readings('dc-env-01', dto({ metric: 'temperature_c', from })),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(query).not.toHaveBeenCalled();
   });
 });
