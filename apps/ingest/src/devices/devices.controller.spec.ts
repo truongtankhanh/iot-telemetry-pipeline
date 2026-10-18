@@ -113,10 +113,87 @@ describe('DevicesController.readings', () => {
     const { sql, params } = sent();
     expect(sql).toContain('FROM reading');
     expect(sql).not.toContain('rollup_1m');
-    // IMP-16 changes this: today the cap is 5 000 points and the response does not say it applied.
+    // One row more than the cap is requested: that extra row is how truncation is detected.
     expect(params).toHaveLength(5);
-    expect(params[4]).toBe(5000);
-    expect(result).toMatchObject({ resolution: 'raw', points });
+    expect(params[4]).toBe(5001);
+    expect(result).toMatchObject({ resolution: 'raw', points, truncated: false, nextFrom: null });
+  });
+
+  describe('when raw readings exceed the cap', () => {
+    /** `count` readings, one second apart, oldest first as the query returns them. */
+    const rawRows = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        ts: new Date(NOW.getTime() + i * 1000),
+        value: i,
+      }));
+
+    it('returns the first 5 000 and points at the first one left out', async () => {
+      const rows = rawRows(5001);
+      const { controller } = setup(rows);
+
+      const result = await controller.readings(
+        'dc-env-01',
+        dto({ metric: 'temperature_c', resolution: 'raw' }),
+      );
+
+      expect(result).toMatchObject({ truncated: true, nextFrom: rows[5000]!.ts });
+      const points = (result as { points: unknown[] }).points;
+      expect(points).toHaveLength(5000);
+      expect(points[4999]).toBe(rows[4999]);
+    });
+
+    it('does not claim truncation for exactly 5 000 readings', async () => {
+      const { controller } = setup(rawRows(5000));
+
+      const result = await controller.readings(
+        'dc-env-01',
+        dto({ metric: 'temperature_c', resolution: 'raw' }),
+      );
+
+      expect(result).toMatchObject({ truncated: false, nextFrom: null });
+      expect((result as { points: unknown[] }).points).toHaveLength(5000);
+    });
+  });
+
+  describe('the range of resolution=1m', () => {
+    const MINUTE = 60_000;
+    /** A range of `minutes` ending at `NOW`. */
+    const range = (minutes: number) => ({
+      from: new Date(NOW.getTime() - minutes * MINUTE),
+      to: NOW,
+    });
+
+    it('accepts exactly 10 080 minutes (7 days)', async () => {
+      const { controller, query } = setup();
+
+      await controller.readings('dc-env-01', dto({ metric: 'temperature_c', ...range(10_080) }));
+
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses one minute more, naming the limit, without querying', async () => {
+      const { controller, query } = setup();
+
+      const rejection = controller.readings(
+        'dc-env-01',
+        dto({ metric: 'temperature_c', ...range(10_081) }),
+      );
+
+      await expect(rejection).rejects.toThrow(BadRequestException);
+      await expect(rejection).rejects.toThrow('10080 minutes (7 days)');
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('does not apply to raw readings, which are capped by their row count', async () => {
+      const { controller, query } = setup();
+
+      await controller.readings(
+        'dc-env-01',
+        dto({ metric: 'temperature_c', resolution: 'raw', ...range(10_081) }),
+      );
+
+      expect(query).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('uses the range it is given, in the order id, metric, from, to', async () => {

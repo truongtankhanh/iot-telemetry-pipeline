@@ -66,7 +66,7 @@ stored for the device, or `null` if none yet).
 }
 ```
 
-`resolution=raw` returns individual readings, **oldest first, capped at 5 000 points**:
+`resolution=raw` returns individual readings, **oldest first, up to 5 000 points per response**:
 
 ```json
 {
@@ -75,16 +75,36 @@ stored for the device, or `null` if none yet).
   "resolution": "raw",
   "from": "…",
   "to": "…",
+  "truncated": false,
+  "nextFrom": null,
   "points": [{ "ts": "2026-10-16T07:59:02.000Z", "value": 24.3 }]
 }
 ```
 
-- The cap is silent: if a range holds more than 5 000 readings you get the **earliest** 5 000.
-  Narrow the range or use `1m`.
-- `1m` has no cap; a 30-day range is up to 43 200 buckets. Ask for what a chart can show.
+- `truncated` is `true` when the range holds more than 5 000 readings: the response has the
+  **earliest** 5 000 and `nextFrom` is the time of the first one left out. When it is `false`,
+  `nextFrom` is `null` and nothing is missing. A response without `truncated` (an older replica
+  during a rolling deploy) does not say either way.
+- `resolution=1m` accepts a range of at most **10 080 minutes (7 days)**, which is also the most
+  buckets a response can hold. A longer range is `400`; ask for what a chart can show. The limit
+  does not apply to `raw`, which is bounded by the 5 000 points.
 - `400` if `from` is not earlier than `to` (an empty or reversed range, or a `from` in the future when
-  `to` is left to default to now), or if `metric` is not one of the four names above.
+  `to` is left to default to now), if `metric` is not one of the four names above, or if a `1m`
+  range is longer than 7 days.
 - `404` if the device is not registered, or the device does not report that metric.
+
+#### Paging raw readings
+
+Repeat the request with `from` set to `nextFrom` and the **same `to`** as the response, until
+`truncated` is `false`. `from` is inclusive and a device has one reading per metric and instant, so
+the pages neither overlap nor leave a gap. Keep `to` fixed: left to default to now, it would move
+between requests.
+
+```bash
+curl "localhost:3100/api/devices/dc-env-01/readings?metric=temperature_c&resolution=raw&from=2026-10-16T00:00:00Z&to=2026-10-17T00:00:00Z"
+# …"truncated": true, "nextFrom": "2026-10-16T01:23:20.000Z"
+curl "localhost:3100/api/devices/dc-env-01/readings?metric=temperature_c&resolution=raw&from=2026-10-16T01:23:20.000Z&to=2026-10-17T00:00:00Z"
+```
 
 ### GET /api/alerts
 
