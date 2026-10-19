@@ -47,9 +47,15 @@ stored for the device, or `null` if none yet).
 | Query        | Required | Default       | Notes                                                                                      |
 | ------------ | -------- | ------------- | ------------------------------------------------------------------------------------------ |
 | `metric`     | yes      | —             | One of `temperature_c`, `humidity_pct`, `co2_ppm`, `power_kw`, and one the device reports. |
-| `from`       | no       | `to` − 1 hour | ISO 8601, inclusive. Must be earlier than `to`.                                            |
-| `to`         | no       | now           | ISO 8601, exclusive.                                                                       |
+| `from`       | no       | `to` − 1 hour | ISO 8601 with a zone, inclusive. Must be earlier than `to`.                                |
+| `to`         | no       | now           | ISO 8601 with a zone, exclusive.                                                           |
 | `resolution` | no       | `1m`          | `1m` per-minute summaries, or `raw` readings.                                              |
+
+`from` and `to` are read as strictly as the `ts` of a telemetry message
+([telemetry-contract.md](telemetry-contract.md)): `YYYY-MM-DDTHH:mm:ss`, an optional fraction of 1 to 9
+digits, then `Z` or `±HH:mm`, and a date that exists. Text with no zone, a date alone, a bare number
+or `24:00:00` is `400`. In a URL a `+` is a space, so write an offset as `%2B`
+(`from=2026-10-17T17:00:00%2B07:00`) or use `Z`.
 
 `resolution=1m` reads the rollup table (`count`, average, `min`, `max` per minute):
 
@@ -89,8 +95,8 @@ stored for the device, or `null` if none yet).
   buckets a response can hold. A longer range is `400`; ask for what a chart can show. The limit
   does not apply to `raw`, which is bounded by the 5 000 points.
 - `400` if `from` is not earlier than `to` (an empty or reversed range, or a `from` in the future when
-  `to` is left to default to now), if `metric` is not one of the four names above, or if a `1m`
-  range is longer than 7 days.
+  `to` is left to default to now), if `from` or `to` is not a timestamp with a zone, if `metric` is
+  not one of the four names above, or if a `1m` range is longer than 7 days.
 - `404` if the device is not registered, or the device does not report that metric.
 
 #### Paging raw readings
@@ -194,7 +200,8 @@ Prometheus text format, at the root (not under `/api`). Metric names and meaning
 Errors use Nest's standard body: `statusCode`, `error` (the status text) and `message`. The type of
 `message` depends on who refused the request:
 
-- **`400` from the validation of the query**: `message` is an **array** of strings, one per problem.
+- **`400` from the validation of the query**: `message` is an **array** of strings, one per problem
+  (an unknown `metric`, a `from` or `to` that is not a timestamp with a zone, a bad `limit`).
 
   ```json
   {

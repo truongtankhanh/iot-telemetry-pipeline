@@ -8,10 +8,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { METRIC_NAMES, type MetricName } from '@itp/telemetry-contract';
-import { Type } from 'class-transformer';
-import { IsDate, IsIn, IsOptional } from 'class-validator';
+import { IsIn, IsOptional } from 'class-validator';
 import { Database } from '../database/database';
 import { DevicesService } from './devices.service';
+import { QueryTimestamp } from './timestamp-query';
 
 const MAX_RAW_POINTS = 5000;
 const MINUTE_MS = 60_000;
@@ -27,16 +27,14 @@ export class ReadingsQueryDto {
   @IsIn(METRIC_NAMES)
   metric: MetricName;
 
-  /** Start of the range (ISO 8601). Default: one hour before `to`. */
+  /** Start of the range (ISO 8601 with a zone, inclusive). Default: one hour before `to`. */
   @IsOptional()
-  @Type(() => Date)
-  @IsDate()
+  @QueryTimestamp()
   from?: Date;
 
-  /** End of the range (ISO 8601). Default: now. */
+  /** End of the range (ISO 8601 with a zone, exclusive). Default: now. */
   @IsOptional()
-  @Type(() => Date)
-  @IsDate()
+  @QueryTimestamp()
   to?: Date;
 
   /** `raw` readings, or `1m` per-minute summaries from the rollup table. */

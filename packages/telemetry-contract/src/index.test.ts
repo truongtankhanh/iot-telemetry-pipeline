@@ -4,10 +4,67 @@ import {
   METRIC_NAMES,
   METRICS,
   parsePayload,
+  parseTimestamp,
   parseTopic,
   telemetryTopic,
   withShareGroup,
 } from './index';
+
+/** Timestamps the contract must refuse, with what is wrong with each: [description, text]. */
+const REJECTED_TS: [string, string][] = [
+  // Read as local time, or not a full timestamp, by Date.parse.
+  ['a timestamp without a zone', '2026-10-01T08:00:00'],
+  ['a date without a time', '2026-10-01'],
+  ['a bare year', '2026'],
+  ['a bare number', '1'],
+  ['free text', 'Oct 1 2026'],
+  ['leading whitespace', ' 2026-10-01T08:00:00Z'],
+  ['a trailing newline', '2026-10-01T08:00:00Z\n'],
+  ['a lowercase t', '2026-10-01t08:00:00Z'],
+  ['a lowercase z', '2026-10-01T08:00:00z'],
+  ['a space instead of T', '2026-10-01 08:00:00Z'],
+  ['an offset without a colon', '2026-10-01T08:00:00+0700'],
+  ['no seconds', '2026-10-01T08:00Z'],
+  ['an empty fraction', '2026-10-01T08:00:00.Z'],
+  ['a fraction of 10 digits', '2026-10-01T08:00:00.1234567890Z'],
+  // Dates Date.parse accepts but rolls over to the next month.
+  ['a day that rolls over (31 February)', '2026-02-31T00:00:00Z'],
+  ['a day that rolls over (31 April)', '2026-04-31T00:00:00Z'],
+  ['29 February of a common year', '2026-02-29T00:00:00Z'],
+  ['29 February of a century year', '2100-02-29T00:00:00Z'],
+  ['day zero', '2026-10-00T00:00:00Z'],
+  ['month 13', '2026-13-01T00:00:00Z'],
+  // Hour 24 is valid ISO 8601 and rolls over; minute, second and offset ranges rely on Date.parse.
+  ['hour 24', '2026-10-01T24:00:00Z'],
+  ['second 60', '2026-10-01T23:59:60Z'],
+  ['an offset of 24 hours', '2026-10-01T08:00:00+24:00'],
+  ['an offset of 60 minutes', '2026-10-01T08:00:00+07:60'],
+];
+
+/** Timestamps the contract accepts, with the UTC form they normalise to: [description, text, expected]. */
+const ACCEPTED_TS: [string, string, string][] = [
+  ['Z', '2026-10-01T08:00:00Z', '2026-10-01T08:00:00.000Z'],
+  ['a positive offset', '2026-10-01T15:00:00+07:00', '2026-10-01T08:00:00.000Z'],
+  ['a negative offset', '2026-10-01T03:00:00-05:00', '2026-10-01T08:00:00.000Z'],
+  ['-00:00', '2026-10-01T08:00:00-00:00', '2026-10-01T08:00:00.000Z'],
+  ['the largest offset', '2026-10-01T08:00:00+23:59', '2026-09-30T08:01:00.000Z'],
+  ['1 fraction digit', '2026-10-01T08:00:00.1Z', '2026-10-01T08:00:00.100Z'],
+  ['3 fraction digits', '2026-10-01T08:00:00.123Z', '2026-10-01T08:00:00.123Z'],
+  [
+    '6 fraction digits (truncated to ms)',
+    '2026-10-01T08:00:00.123456Z',
+    '2026-10-01T08:00:00.123Z',
+  ],
+  [
+    '9 fraction digits (truncated to ms)',
+    '2026-10-01T08:00:00.123456789Z',
+    '2026-10-01T08:00:00.123Z',
+  ],
+  ['29 February of a leap year', '2028-02-29T00:00:00Z', '2028-02-29T00:00:00.000Z'],
+  ['29 February of a leap century year', '2000-02-29T00:00:00Z', '2000-02-29T00:00:00.000Z'],
+  // Fails if the day check is built on Date.UTC, which maps year 0 to 1900 (not a leap year).
+  ['29 February of year 0', '0000-02-29T00:00:00Z', '0000-02-29T00:00:00.000Z'],
+];
 
 describe('topics', () => {
   it('builds and parses the telemetry topic', () => {
@@ -80,61 +137,11 @@ describe('parsePayload', () => {
     expect(parsePayload(new TextEncoder().encode(raw))).toEqual({ ok: false, reason });
   });
 
-  it.each([
-    // Read as local time, or not a full timestamp, by Date.parse.
-    ['a timestamp without a zone', '2026-10-01T08:00:00'],
-    ['a date without a time', '2026-10-01'],
-    ['a bare year', '2026'],
-    ['a bare number', '1'],
-    ['free text', 'Oct 1 2026'],
-    ['leading whitespace', ' 2026-10-01T08:00:00Z'],
-    ['a trailing newline', '2026-10-01T08:00:00Z\n'],
-    ['a lowercase t', '2026-10-01t08:00:00Z'],
-    ['a lowercase z', '2026-10-01T08:00:00z'],
-    ['a space instead of T', '2026-10-01 08:00:00Z'],
-    ['an offset without a colon', '2026-10-01T08:00:00+0700'],
-    ['no seconds', '2026-10-01T08:00Z'],
-    ['an empty fraction', '2026-10-01T08:00:00.Z'],
-    ['a fraction of 10 digits', '2026-10-01T08:00:00.1234567890Z'],
-    // Dates Date.parse accepts but rolls over to the next month.
-    ['a day that rolls over (31 February)', '2026-02-31T00:00:00Z'],
-    ['a day that rolls over (31 April)', '2026-04-31T00:00:00Z'],
-    ['29 February of a common year', '2026-02-29T00:00:00Z'],
-    ['29 February of a century year', '2100-02-29T00:00:00Z'],
-    ['day zero', '2026-10-00T00:00:00Z'],
-    ['month 13', '2026-13-01T00:00:00Z'],
-    // Hour 24 is valid ISO 8601 and rolls over; minute, second and offset ranges rely on Date.parse.
-    ['hour 24', '2026-10-01T24:00:00Z'],
-    ['second 60', '2026-10-01T23:59:60Z'],
-    ['an offset of 24 hours', '2026-10-01T08:00:00+24:00'],
-    ['an offset of 60 minutes', '2026-10-01T08:00:00+07:60'],
-  ])('rejects %s as ts', (_, ts) => {
+  it.each(REJECTED_TS)('rejects %s as ts', (_, ts) => {
     expect(parsePayload(JSON.stringify({ ...valid, ts }))).toEqual({ ok: false, reason: 'ts' });
   });
 
-  it.each([
-    ['Z', '2026-10-01T08:00:00Z', '2026-10-01T08:00:00.000Z'],
-    ['a positive offset', '2026-10-01T15:00:00+07:00', '2026-10-01T08:00:00.000Z'],
-    ['a negative offset', '2026-10-01T03:00:00-05:00', '2026-10-01T08:00:00.000Z'],
-    ['-00:00', '2026-10-01T08:00:00-00:00', '2026-10-01T08:00:00.000Z'],
-    ['the largest offset', '2026-10-01T08:00:00+23:59', '2026-09-30T08:01:00.000Z'],
-    ['1 fraction digit', '2026-10-01T08:00:00.1Z', '2026-10-01T08:00:00.100Z'],
-    ['3 fraction digits', '2026-10-01T08:00:00.123Z', '2026-10-01T08:00:00.123Z'],
-    [
-      '6 fraction digits (truncated to ms)',
-      '2026-10-01T08:00:00.123456Z',
-      '2026-10-01T08:00:00.123Z',
-    ],
-    [
-      '9 fraction digits (truncated to ms)',
-      '2026-10-01T08:00:00.123456789Z',
-      '2026-10-01T08:00:00.123Z',
-    ],
-    ['29 February of a leap year', '2028-02-29T00:00:00Z', '2028-02-29T00:00:00.000Z'],
-    ['29 February of a leap century year', '2000-02-29T00:00:00Z', '2000-02-29T00:00:00.000Z'],
-    // Fails if the day check is built on Date.UTC, which maps year 0 to 1900 (not a leap year).
-    ['29 February of year 0', '0000-02-29T00:00:00Z', '0000-02-29T00:00:00.000Z'],
-  ])('accepts %s and normalises it to UTC', (_, ts, expected) => {
+  it.each(ACCEPTED_TS)('accepts %s and normalises it to UTC', (_, ts, expected) => {
     expect(parsePayload(JSON.stringify({ ...valid, ts }))).toMatchObject({
       ok: true,
       value: { ts: expected },
@@ -208,4 +215,33 @@ describe('parsePayload', () => {
     const payload = { ...valid, metrics: { [name]: METRICS[name].min } };
     expect(parsePayload(JSON.stringify(payload))).toMatchObject({ ok: true });
   });
+});
+
+describe('parseTimestamp', () => {
+  it.each(ACCEPTED_TS)('returns the instant of %s', (_, ts, expected) => {
+    expect(new Date(parseTimestamp(ts)).toISOString()).toBe(expected);
+  });
+
+  it('returns epoch milliseconds, the same number Date.parse gives for a zoned string', () => {
+    expect(parseTimestamp('2026-10-01T08:00:00Z')).toBe(Date.parse('2026-10-01T08:00:00Z'));
+    expect(parseTimestamp('2026-10-01T15:00:00+07:00')).toBe(Date.parse('2026-10-01T08:00:00Z'));
+  });
+
+  it.each(REJECTED_TS)('returns NaN for %s', (_, ts) => {
+    expect(parseTimestamp(ts)).toBeNaN();
+  });
+
+  it('returns NaN for an empty string', () => {
+    expect(parseTimestamp('')).toBeNaN();
+  });
+
+  // Shows the export is the function parsePayload uses: one rule for the payload and for the HTTP API.
+  it.each([...REJECTED_TS, ...ACCEPTED_TS].map(([name, ts]) => [name, ts] as const))(
+    'agrees with parsePayload about %s',
+    (_, ts) => {
+      const payload = { seq: 1, ts, metrics: { temperature_c: 24.5 } };
+
+      expect(parsePayload(JSON.stringify(payload)).ok).toBe(!Number.isNaN(parseTimestamp(ts)));
+    },
+  );
 });
