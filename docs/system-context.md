@@ -121,17 +121,17 @@ incidents the pipeline then cannot resolve. See the command center's incident ca
 On AWS the pipeline runs unchanged as an ECS Fargate service. The infrastructure injects the same
 environment variables used everywhere else:
 
-| Variable                         | AWS value                                                                          |
-| -------------------------------- | ---------------------------------------------------------------------------------- |
-| `MQTT_URL`                       | `mqtts://<IoT Core endpoint>:8883`                                                 |
-| `MQTT_CERT_PEM` / `MQTT_KEY_PEM` | from Secrets Manager; the private key never appears in CloudFormation              |
-| `MQTT_CLIENT_ID_PREFIX`          | `ingest`, matched by the IoT policy `client/ingest-*`                              |
-| `MQTT_SHARE_GROUP`               | `ingest`, matched by the policy's `topicfilter/$share/ingest/campus/+/+/telemetry` |
-| `MQTT_CONNECTIONS`               | 2 (staging) / 4 (production), to get past IoT Core's 100 messages/s per connection |
-| `DATABASE_URL` + `PGPASSWORD`    | RDS, database `telemetry`, `sslmode=verify-full`; password from Secrets Manager    |
-| `OCC_API_URL`                    | `http://occ-api:3000/api` over ECS Service Connect                                 |
-| `OCC_TOKEN_URL`, `OCC_CLIENT_ID` | the platform's Keycloak, client `telemetry-pipeline`                               |
-| `OCC_CLIENT_SECRET`              | Secrets Manager, copied from Keycloak once by an administrator                     |
+| Variable                         | AWS value                                                                                                            |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `MQTT_URL`                       | `mqtts://<IoT Core endpoint>:8883`                                                                                   |
+| `MQTT_CERT_PEM` / `MQTT_KEY_PEM` | from Secrets Manager; the private key never appears in CloudFormation                                                |
+| `MQTT_CLIENT_ID_PREFIX`          | `ingest`, matched by the IoT policy `client/ingest-*`                                                                |
+| `MQTT_SHARE_GROUP`               | `ingest`, matched by the policy's `topicfilter/$share/ingest/campus/+/+/telemetry`                                   |
+| `MQTT_CONNECTIONS`               | 2 (staging) / 4 (production), to get past IoT Core's 100 messages/s per connection (AWS's figure, not verified here) |
+| `DATABASE_URL` + `PGPASSWORD`    | RDS, database `telemetry`, `sslmode=verify-full`; password from Secrets Manager                                      |
+| `OCC_API_URL`                    | `http://occ-api:3000/api` over ECS Service Connect                                                                   |
+| `OCC_TOKEN_URL`, `OCC_CLIENT_ID` | the platform's Keycloak, client `telemetry-pipeline`                                                                 |
+| `OCC_CLIENT_SECRET`              | Secrets Manager, copied from Keycloak once by an administrator                                                       |
 
 Metrics are scraped by an in-task OpenTelemetry collector into CloudWatch (namespace
 `Platform/Telemetry`). The services are described in
@@ -205,15 +205,15 @@ sequenceDiagram
 How to run and test across the repositories locally:
 [development.md](development.md#working-across-the-three-repositories).
 
-| If you change…                       | Also check                                                                                             |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| A zone code or device id             | `devices.json`, OCC zone seed, IoT things and attributes, any firmware                                 |
-| The topic layout or payload          | `telemetry-contract` (devices and service share it), IoT policies, the simulator                       |
-| A metric name or its range           | `METRICS` in the contract, `devices.json`, `rules.json`, CloudWatch selectors                          |
-| A rule's `incidentType`              | Whether the `technician` role may still resolve it                                                     |
-| A Prometheus metric name or label    | platform-aws metrics sidecar declarations and alarms; any Grafana dashboard                            |
-| Authentication to the command center | [ADR-0006](adr/0006-client-credentials-to-the-command-center.md), Keycloak client, platform-aws secret |
-| The shutdown or drain time           | `stop_grace_period` (Compose), `terminationGracePeriodSeconds` (Kubernetes), `stopTimeout` (ECS)       |
+| If you change…                       | Also check                                                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| A zone code or device id             | `devices.json`, OCC zone seed, IoT things and attributes, any firmware                                                |
+| The topic layout or payload          | `telemetry-contract` (devices and service share it), IoT policies, the simulator                                      |
+| A metric name or its range           | `METRICS` in the contract, `devices.json`, `rules.json`, CloudWatch selectors                                         |
+| A rule's `incidentType`              | Whether the `technician` role may still resolve it                                                                    |
+| A Prometheus metric name or label    | platform-aws metrics sidecar declarations and alarms; any Grafana dashboard                                           |
+| Authentication to the command center | [ADR-0006](adr/0006-client-credentials-to-the-command-center.md), Keycloak client, platform-aws secret                |
+| The shutdown or drain time           | `stop_grace_period` (Compose), `terminationGracePeriodSeconds` (Kubernetes), `stopTimeout` (ECS, set in platform-aws) |
 
 ## 7. Open points across the three repositories
 

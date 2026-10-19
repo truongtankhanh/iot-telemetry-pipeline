@@ -48,7 +48,7 @@ replicas.
 > limit is the serial flush to PostgreSQL, not the handling of messages. ADR-0001 is not
 > affected: replicas are still how consumers are added. What changes is what limits one replica.
 
-For scale: 1 000 sensors reporting every 10 seconds is 100 messages/s, about 1 % of one replica.
+For scale: 1 000 sensors reporting every 10 seconds is 100 messages/s.
 
 ## Baseline for the optimization work
 
@@ -359,6 +359,8 @@ ingest faster, and the default of 10 is well above what this load uses.
 
 ## What the gap metric caught
 
+_The date, commit and machine of this run were not recorded._
+
 The first run used Mosquitto's **default** configuration. 50 000 messages were published; the
 service stored 89 753 readings instead of 100 000 and reported:
 
@@ -388,7 +390,8 @@ pnpm bench:gaps:loss   # lossy broker: every lost message counted exactly once
 pnpm bench:gaps:all    # both, one after the other
 ```
 
-It builds the ingest image, wipes its own volumes and removes the stack on exit.
+It builds the ingest image, wipes its own volumes and removes the stack on exit. This page records no result of it: quote
+the output of your own run (`pnpm bench:gaps:all`) with its date and commit.
 
 ## Not measured yet
 

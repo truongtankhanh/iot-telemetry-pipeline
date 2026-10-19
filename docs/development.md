@@ -216,7 +216,7 @@ run before a merge. The e2e step is the heavy one; run it on its own, like `pnpm
 script's temporary log folder are always removed (the logs are kept after a failure). The images
 are **kept** by default: `iot-telemetry-pipeline-ingest` and `-simulator` (about 600 MB together,
 the same ones `pnpm docker:demo` uses, so the next build is fast), plus the `postgres:17-alpine`
-and `eclipse-mosquitto:2.0.18` images that `pnpm docker:up` uses too. `--clean` removes the two
+and `eclipse-mosquitto:2.0.22` images that `pnpm docker:up` uses too. `--clean` removes the two
 images the run built and `.turbo/cache`; it never touches PostgreSQL, Mosquitto or the containers
 of `pnpm docker:up`. Older builds of the same images turn into dangling layers: `docker image prune`
 removes them, and `docker builder prune` clears Docker's build cache.

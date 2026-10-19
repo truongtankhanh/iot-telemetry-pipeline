@@ -50,7 +50,7 @@ jobs:
         run: |
           docker run -d --name mosquitto -p 1883:1883 \
             -v "$PWD/deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" \
-            eclipse-mosquitto:2.0.18
+            eclipse-mosquitto:2.0.22
           for i in $(seq 1 30); do
             docker exec mosquitto mosquitto_pub -h 127.0.0.1 -t ci/ready -m 1 && exit 0
             sleep 1
@@ -65,6 +65,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
+      # Every relative link and anchor in the tracked Markdown files resolves (scripts/check-doc-links.mjs).
+      - run: node --test scripts/check-doc-links.test.mjs
+      - run: pnpm docs:links
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
