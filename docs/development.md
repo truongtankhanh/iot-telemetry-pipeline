@@ -117,6 +117,7 @@ Design choices worth knowing before you edit:
 | `pnpm bench:gaps` / `pnpm bench:gaps:loss` / `…:all`      | Two-replica sequence-gap check, without and with broker loss ([benchmarks](benchmarks.md#gap-count-across-replicas))  |
 | `pnpm --filter @itp/simulator bench -- --messages 100000` | End-to-end throughput benchmark ([benchmarks](benchmarks.md))                                                         |
 | `pnpm bench:baseline`                                     | One replica on the host under a CPU profile, three runs, results in `deploy/bench/out/` ([benchmarks](benchmarks.md)) |
+| `pnpm docs:openapi`                                       | Builds the contract and the service, then regenerates `docs/openapi.json` from the controllers (no database needed)   |
 
 Turborepo builds the contract package before anything that depends on it, so run `pnpm build` (or
 any of the above) after editing `packages/telemetry-contract`.
@@ -284,6 +285,10 @@ Controllers live next to their feature module and are registered in `AppModule`.
 `class-validator` decorators — the global `ValidationPipe` is strict (`whitelist`,
 `forbidNonWhitelisted`). New Prometheus metrics go in `metrics.ts`; keep label values to small
 fixed sets and never label by device id. Update [api.md](api.md) or [operations.md](operations.md).
+
+The OpenAPI document `docs/openapi.json` is generated from the controllers, not written by hand. After changing a
+route, a DTO or a controller's decorators, run `pnpm docs:openapi` and commit the result. A new controller goes in
+`src/http-controllers.ts`, the one list that both the service and the generator use.
 
 ## Working across the three repositories
 

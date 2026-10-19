@@ -1,15 +1,13 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AlertsController } from './alerts/alerts.controller';
 import { type Env, validateEnv } from './config/env.validation';
 import { Database } from './database/database';
 import { ALERT_SINK } from './delivery/alert-sink';
 import { DeliveryWorker } from './delivery/delivery.worker';
 import { ClientCredentials } from './delivery/client-credentials';
 import { NoopSink, OpsCommandCenterSink } from './delivery/ops-command-center.sink';
-import { DevicesController } from './devices/devices.controller';
 import { DevicesService } from './devices/devices.service';
-import { HealthController } from './health/health.controller';
+import { HTTP_CONTROLLERS } from './http-controllers';
 import { PartitionMaintenance } from './maintenance/partition-maintenance.service';
 import { Metrics } from './metrics/metrics';
 import { RulesService } from './rules/rules.service';
@@ -35,7 +33,7 @@ export class MaintenanceModule {}
 
 @Module({
   imports: [CoreModule, MaintenanceModule],
-  controllers: [DevicesController, AlertsController, HealthController],
+  controllers: HTTP_CONTROLLERS,
   providers: [
     DevicesService,
     RulesService,
