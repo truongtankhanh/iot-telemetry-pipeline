@@ -2,7 +2,7 @@
 #
 # A local stand-in for .github/workflows/ci.yml, so a PR does not wait for GitHub's runners.
 #
-#   verify     (job 1)  install, format:check, lint, typecheck, test, test:coverage, test:e2e, build, OpenAPI check
+#   verify     (job 1)  install, format:check, docs:links, lint, typecheck, test, test:coverage, test:e2e, build, OpenAPI check
 #   manifests  (job 2)  kustomize build of deploy/k8s/overlays/local, validated with kubeconform
 #   images     (job 3)  docker compose --profile demo build
 #
@@ -172,7 +172,7 @@ start_e2e_services() {
     -e POSTGRES_DB=telemetry_test -p "127.0.0.1:$PG_PORT:5432" postgres:17-alpine >/dev/null || return 1
   # Same image and config as docker-compose.yml and as the broker step of ci.yml.
   docker run -d --name "$MQTT_NAME" -v "$PWD/deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" \
-    -p "127.0.0.1:$MQTT_PORT:1883" eclipse-mosquitto:2.0.18 >/dev/null || return 1
+    -p "127.0.0.1:$MQTT_PORT:1883" eclipse-mosquitto:2.0.22 >/dev/null || return 1
   local i
   for i in $(seq 1 60); do
     if docker exec "$PG_NAME" pg_isready -U postgres -d telemetry_test >/dev/null 2>&1 &&
@@ -214,6 +214,8 @@ verify_job() {
 
   [ "$DO_INSTALL" -eq 1 ] && run_step "pnpm install --frozen-lockfile" pnpm install --frozen-lockfile
   run_step "format:check"  pnpm format:check
+  run_step "docs:links (script test)" node --test scripts/check-doc-links.test.mjs
+  run_step "docs:links"     pnpm docs:links
   run_step "lint"          pnpm exec turbo run lint --concurrency="$JOBS" $FORCE
   run_step "typecheck"     pnpm exec turbo run typecheck --concurrency="$JOBS" $FORCE
   run_step "test (unit)"   unit

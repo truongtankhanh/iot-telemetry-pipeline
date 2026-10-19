@@ -45,8 +45,9 @@ the repositories, are in [docs/system-context.md](docs/system-context.md).
 
 ## Highlights
 
-- **≈ 10 000 messages/s (≈ 20 000 readings/s) end to end on one replica** — broker to committed
-  rows, rollups and rules included — with zero loss and zero duplicates. [Benchmarks](docs/benchmarks.md)
+- **≈ 24 500 messages/s (≈ 49 000 readings/s) end to end on one replica** — broker to committed
+  rows, rollups and rules included — with zero loss and zero duplicates (median of three 200 000-message
+  runs on an Apple M3 Pro, `main` at `ca25ec7`). [Benchmarks](docs/benchmarks.md#baseline-for-the-optimization-work)
 - **Horizontal scale-out** with MQTT 5 shared subscriptions; replicas are stateless and race-safe.
 - **Idempotent storage**: redelivered messages hit the primary key; rollups are computed from the
   rows actually inserted, so duplicates never inflate counts.

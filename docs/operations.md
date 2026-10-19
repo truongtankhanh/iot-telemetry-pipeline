@@ -6,12 +6,12 @@ How to run, watch and troubleshoot the ingest service. Configuration is in
 
 ## What runs, and what holds state
 
-| Component       | State                                                             | Notes                                                                        |
-| --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Ingest replicas | In memory only: write buffer, rule streaks, token and zone caches | Stateless in the sense that matters: any replica can be killed and replaced. |
-| PostgreSQL      | **All durable state**: devices, readings, rollups, alerts, outbox | The only thing to back up.                                                   |
-| Mosquitto       | None (`persistence false`)                                        | Queued, unacknowledged messages are lost if it restarts.                     |
-| AWS IoT Core    | Managed                                                           | Clean sessions: a group with no member online drops QoS 1 messages.          |
+| Component       | State                                                             | Notes                                                                                                                    |
+| --------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Ingest replicas | In memory only: write buffer, rule streaks, token and zone caches | Stateless in the sense that matters: any replica can be killed and replaced.                                             |
+| PostgreSQL      | **All durable state**: devices, readings, rollups, alerts, outbox | The only thing to back up.                                                                                               |
+| Mosquitto       | None (`persistence false`)                                        | Queued, unacknowledged messages are lost if it restarts.                                                                 |
+| AWS IoT Core    | Managed                                                           | Clean sessions: a group with no member online drops QoS 1 messages (per platform-aws; AWS behaviour, not verified here). |
 
 One process does everything: consume, validate, batch-write, evaluate rules, deliver alerts,
 maintain partitions, serve the API. There is no separate worker to deploy.
@@ -89,8 +89,9 @@ With the Prometheus operator, the same `groups:` go under `spec:` of a `Promethe
 | `increase(alerts_state_corrections_total[15m]) > 0 or (alerts_state_corrections_total > 0 unless alerts_state_corrections_total offset 15m)`                                | A replica's cached alert state disagreed with the `alert` table and was corrected; normally `0`, so alert rows changed behind its back                                         |
 | `sum by (reason) (rate(telemetry_rejections_total[5m])) > 0`                                                                                                                | Misconfigured or unknown devices; `unknown_device` after onboarding means the registry is behind                                                                               |
 
-Throughput reference: ≈ 10 000 messages/s on one replica ([benchmarks](benchmarks.md)). For scale,
-1 000 sensors reporting every 10 s is 100 messages/s.
+Throughput reference: a median of 24 554 messages/s on one replica, measured on an Apple M3 Pro with a Docker VM of 2 CPUs
+(`main` at `ca25ec7`, 2026-10-18; [benchmarks](benchmarks.md#baseline-for-the-optimization-work)). Another machine gives other numbers.
+For scale, 1 000 sensors reporting every 10 s is 100 messages/s.
 
 ## Logs
 
@@ -155,11 +156,17 @@ The grace period must cover that drain, and is set in each environment:
 | ----------- | ------------------------------- | ----- |
 | Compose     | `stop_grace_period`             | 30 s  |
 | Kubernetes  | `terminationGracePeriodSeconds` | 30 s  |
-| AWS (ECS)   | `stopTimeout`                   | 30 s  |
+| AWS (ECS)   | `stopTimeout` (platform-aws)    | 30 s  |
 
-Rolling deploys keep capacity: Kubernetes uses `maxUnavailable: 0`, ECS keeps 100 % healthy. This
-matters on AWS IoT Core, where a shared-subscription group with no online member **drops** QoS 1
-messages.
+The AWS row is platform-aws's setting, not this repository's: its `lib/stacks/telemetry.ts` sets `stopTimeout` to 30 s and
+`minHealthyPercent` to 100, and this repository keeps a snapshot of that file
+(`apps/ingest/test/contract/platform-aws-telemetry.ts.txt`, lines 170 and 207). The parity test
+([ADR-0010](adr/0010-parity-test-against-platform-aws.md)) does not compare these two values with the Compose and Kubernetes ones.
+
+Rolling deploys keep capacity: Kubernetes uses `maxUnavailable: 0`, and platform-aws sets ECS to keep 100 % healthy
+(`minHealthyPercent`). This matters on AWS IoT Core, where, as platform-aws's comment in the same file puts it, a
+shared-subscription group with no online member drops QoS 1 messages unless a member holds a persistent session
+(AWS behaviour, not verified by this repository).
 
 Migrations run at boot (`MIGRATE_ON_BOOT`), serialised by an advisory lock. They are forward-only
 plain SQL files; there is no down-migration. Review a new migration as you would any schema change
@@ -171,7 +178,7 @@ on a live, partitioned table.
   Writes are idempotent, rollup rows are upserted in key order, outbox rows are leased,
   and partition maintenance and migrations take advisory locks, so replicas do not collide. The Kubernetes HPA targets 70 % CPU
   between 2 and 6 replicas.
-- **Brokers that cap per connection** (AWS IoT Core, 100 messages/s): raise `MQTT_CONNECTIONS`.
+- **Brokers that cap per connection** (AWS IoT Core: 100 messages/s per connection by default, AWS's figure, not verified here): raise `MQTT_CONNECTIONS`.
   Capacity is replicas × connections × the cap.
 - **The database is the next limit.** A flush averages ~93 ms for ~1 800 readings in the
   benchmark, so one PostgreSQL instance carries several replicas. `synchronous_commit` was

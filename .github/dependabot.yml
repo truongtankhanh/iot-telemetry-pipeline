@@ -12,8 +12,10 @@
 # scripts/ci-local.sh and deploy/k8s; for a package: the lockfile and whatever the release notes ask).
 # Minor, patch and digest updates still arrive. Majors of GitHub Actions are still proposed.
 #
-# Not covered: the image in deploy/k8s (Dependabot does not read kustomize manifests), so the broker
-# version there is changed by hand together with docker-compose.yml.
+# Not covered: the image in deploy/k8s (Dependabot does not read kustomize manifests). The broker tag
+# eclipse-mosquitto has five copies (docker-compose.yml, deploy/bench/docker-compose.replicas.yml,
+# deploy/k8s/base/mosquitto.yaml, ci.yml, scripts/ci-local.sh): a Dependabot pull request changes only
+# the first, so change the other four in the same pull request.
 version: 2
 
 updates:

@@ -27,7 +27,11 @@ services:
       - '${POSTGRES_HOST_PORT:-5433}:5432'
 
   mosquitto:
-    image: eclipse-mosquitto:2.0.18
+    # 2.0.22, the newest 2.0.x image (2.0.18 before 2026-10-19). The 2.0.19 to 2.0.21 releases fix shared-subscription
+    # and SUBSCRIBE handling; 2.1 is not used because it changes defaults (max_packet_size, receive maximum).
+    # The same tag is in deploy/bench/docker-compose.replicas.yml, deploy/k8s/base/mosquitto.yaml,
+    # .github/workflows/ci.yml and scripts/ci-local.sh: change all five together.
+    image: eclipse-mosquitto:2.0.22
     volumes:
       - ./deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     ports:

@@ -17,7 +17,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: mosquitto
-          image: eclipse-mosquitto:2.0.18
+          image: eclipse-mosquitto:2.0.22
           ports:
             - { name: mqtt, containerPort: 1883 }
           volumeMounts:
