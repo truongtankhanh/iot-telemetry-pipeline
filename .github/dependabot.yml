@@ -5,6 +5,11 @@
 # update arrives as a pull request that the ordinary CI workflow checks; majors are never grouped,
 # so a breaking change is reviewed on its own.
 #
+# Majors that the repository pins on purpose are ignored (node, postgres): a major is adopted by hand,
+# in one pull request that changes every place that names it together (.nvmrc, `engines`, both
+# Dockerfiles, ci.yml and scripts/ci-local.sh for Node; docker-compose.yml, ci.yml, scripts/ci-local.sh
+# and deploy/k8s for PostgreSQL). Minor, patch and digest updates still arrive.
+#
 # Not covered: the image in deploy/k8s (Dependabot does not read kustomize manifests), so the broker
 # version there is changed by hand together with docker-compose.yml.
 version: 2
@@ -45,6 +50,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(docker)
+    ignore:
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
 
   # postgres and eclipse-mosquitto in docker-compose.yml, and prom/prometheus and grafana/grafana of
   # its `observe` profile, which are pinned by digest.
@@ -56,3 +64,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(docker)
+    ignore:
+      - dependency-name: postgres
+        update-types: ['version-update:semver-major']

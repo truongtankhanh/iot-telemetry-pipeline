@@ -68,6 +68,17 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # The ingest unit tests again, with coverage: fails below the floor in apps/ingest/jest.config.ts.
+      - run: pnpm test:coverage
+      # Kept even when the floor fails, so the report can be read.
+      - name: Upload the coverage report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ingest-coverage
+          path: apps/ingest/coverage
+          retention-days: 14
+          if-no-files-found: ignore
       - run: pnpm test:e2e
       - run: pnpm build
       # docs/openapi.json is generated from the built controllers; this fails when a change to a route

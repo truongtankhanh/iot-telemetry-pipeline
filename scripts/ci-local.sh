@@ -2,11 +2,13 @@
 #
 # A local stand-in for .github/workflows/ci.yml, so a PR does not wait for GitHub's runners.
 #
-#   verify     (job 1)  install, format:check, lint, typecheck, test, test:e2e, build, OpenAPI check
+#   verify     (job 1)  install, format:check, lint, typecheck, test, test:coverage, test:e2e, build, OpenAPI check
 #   manifests  (job 2)  kustomize build of deploy/k8s/overlays/local, validated with kubeconform
 #   images     (job 3)  docker compose --profile demo build
 #
 # It keeps CI's order and its checks; when ci.yml changes, change this file in the same PR.
+# It does not run the other three workflows: security.yml (dependency audit), occ-contract.yml and
+# platform-aws-contract.yml. They need the network or another repository and are separate on purpose.
 # Differences, on purpose: it throttles (turbo and Jest workers; this machine has little headroom),
 # and e2e runs against a throwaway PostgreSQL and Mosquitto (own containers, own ports), so it never
 # touches the Compose stack and the databases of `pnpm docker:up`.
@@ -156,8 +158,8 @@ need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing tool: $1 ($2)" >&2; 
 
 # --- job 1: verify -------------------------------------------------------------------------------
 
-# CI starts Mosquitto from the repository's config and PostgreSQL as a service container; here both
-# are throwaway containers on their own ports, so the Compose stack of `pnpm docker:up` is left alone.
+# CI runs the same Mosquitto image with the repository's config (a `docker run` step) and PostgreSQL as a
+# service container; here both are throwaway containers on their own ports, so the Compose stack of `pnpm docker:up` is left alone.
 start_e2e_services() {
   need docker "e2e needs a throwaway PostgreSQL and Mosquitto; use --skip-e2e to go without"
   local p
@@ -168,7 +170,7 @@ start_e2e_services() {
   CONTAINERS_STARTED=1
   docker run -d --name "$PG_NAME" -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
     -e POSTGRES_DB=telemetry_test -p "127.0.0.1:$PG_PORT:5432" postgres:17-alpine >/dev/null || return 1
-  # Same image and config as docker-compose.yml (and as the broker CI installs from this config).
+  # Same image and config as docker-compose.yml and as the broker step of ci.yml.
   docker run -d --name "$MQTT_NAME" -v "$PWD/deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" \
     -p "127.0.0.1:$MQTT_PORT:1883" eclipse-mosquitto:2.0.18 >/dev/null || return 1
   local i
@@ -198,6 +200,12 @@ unit() {
     pnpm exec turbo run test --concurrency="$JOBS" $FORCE --filter='!@itp/ingest'
 }
 
+# The ingest unit tests again with coverage; fails below the floor in apps/ingest/jest.config.ts.
+# ci.yml also uploads the report as an artifact; here it stays in apps/ingest/coverage.
+coverage() {
+  pnpm exec turbo run test:coverage --concurrency="$JOBS" $FORCE --filter=@itp/ingest -- --maxWorkers="$JOBS"
+}
+
 verify_job() {
   need pnpm "corepack enable"
   local want have
@@ -209,6 +217,7 @@ verify_job() {
   run_step "lint"          pnpm exec turbo run lint --concurrency="$JOBS" $FORCE
   run_step "typecheck"     pnpm exec turbo run typecheck --concurrency="$JOBS" $FORCE
   run_step "test (unit)"   unit
+  run_step "test:coverage (ingest floor)" coverage
   [ "$RUN_E2E" -eq 1 ]   && run_step "test:e2e (throwaway PostgreSQL + Mosquitto)" e2e
   [ "$RUN_BUILD" -eq 1 ] && run_step "build" pnpm exec turbo run build --concurrency="$JOBS" $FORCE
   # docs/openapi.json must match the controllers; the check reads the build made just above.

@@ -102,25 +102,27 @@ Design choices worth knowing before you edit:
 
 ## Everyday commands
 
-| Command                                                   | What it does                                                                                                          |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `pnpm build`                                              | Builds every package through Turborepo (contract first)                                                               |
-| `pnpm lint`                                               | ESLint across workspaces                                                                                              |
-| `pnpm typecheck`                                          | `tsc --noEmit` across workspaces                                                                                      |
-| `pnpm format` / `pnpm format:check`                       | Prettier (single quotes, trailing commas, 100 columns) over the whole repo                                            |
-| `pnpm test`                                               | Unit tests (Jest for ingest, Vitest for the contract, `node --test` for the simulator)                                |
-| `pnpm test:e2e`                                           | End-to-end suite — wipes `TEST_DATABASE_URL`, see below                                                               |
-| `pnpm docker:up` / `docker:down` / `docker:restart`       | PostgreSQL and Mosquitto from Compose, shared by development and the e2e suite                                        |
-| `pnpm docker:demo`                                        | The whole demo in containers: also builds the ingest service and starts a simulator (foreground)                      |
-| `pnpm docker:demo:down`                                   | Removes the demo's ingest and simulator containers; PostgreSQL and Mosquitto keep running                             |
-| `pnpm docker:observe`                                     | Prometheus (`:9090`) and Grafana (`:3000`) on the shipped rules and dashboard (demo only; see below)                  |
-| `pnpm docker:observe:down`                                | Removes only those two containers                                                                                     |
-| `pnpm test:ingest` / `test:simulator` / `test:contract`   | Unit tests of one package (builds what it depends on first)                                                           |
-| `pnpm e2e:ingest`                                         | `docker:up`, then the ingest e2e suite against the `telemetry_test` database                                          |
-| `pnpm bench:gaps` / `pnpm bench:gaps:loss` / `…:all`      | Two-replica sequence-gap check, without and with broker loss ([benchmarks](benchmarks.md#gap-count-across-replicas))  |
-| `pnpm --filter @itp/simulator bench -- --messages 100000` | End-to-end throughput benchmark ([benchmarks](benchmarks.md))                                                         |
-| `pnpm bench:baseline`                                     | One replica on the host under a CPU profile, three runs, results in `deploy/bench/out/` ([benchmarks](benchmarks.md)) |
-| `pnpm docs:openapi`                                       | Builds the contract and the service, then regenerates `docs/openapi.json` from the controllers (no database needed)   |
+| Command                                                   | What it does                                                                                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm build`                                              | Builds every package through Turborepo (contract first)                                                                                    |
+| `pnpm lint`                                               | ESLint across workspaces                                                                                                                   |
+| `pnpm typecheck`                                          | `tsc --noEmit` across workspaces                                                                                                           |
+| `pnpm format` / `pnpm format:check`                       | Prettier (single quotes, trailing commas, 100 columns) over the whole repo                                                                 |
+| `pnpm test`                                               | Unit tests (Jest for ingest, Vitest for the contract, `node --test` for the simulator)                                                     |
+| `pnpm test:coverage`                                      | Unit tests of `apps/ingest` with a coverage report in `apps/ingest/coverage` and fails below the floor set in `apps/ingest/jest.config.ts` |
+| `pnpm docs:links`                                         | Checks that every relative link and anchor in the tracked Markdown files resolves                                                          |
+| `pnpm test:e2e`                                           | End-to-end suite — wipes `TEST_DATABASE_URL`, see below                                                                                    |
+| `pnpm docker:up` / `docker:down` / `docker:restart`       | PostgreSQL and Mosquitto from Compose, shared by development and the e2e suite                                                             |
+| `pnpm docker:demo`                                        | The whole demo in containers: also builds the ingest service and starts a simulator (foreground)                                           |
+| `pnpm docker:demo:down`                                   | Removes the demo's ingest and simulator containers; PostgreSQL and Mosquitto keep running                                                  |
+| `pnpm docker:observe`                                     | Prometheus (`:9090`) and Grafana (`:3000`) on the shipped rules and dashboard (demo only; see below)                                       |
+| `pnpm docker:observe:down`                                | Removes only those two containers                                                                                                          |
+| `pnpm test:ingest` / `test:simulator` / `test:contract`   | Unit tests of one package (builds what it depends on first)                                                                                |
+| `pnpm e2e:ingest`                                         | `docker:up`, then the ingest e2e suite against the `telemetry_test` database                                                               |
+| `pnpm bench:gaps` / `pnpm bench:gaps:loss` / `…:all`      | Two-replica sequence-gap check, without and with broker loss ([benchmarks](benchmarks.md#gap-count-across-replicas))                       |
+| `pnpm --filter @itp/simulator bench -- --messages 100000` | End-to-end throughput benchmark ([benchmarks](benchmarks.md))                                                                              |
+| `pnpm bench:baseline`                                     | One replica on the host under a CPU profile, three runs, results in `deploy/bench/out/` ([benchmarks](benchmarks.md))                      |
+| `pnpm docs:openapi`                                       | Builds the contract and the service, then regenerates `docs/openapi.json` from the controllers (no database needed)                        |
 
 Turborepo builds the contract package before anything that depends on it, so run `pnpm build` (or
 any of the above) after editing `packages/telemetry-contract`.
@@ -128,6 +130,26 @@ any of the above) after editing `packages/telemetry-contract`.
 CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck, unit tests, e2e and build, checks
 that `docs/openapi.json` still matches the controllers, then validates the Kubernetes manifests with
 kubeconform and builds the Compose images.
+
+### The GitHub workflows
+
+| File                                          | When                                                                        | What it does                                                                                                                                                                                      |
+| --------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/ci.yml`                    | Pull requests; pushes to `main`                                             | The three jobs above. Switched by `CI_ENABLED`.                                                                                                                                                   |
+| `.github/workflows/occ-contract.yml`          | Daily; manual                                                               | The command center contract test against that repository's current OpenAPI document ([ADR-0009](adr/0009-contract-check-against-command-center-openapi.md))                                       |
+| `.github/workflows/platform-aws-contract.yml` | Daily; manual                                                               | The parity test against platform-aws's current telemetry stack ([ADR-0010](adr/0010-parity-test-against-platform-aws.md))                                                                         |
+| `.github/workflows/security.yml`              | Mondays; manual; pull requests that change the lockfile or a `package.json` | `pnpm audit` of `pnpm-lock.yaml`: job `Production dependencies` fails on a high or critical advisory, job `All dependencies` (development tools too) is advisory and must not be a required check |
+
+Every workflow has `permissions: contents: read` and a `timeout-minutes` on each job, and uses no secret. Third-party
+actions are pinned to the commit of a release, with the version in a comment (`uses: actions/checkout@<sha> # v4.4.0`).
+Do not edit a pin by hand: Dependabot (`.github/dependabot.yml`, weekly on Monday) proposes the new SHA and rewrites the
+comment, for the actions, the npm lockfile, the `node:24-alpine` digest in both Dockerfiles and the Compose images. It
+ignores major versions of `node` and `postgres`, which are adopted by hand in one pull request. It does not read
+`deploy/k8s`, `deploy/bench/docker-compose.replicas.yml`, `ci.yml` or `scripts/ci-local.sh`, so a change to the broker image
+tag in `docker-compose.yml` is also made in those four places.
+
+Which checks are **required** on `main` is a repository setting (Settings, Branches), not a file. `Production dependencies`
+makes sense as required; `All dependencies` does not. A job skipped by `CI_ENABLED=false` counts as passed.
 
 ### Prometheus and Grafana for the demo
 
@@ -220,8 +242,9 @@ Actions → Variables → `CI_ENABLED`**.
 - **A skipped job counts as passed for a required status check**, so branch protection does not
   block a merge while CI is off. Run `pnpm ci:local` (at least `--skip-images`) before merging, and
   turn CI back on afterwards.
-- **Only `ci.yml` is switched.** The two scheduled contract workflows (`occ-contract.yml`,
-  `platform-aws-contract.yml`) keep running at their own times.
+- **Only `ci.yml` is switched.** The other three workflows (`occ-contract.yml`,
+  `platform-aws-contract.yml`, `security.yml`) keep running at their own times; they check other
+  repositories or the advisory database, not a build.
 - For one push only, put `[skip ci]` in the commit message; no variable is involved.
 
 ### Tests
