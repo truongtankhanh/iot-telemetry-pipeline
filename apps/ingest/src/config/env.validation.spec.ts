@@ -38,3 +38,17 @@ describe('validateEnv: DB_STATEMENT_TIMEOUT_MS', () => {
     );
   });
 });
+
+describe('validateEnv: LOG_FORMAT', () => {
+  it("is 'text' when not set, which is what the service logged before the setting existed", () => {
+    expect(validateEnv(base).LOG_FORMAT).toBe('text');
+  });
+
+  it.each(['text', 'json'])('accepts %s', (value) => {
+    expect(validateEnv({ ...base, LOG_FORMAT: value }).LOG_FORMAT).toBe(value);
+  });
+
+  it.each(['yaml', 'JSON', ''])('refuses "%s" and names the variable', (value) => {
+    expect(() => validateEnv({ ...base, LOG_FORMAT: value })).toThrow(/LOG_FORMAT/);
+  });
+});
