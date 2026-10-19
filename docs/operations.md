@@ -53,6 +53,12 @@ cardinality does not grow with the fleet. Default Node.js process metrics are in
 | `alerts_state_corrections_total`   | counter   | `direction`  | Cached alert state fixed from the `alert` table (`to_open`, `to_closed`); normally `0`  |
 | `alert_deliveries_total`           | counter   | `result`     | Outbox attempts: `delivered`, `skipped`, `retry`, `failed`, `waiting`                   |
 
+### Dashboard
+
+A Grafana dashboard for these metrics is in [`deploy/observability/grafana/telemetry-ingest.json`](../deploy/observability/grafana/telemetry-ingest.json), in five rows: Ingest, Write path, Gaps, Alerts and delivery, and Process.
+To use it, in Grafana choose Dashboards, then Import, upload the file and pick the Prometheus datasource that scrapes the service. The datasource and the `job` and `instance` variables are chosen in the dashboard itself, so nothing in it belongs to one site.
+A counter that has never moved shows `0` instead of "No data". The red lines on the lag, flush and buffer panels are the thresholds of the matching [alert rules](#suggested-alerts). The file was authored for Grafana 13.2 (dashboard `schemaVersion` 42). It is a file to import, not provisioned.
+
 ### Suggested alerts
 
 Shipped as Prometheus rules in [`deploy/observability/prometheus/alerts.yml`](../deploy/observability/prometheus/alerts.yml): one rule for each row, with the same expression, and a `for` duration and a `severity` set there. Starting points, to tune per site.
