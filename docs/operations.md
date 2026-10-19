@@ -81,8 +81,14 @@ The service logs through the built-in NestJS logger, to stdout (`error` and `fat
 
 - `text`, the default when the variable is unset (local development): Nest's readable, coloured lines.
 - `json`, which the container image sets: one JSON object per line, with the fields `level`, `pid`, `timestamp` (milliseconds since the epoch), `message` and,
-  when there are any, `context` (the Logger column below), `stack`, `error` (`name`, `message`, `stack` and own properties such as `code`) and `params`.
-  The text of a line in the table below is its `message`.
+  when there are any, `context` (the Logger column below), `stack`, `error` (`name`, `message`, `stack` and own properties such as `code`), `params` and `requestId`
+  (see below). The text of a line in the table below is its `message`.
+
+**Request id.** Every HTTP request gets an id: the caller's `X-Request-Id` if it is a valid one, a new UUID otherwise ([API](api.md#request-id)). In the `json` format a line
+written while a request is being served carries it as `requestId`; the `text` format has no ids. Nest writes a line for a request only when it fails with an unhandled
+error (HTTP `500`, for example a query cancelled by `DB_STATEMENT_TIMEOUT_MS`), so that is where the id is usually found: a client reports the `X-Request-Id` of its response, and
+`grep` finds the line. Lines written by timers, the MQTT consumer and the boot have no `requestId`. The field means "written while serving this request", not "caused by it": a
+database connection opened for a request can later log an idle-connection warning with that request's id.
 
 `NEST_LOG_LEVEL` sets the level in both formats (for example `warn`, `>=debug` or `warn,error`); unset, every level is written.
 

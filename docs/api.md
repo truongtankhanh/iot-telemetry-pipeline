@@ -236,6 +236,13 @@ A client should accept both forms of `message`. The validation runs before the h
 malformed query is `400` even for a device that is not registered; do not rely on which of two
 simultaneous problems is reported first.
 
+## Request id
+
+Every response carries an `X-Request-Id` header, the answers to `404`, `400` and `503` included, and the probes and `/metrics` too. A client may send its own: it is used as it is
+if it is 1 to 64 characters from `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`. Anything else (a space, a line break, a longer value, a repeated header) is replaced by a new UUID, never
+rejected, so the response header is always the value to quote. The id is also written on the server's JSON log lines for that request (see
+[operations](operations.md#logs)). During a rolling deploy an older pod sends no such header, so a client must treat it as optional.
+
 ## Examples
 
 ```bash
