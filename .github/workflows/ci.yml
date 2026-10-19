@@ -43,7 +43,7 @@ jobs:
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/telemetry_test
       MQTT_URL: mqtt://localhost:1883
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The image Compose and Kubernetes deploy, with the repository's config mounted. A `services:`
       # container cannot do this: GitHub starts it before the checkout, so the file would not exist yet.
       - name: Start Mosquitto from the deployed image, with the repository's broker config
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Pinned by version and by checksum (the hashes are the ones the releases publish): a download
       # that differs from the release the repository was reviewed against fails the job.
       - name: Install kustomize and kubeconform
@@ -104,5 +104,5 @@ jobs:
     timeout-minutes: 15
     needs: verify
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker compose --profile demo build
