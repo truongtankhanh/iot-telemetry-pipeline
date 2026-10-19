@@ -1,9 +1,16 @@
-# Dependabot version updates. Weekly, on Monday, one entry per ecosystem the repository uses.
+# Dependabot version updates. Monthly, one entry per ecosystem the repository uses, at most two open
+# pull requests each: a one-person demo repository cannot review more, and an update that waits a few
+# weeks costs nothing. Security advisories are not delayed by this schedule (see security.yml).
 #
 # Pins are only useful if something moves them: the action SHAs in .github/workflows, the Node image
 # digest in both Dockerfiles, the Compose images and the npm lockfile all go stale otherwise. Each
-# update arrives as a pull request that the ordinary CI workflow checks; majors are never grouped,
-# so a breaking change is reviewed on its own.
+# update arrives as a pull request that the ordinary CI workflow checks.
+#
+# Major versions are not proposed for npm packages, node or postgres: a major is adopted by hand, in
+# one pull request that changes every place that names it together (for Node: .nvmrc, `engines`, both
+# Dockerfiles, ci.yml and scripts/ci-local.sh; for PostgreSQL: docker-compose.yml, ci.yml,
+# scripts/ci-local.sh and deploy/k8s; for a package: the lockfile and whatever the release notes ask).
+# Minor, patch and digest updates still arrive. Majors of GitHub Actions are still proposed.
 #
 # Not covered: the image in deploy/k8s (Dependabot does not read kustomize manifests), so the broker
 # version there is changed by hand together with docker-compose.yml.
@@ -14,9 +21,8 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     commit-message:
       prefix: ci
 
@@ -24,15 +30,17 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     commit-message:
       prefix: build(deps)
     groups:
       minor-and-patch:
         patterns: ['*']
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # The node:24-alpine base of both Dockerfiles, which is pinned by digest.
   - package-ecosystem: docker
@@ -40,19 +48,23 @@ updates:
       - /apps/ingest
       - /apps/simulator
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     commit-message:
       prefix: build(docker)
+    ignore:
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
 
   # postgres and eclipse-mosquitto in docker-compose.yml, and prom/prometheus and grafana/grafana of
   # its `observe` profile, which are pinned by digest.
   - package-ecosystem: docker-compose
     directory: /
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     commit-message:
       prefix: build(docker)
+    ignore:
+      - dependency-name: postgres
+        update-types: ['version-update:semver-major']

@@ -13,6 +13,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage --filter=@itp/ingest",
     "test:e2e": "turbo run test:e2e",
     "docker:up": "bash scripts/stack.sh up",
     "docker:demo": "bash scripts/stack.sh demo",
@@ -33,6 +34,7 @@
     "bench:gaps:loss": "bash deploy/bench/run-gap-check.sh loss",
     "bench:gaps:all": "pnpm bench:gaps && pnpm bench:gaps:loss",
     "bench:baseline": "bash deploy/bench/run-baseline.sh",
+    "docs:links": "node scripts/check-doc-links.mjs",
     "docs:openapi": "pnpm --filter @itp/telemetry-contract build && pnpm --filter @itp/ingest openapi:generate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

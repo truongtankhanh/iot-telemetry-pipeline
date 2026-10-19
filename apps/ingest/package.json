@@ -17,6 +17,7 @@
     "openapi:generate": "nest build && node dist/openapi/generate-openapi.js",
     "openapi:check": "node dist/openapi/generate-openapi.js --check",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage --coverageReporters=text-summary --coverageReporters=json-summary --coverageReporters=lcov",
     "test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --config test/jest-e2e.config.js --runInBand"
   },
   "dependencies": {
