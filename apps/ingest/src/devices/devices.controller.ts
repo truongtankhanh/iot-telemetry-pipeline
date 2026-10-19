@@ -6,12 +6,23 @@ import {
   Param,
   Query,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
-import { METRIC_NAMES, type MetricName } from '@itp/telemetry-contract';
-import { IsIn, IsOptional } from 'class-validator';
+import {
+  ApiBadRequestResponse,
+  ApiExtraModels,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { Database } from '../database/database';
+import { ErrorResponse } from '../error-response.dto';
+import {
+  DeviceResponse,
+  RawReadingsResponse,
+  ReadingsQueryDto,
+  RollupReadingsResponse,
+} from './devices.dto';
 import { DevicesService } from './devices.service';
-import { QueryTimestamp } from './timestamp-query';
 
 const MAX_RAW_POINTS = 5000;
 const MINUTE_MS = 60_000;
@@ -22,28 +33,8 @@ const MINUTE_MS = 60_000;
 const MAX_ROLLUP_BUCKETS = 10_080;
 const DEFAULT_RANGE_MS = 60 * MINUTE_MS;
 
-export class ReadingsQueryDto {
-  /** Metric to return, e.g. `temperature_c`. */
-  @IsIn(METRIC_NAMES)
-  metric: MetricName;
-
-  /** Start of the range (ISO 8601 with a zone, inclusive). Default: one hour before `to`. */
-  @IsOptional()
-  @QueryTimestamp()
-  from?: Date;
-
-  /** End of the range (ISO 8601 with a zone, exclusive). Default: now. */
-  @IsOptional()
-  @QueryTimestamp()
-  to?: Date;
-
-  /** `raw` readings, or `1m` per-minute summaries from the rollup table. */
-  @IsOptional()
-  @IsIn(['raw', '1m'])
-  resolution: 'raw' | '1m' = '1m';
-}
-
 @ApiTags('devices')
+@ApiExtraModels(RawReadingsResponse, RollupReadingsResponse)
 @Controller('devices')
 export class DevicesController {
   constructor(
@@ -53,7 +44,8 @@ export class DevicesController {
 
   /** Registered devices with when they were last heard from. */
   @Get()
-  async list() {
+  @ApiOkResponse({ description: 'Every registered device.', type: [DeviceResponse] })
+  async list(): Promise<DeviceResponse[]> {
     const { rows } = await this.db.query<{ id: string; last_seen: Date | null }>(
       'SELECT id, last_seen FROM device',
     );
@@ -63,7 +55,29 @@ export class DevicesController {
 
   /** Readings for one device and metric over a time range. */
   @Get(':id/readings')
-  async readings(@Param('id') id: string, @Query() query: ReadingsQueryDto) {
+  @ApiOkResponse({
+    description:
+      'Readings of the device. Raw readings (up to 5 000, with `truncated` and `nextFrom`) or per-minute summaries, by `resolution`.',
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(RawReadingsResponse) },
+        { $ref: getSchemaPath(RollupReadingsResponse) },
+      ],
+    },
+  })
+  @ApiBadRequestResponse({
+    description:
+      'The query is not valid: an unknown metric, a timestamp without a zone, a range that ends before it starts, or a 1m range of more than 7 days.',
+    type: ErrorResponse,
+  })
+  @ApiNotFoundResponse({
+    description: 'The device is not registered, or does not report that metric.',
+    type: ErrorResponse,
+  })
+  async readings(
+    @Param('id') id: string,
+    @Query() query: ReadingsQueryDto,
+  ): Promise<RawReadingsResponse | RollupReadingsResponse> {
     const device = this.devices.get(id);
     if (!device) throw new NotFoundException(`Device ${id} is not registered`);
     if (!device.metrics.includes(query.metric)) {

@@ -7,11 +7,17 @@ An interactive OpenAPI document is served at `/api/docs` (for example
 <http://localhost:3100/api/docs>) when `API_DOCS_ENABLED=true`. It is on in local development and
 the Compose demo and off by default elsewhere, including the Kubernetes base.
 
+The machine-readable reference is [openapi.json](openapi.json): it lists every route with its
+parameters, its response schemas and its error answers. It is generated from the controllers
+(`pnpm docs:openapi`), not written by hand, so it is the one to build a client from. The examples on
+this page are the human version of the same shapes.
+
 > **There is no authentication on this API.** It is meant to be reached from inside the platform's
 > network only. See [operations.md](operations.md#security-posture) before exposing it anywhere.
 
 Requests are validated strictly: an unknown query parameter or a malformed value returns `400`
-with the validation messages. Every error has the same envelope; see [Errors](#errors).
+with the validation messages. Errors share one envelope, except the `503` of `/api/ready`; see
+[Errors](#errors).
 
 ## Endpoints
 

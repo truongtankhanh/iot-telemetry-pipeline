@@ -1,7 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import type { Database } from '../database/database';
-import { AlertsController, AlertsQueryDto } from './alerts.controller';
+import { AlertsController } from './alerts.controller';
+import { AlertsQueryDto } from './alerts.dto';
 import { decodeCursor, encodeCursor } from './cursor';
 
 const NEWEST = new Date('2026-10-17T10:00:00.000Z').getTime();

@@ -3,7 +3,8 @@ import type { MetricName } from '@itp/telemetry-contract';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Database } from '../database/database';
-import { DevicesController, ReadingsQueryDto } from './devices.controller';
+import { DevicesController } from './devices.controller';
+import { ReadingsQueryDto } from './devices.dto';
 import { parseDevices, type DevicesService } from './devices.service';
 
 const NOW = new Date('2026-10-17T10:00:00Z');

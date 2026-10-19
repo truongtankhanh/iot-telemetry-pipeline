@@ -61,6 +61,86 @@ describe('the OpenAPI document', () => {
   });
 });
 
+interface Schema {
+  $ref?: string;
+  type?: string;
+  items?: Schema;
+  oneOf?: Schema[];
+}
+interface ApiResponse {
+  description?: string;
+  content?: Record<string, { schema?: Schema }>;
+  headers?: Record<string, unknown>;
+}
+
+/** What the explicit decorators (`@ApiOkResponse`, `@ApiProperty`, …) put in the document: no plugin needed. */
+describe('the responses the document describes', () => {
+  let doc: {
+    paths: Record<string, { get: { responses: Record<string, ApiResponse> } }>;
+    components: { schemas: Record<string, unknown> };
+  };
+
+  beforeAll(async () => {
+    doc = JSON.parse(await renderOpenApiDocument()) as typeof doc;
+  });
+
+  const response = (path: string, status: string) => doc.paths[path]?.get.responses[status];
+  const schemaOf = (path: string, status: string) =>
+    response(path, status)?.content?.['application/json']?.schema;
+  const refName = (schema?: Schema) => schema?.$ref?.split('/').pop();
+
+  it('has a schema for every response class', () => {
+    expect(Object.keys(doc.components.schemas)).toEqual(
+      expect.arrayContaining([
+        'AlertResponse',
+        'DeviceResponse',
+        'ErrorResponse',
+        'HealthResponse',
+        'NotReadyResponse',
+        'RawReading',
+        'RawReadingsResponse',
+        'ReadyResponse',
+        'RollupPoint',
+        'RollupReadingsResponse',
+      ]),
+    );
+  });
+
+  it('answers each route with a described, typed 200', () => {
+    expect(schemaOf('/api/devices', '200')).toMatchObject({
+      type: 'array',
+      items: { $ref: '#/components/schemas/DeviceResponse' },
+    });
+    expect(refName(schemaOf('/api/health', '200'))).toBe('HealthResponse');
+    expect(refName(schemaOf('/api/ready', '200'))).toBe('ReadyResponse');
+    for (const path of Object.keys(doc.paths)) {
+      expect(response(path, '200')?.description).toBeTruthy();
+    }
+  });
+
+  it('answers readings with either the raw or the rollup response', () => {
+    const options = schemaOf('/api/devices/{id}/readings', '200')?.oneOf ?? [];
+
+    expect(options.map(refName).sort()).toEqual(['RawReadingsResponse', 'RollupReadingsResponse']);
+  });
+
+  it('answers alerts with an array of alerts, and says where the next page starts', () => {
+    expect(schemaOf('/api/alerts', '200')).toMatchObject({
+      type: 'array',
+      items: { $ref: '#/components/schemas/AlertResponse' },
+    });
+    expect(response('/api/alerts', '200')?.headers).toHaveProperty('X-Next-Cursor');
+  });
+
+  it('documents the error answers with the shape the service really sends', () => {
+    expect(refName(schemaOf('/api/devices/{id}/readings', '400'))).toBe('ErrorResponse');
+    expect(refName(schemaOf('/api/devices/{id}/readings', '404'))).toBe('ErrorResponse');
+    expect(refName(schemaOf('/api/alerts', '400'))).toBe('ErrorResponse');
+    // Not the standard envelope: ready() throws its own object as the body.
+    expect(refName(schemaOf('/api/ready', '503'))).toBe('NotReadyResponse');
+  });
+});
+
 describe('the module the document is built from', () => {
   it('uses the controller list the service itself uses, so none can be missing from the document', () => {
     expect(Reflect.getMetadata('controllers', OpenApiModule)).toBe(HTTP_CONTROLLERS);
