@@ -2,7 +2,7 @@
 #
 # A local stand-in for .github/workflows/ci.yml, so a PR does not wait for GitHub's runners.
 #
-#   verify     (job 1)  install, format:check, lint, typecheck, test, test:e2e, build
+#   verify     (job 1)  install, format:check, lint, typecheck, test, test:e2e, build, OpenAPI check
 #   manifests  (job 2)  kustomize build of deploy/k8s/overlays/local, validated with kubeconform
 #   images     (job 3)  docker compose --profile demo build
 #
@@ -211,6 +211,8 @@ verify_job() {
   run_step "test (unit)"   unit
   [ "$RUN_E2E" -eq 1 ]   && run_step "test:e2e (throwaway PostgreSQL + Mosquitto)" e2e
   [ "$RUN_BUILD" -eq 1 ] && run_step "build" pnpm exec turbo run build --concurrency="$JOBS" $FORCE
+  # docs/openapi.json must match the controllers; the check reads the build made just above.
+  [ "$RUN_BUILD" -eq 1 ] && run_step "OpenAPI document is current" pnpm --filter @itp/ingest openapi:check
 }
 
 # --- job 2: manifests ---------------------------------------------------------------------------

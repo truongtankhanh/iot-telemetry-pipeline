@@ -9,8 +9,8 @@ the Compose demo and off by default elsewhere, including the Kubernetes base.
 
 The machine-readable reference is [openapi.json](openapi.json): it lists every route with its
 parameters, its response schemas and its error answers. It is generated from the controllers
-(`pnpm docs:openapi`), not written by hand, so it is the one to build a client from. The examples on
-this page are the human version of the same shapes.
+(`pnpm docs:openapi`), not written by hand, and CI fails when it differs from the code, so it is the
+one to build a client from. The examples on this page are the human version of the same shapes.
 
 > **There is no authentication on this API.** It is meant to be reached from inside the platform's
 > network only. See [operations.md](operations.md#security-posture) before exposing it anywhere.

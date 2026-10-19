@@ -122,8 +122,9 @@ Design choices worth knowing before you edit:
 Turborepo builds the contract package before anything that depends on it, so run `pnpm build` (or
 any of the above) after editing `packages/telemetry-contract`.
 
-CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck, unit tests, e2e and build, then
-validates the Kubernetes manifests with kubeconform and builds the Compose images.
+CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck, unit tests, e2e and build, checks
+that `docs/openapi.json` still matches the controllers, then validates the Kubernetes manifests with
+kubeconform and builds the Compose images.
 
 ### Running CI on your machine
 
