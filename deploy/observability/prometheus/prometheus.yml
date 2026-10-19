@@ -1,0 +1,15 @@
+# Prometheus configuration of the `observe` profile of docker-compose.yml: a demo setting, not a
+# production one. It scrapes the ingest service of the same Compose project and loads the alert rules
+# of this folder (mounted at /etc/prometheus/alerts.yml). The target is down until ingest runs.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: ingest
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['ingest:3100']

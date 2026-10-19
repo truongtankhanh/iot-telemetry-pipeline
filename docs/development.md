@@ -65,7 +65,7 @@ packages/
 deploy/
   mosquitto/              broker config
   k8s/                    kustomize base + local overlay
-  observability/          Prometheus alert rules and the Grafana dashboard
+  observability/          Prometheus rules and configuration, Grafana dashboard and provisioning
 docs/                     this documentation
 ```
 
@@ -113,6 +113,8 @@ Design choices worth knowing before you edit:
 | `pnpm docker:up` / `docker:down` / `docker:restart`       | PostgreSQL and Mosquitto from Compose, shared by development and the e2e suite                                        |
 | `pnpm docker:demo`                                        | The whole demo in containers: also builds the ingest service and starts a simulator (foreground)                      |
 | `pnpm docker:demo:down`                                   | Removes the demo's ingest and simulator containers; PostgreSQL and Mosquitto keep running                             |
+| `pnpm docker:observe`                                     | Prometheus (`:9090`) and Grafana (`:3000`) on the shipped rules and dashboard (demo only; see below)                  |
+| `pnpm docker:observe:down`                                | Removes only those two containers                                                                                     |
 | `pnpm test:ingest` / `test:simulator` / `test:contract`   | Unit tests of one package (builds what it depends on first)                                                           |
 | `pnpm e2e:ingest`                                         | `docker:up`, then the ingest e2e suite against the `telemetry_test` database                                          |
 | `pnpm bench:gaps` / `pnpm bench:gaps:loss` / `…:all`      | Two-replica sequence-gap check, without and with broker loss ([benchmarks](benchmarks.md#gap-count-across-replicas))  |
@@ -126,6 +128,20 @@ any of the above) after editing `packages/telemetry-contract`.
 CI (`.github/workflows/ci.yml`) runs format check, lint, typecheck, unit tests, e2e and build, checks
 that `docs/openapi.json` still matches the controllers, then validates the Kubernetes manifests with
 kubeconform and builds the Compose images.
+
+### Prometheus and Grafana for the demo
+
+The Compose profile `observe` runs a Prometheus that loads the rules of `deploy/observability/prometheus/alerts.yml` and scrapes the ingest service, and a Grafana that provisions the dashboard `deploy/observability/grafana/telemetry-ingest.json` (folder Telemetry).
+It is off by default: `pnpm docker:up`, `pnpm docker:demo` and `pnpm ci:local` do not start or build it.
+
+Prometheus scrapes the ingest service of the same Compose project, so the demo has to run too: `pnpm docker:demo` in one terminal and `pnpm docker:observe` in another, or `docker compose --profile demo --profile observe up --build` in one.
+Then open `http://localhost:9090/targets` (the `ingest` target is up after about 15 seconds), `http://localhost:9090/rules` and `http://localhost:3000`, Dashboards, Telemetry, **Telemetry ingest**; an alert opens about 25 seconds after the demo starts.
+`pnpm docker:observe:down` removes the two containers and `pnpm docker:down` removes everything.
+
+Both ports are published on `localhost` only; move them with `PROMETHEUS_HOST_PORT` and `GRAFANA_HOST_PORT` in the root `.env`. Nothing is persisted, so recreating the containers starts with an empty history.
+
+**Demo only.** Like the anonymous broker ([security posture](operations.md#security-posture)), the profile is a demo setting: Grafana lets anyone on the machine view the dashboards (anonymous `Viewer`; its built-in `admin` account is still there, with the product's default credentials) and Prometheus has no authentication.
+A real deployment uses the site's own Prometheus and Grafana: load the rules and import the dashboard as [operations](operations.md#suggested-alerts) describes.
 
 ### Running CI on your machine
 

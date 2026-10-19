@@ -1,0 +1,11 @@
+# The data source of the `observe` profile. The dashboard picks it through its DS_PROMETHEUS
+# variable, which resolves to the default Prometheus data source, so no uid is fixed here.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
