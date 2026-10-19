@@ -5,6 +5,8 @@
 # Delivering alerts to ops-command-center needs its Keycloak token: see the README.
 # Host ports can be moved in the root `.env` (copy .env.example): POSTGRES_HOST_PORT (5433),
 # MQTT_HOST_PORT (1883). Start/stop only PostgreSQL and Mosquitto with `pnpm docker:up|down|restart`.
+# Prometheus and Grafana on the shipped rules and dashboard (demo only): `pnpm docker:observe`, or add
+# `--profile observe`; their ports are PROMETHEUS_HOST_PORT (9090) and GRAFANA_HOST_PORT (3000).
 name: iot-telemetry-pipeline
 
 services:
@@ -64,6 +66,33 @@ services:
     depends_on:
       ingest:
         condition: service_healthy
+
+  # The `observe` profile: Prometheus scrapes the ingest above and loads deploy/observability/prometheus,
+  # Grafana provisions the dashboard of deploy/observability/grafana. Demo only: both are published on
+  # localhost, Grafana lets anyone on this machine view the dashboards (anonymous Viewer) and Prometheus
+  # has no authentication. The images are pinned by digest; Dependabot (docker-compose) moves them.
+  prometheus:
+    profiles: [observe]
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    volumes:
+      - ./deploy/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports:
+      - '127.0.0.1:${PROMETHEUS_HOST_PORT:-9090}:9090'
+
+  grafana:
+    profiles: [observe]
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/telemetry-ingest.json:/var/lib/grafana/dashboards/telemetry-ingest.json:ro
+    depends_on:
+      - prometheus
+    ports:
+      - '127.0.0.1:${GRAFANA_HOST_PORT:-3000}:3000'
 
 volumes:
   pgdata:

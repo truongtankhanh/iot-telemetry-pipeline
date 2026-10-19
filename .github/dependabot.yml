@@ -46,7 +46,8 @@ updates:
     commit-message:
       prefix: build(docker)
 
-  # postgres and eclipse-mosquitto in docker-compose.yml.
+  # postgres and eclipse-mosquitto in docker-compose.yml, and prom/prometheus and grafana/grafana of
+  # its `observe` profile, which are pinned by digest.
   - package-ecosystem: docker-compose
     directory: /
     schedule:

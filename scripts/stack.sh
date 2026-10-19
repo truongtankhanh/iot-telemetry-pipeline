@@ -6,11 +6,16 @@
 #                              service and a simulator (foreground; Ctrl+C stops it)
 #   scripts/stack.sh demo-down stop and remove only the demo's ingest and simulator containers;
 #                              PostgreSQL and Mosquitto keep running
-#   scripts/stack.sh down      stop and remove every container of the Compose project, demo included;
-#                              the database volume is kept
+#   scripts/stack.sh observe   start Prometheus and Grafana (profile `observe`, detached) on the shipped
+#                              rules and dashboard; demo only. Prometheus scrapes the ingest service of
+#                              this project, so run `demo` (or an ingest of the project) as well
+#   scripts/stack.sh observe-down  stop and remove only those two containers
+#   scripts/stack.sh down      stop and remove every container of the Compose project, demo and observe
+#                              included; the database volume is kept
 #   scripts/stack.sh restart   down, then up
 #
-# Host ports come from POSTGRES_HOST_PORT / MQTT_HOST_PORT in `.env` (see .env.example).
+# Host ports come from POSTGRES_HOST_PORT / MQTT_HOST_PORT (and, for `observe`, PROMETHEUS_HOST_PORT /
+# GRAFANA_HOST_PORT) in `.env` (see .env.example).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -34,6 +39,14 @@ demo_down() {
   docker compose --profile demo rm -sf ingest simulator
 }
 
+observe() {
+  docker compose --profile observe up -d prometheus grafana
+}
+
+observe_down() {
+  docker compose --profile observe rm -sf prometheus grafana
+}
+
 down() {
   docker compose --profile '*' down
 }
@@ -42,7 +55,9 @@ case "${1:-}" in
   up) up ;;
   demo) demo ;;
   demo-down) demo_down ;;
+  observe) observe ;;
+  observe-down) observe_down ;;
   down) down ;;
   restart) down && up ;;
-  *) echo "usage: $0 up|demo|demo-down|down|restart" >&2; exit 2 ;;
+  *) echo "usage: $0 up|demo|demo-down|observe|observe-down|down|restart" >&2; exit 2 ;;
 esac

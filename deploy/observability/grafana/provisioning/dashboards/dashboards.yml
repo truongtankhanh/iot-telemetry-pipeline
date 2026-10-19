@@ -1,0 +1,13 @@
+# Loads the dashboard file mounted by the `observe` profile of docker-compose.yml. The file is the
+# source of truth, so changes made in the Grafana interface are not saved.
+apiVersion: 1
+
+providers:
+  - name: telemetry
+    folder: Telemetry
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

@@ -17,6 +17,8 @@
     "docker:up": "bash scripts/stack.sh up",
     "docker:demo": "bash scripts/stack.sh demo",
     "docker:demo:down": "bash scripts/stack.sh demo-down",
+    "docker:observe": "bash scripts/stack.sh observe",
+    "docker:observe:down": "bash scripts/stack.sh observe-down",
     "docker:down": "bash scripts/stack.sh down",
     "docker:restart": "bash scripts/stack.sh restart",
     "test:ingest": "turbo run test --filter=@itp/ingest",
