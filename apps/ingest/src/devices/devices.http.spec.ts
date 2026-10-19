@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { parseTimestamp } from '@itp/telemetry-contract';
 import { Test } from '@nestjs/testing';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -80,17 +81,6 @@ describe('GET /api/devices/:id/readings (HTTP)', () => {
       expect(query).not.toHaveBeenCalled();
     });
 
-    // Pinned as it is today. IMP-16.4 changes this: the pipe reads "from" with `new Date(value)`,
-    // so a loose string is accepted (confirmed in the first run, before the fix: 200). It is a raw
-    // request because `from=1` is the year 2001, a range the 1m resolution refuses.
-    it('accepts a loose "from" such as 1', async () => {
-      await readings('metric=temperature_c&resolution=raw&from=1&to=2026-10-17T10:00:00Z').expect(
-        200,
-      );
-
-      expect(query).toHaveBeenCalledTimes(1);
-    });
-
     it('refuses a 1m range of more than 7 days, naming the limit, without querying', async () => {
       const res = await readings('metric=temperature_c&from=2020-01-01T00:00:00Z').expect(400);
 
@@ -110,6 +100,79 @@ describe('GET /api/devices/:id/readings (HTTP)', () => {
       await readings('metric=temperature_c&resolution=raw&from=2020-01-01T00:00:00Z').expect(200);
 
       expect(query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('"from" and "to" as timestamps', () => {
+    const base = 'metric=temperature_c&resolution=raw';
+    const LATER = '2026-10-17T11:00:00Z';
+    const EARLIER = '2026-10-17T09:00:00Z';
+    /** `text` as the named bound, the other one fixed so the range itself is valid. */
+    const withBound = (param: 'from' | 'to', text: string) =>
+      param === 'from' ? `${base}&from=${text}&to=${LATER}` : `${base}&from=${EARLIER}&to=${text}`;
+
+    // An unencoded `+` in a query string is read as a space, so an offset is sent as %2B.
+    const accepted: [string, string, string][] = [
+      ['Z', '2026-10-17T10:00:00Z', '2026-10-17T10:00:00.000Z'],
+      ['a fraction of one digit', '2026-10-17T10:00:00.5Z', '2026-10-17T10:00:00.500Z'],
+      ['a fraction of nine digits', '2026-10-17T10:00:00.123456789Z', '2026-10-17T10:00:00.123Z'],
+      ['an offset sent as %2B', '2026-10-17T17:00:00%2B07:00', '2026-10-17T10:00:00.000Z'],
+    ];
+    const rejected: [string, string][] = [
+      ['no zone', '2026-10-17T10:00:00'],
+      ['a date only', '2026-10-17'],
+      ['a bare number', '1'],
+      ['an offset with an unencoded plus', '2026-10-17T17:00:00+07:00'],
+      ['a day that rolls over', '2026-02-31T00:00:00Z'],
+      ['hour 24', '2026-10-17T24:00:00Z'],
+      ['a lowercase z', '2026-10-17T10:00:00z'],
+      ['an empty value', ''],
+    ];
+
+    describe.each(['from', 'to'] as const)('"%s"', (param) => {
+      it.each(accepted)(
+        'accepts %s as the same instant the contract reads',
+        async (_, text, instant) => {
+          const res = await readings(withBound(param, text)).expect(200);
+
+          expect(res.body[param]).toBe(instant);
+          expect(query).toHaveBeenCalledTimes(1);
+        },
+      );
+
+      it.each(rejected)('refuses %s, saying what is wanted', async (_, text) => {
+        const res = await readings(withBound(param, text)).expect(400);
+
+        expect(Array.isArray(res.body.message)).toBe(true);
+        expect(res.body.message.join(' ')).toContain(
+          `"${param}" must be an ISO 8601 timestamp with a zone, e.g. 2026-10-17T10:00:00Z`,
+        );
+        expect(query).not.toHaveBeenCalled();
+      });
+
+      it('refuses a repeated parameter', async () => {
+        const res = await readings(
+          `${base}&${param}=2026-10-17T10:00:00Z&${param}=2026-10-17T10:30:00Z`,
+        ).expect(400);
+
+        expect(res.body.message.join(' ')).toContain(`"${param}" must be an ISO 8601 timestamp`);
+        expect(query).not.toHaveBeenCalled();
+      });
+    });
+
+    it('reads a zoned timestamp as the contract reads it', async () => {
+      const text = '2026-10-17T17:00:00+07:00';
+
+      const res = await readings(`${base}&from=${encodeURIComponent(text)}&to=${LATER}`).expect(
+        200,
+      );
+
+      expect(res.body.from).toBe(new Date(parseTimestamp(text)).toISOString());
+    });
+
+    it('does not mind an absent bound: the defaults still apply', async () => {
+      await readings(`${base}&from=2026-10-17T10:00:00Z`).expect(200);
+      await readings(`${base}&to=2026-10-17T10:00:00Z`).expect(200);
     });
   });
 

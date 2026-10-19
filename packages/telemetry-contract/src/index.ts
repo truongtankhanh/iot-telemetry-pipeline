@@ -70,8 +70,11 @@ function daysInMonth(year: number, month: number): number {
  * date-only strings and free text, and rolls `02-31` over to March. It stays as the range check for
  * month, minute, second and offset. The day is checked by rule, not by a `Date.UTC` round trip,
  * because `Date.UTC` maps the years 0 to 99 to 1900 to 1999.
+ *
+ * Exported so that anything else that reads a timestamp (the HTTP API reads `from` and `to` with it)
+ * applies this rule and not its own: one string must not mean two instants.
  */
-function parseTimestamp(ts: string): number {
+export function parseTimestamp(ts: string): number {
   const match = TIMESTAMP.exec(ts);
   if (!match) return NaN;
   const year = Number(match[1]);
