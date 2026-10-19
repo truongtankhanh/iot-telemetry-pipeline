@@ -9,14 +9,23 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# No job writes to the repository or talks to the GitHub API: the token is read-only by declaration,
+# not by the repository's default setting.
+permissions:
+  contents: read
+
 # CI can be switched off for the repository with the Actions variable CI_ENABLED=false
 # (`pnpm ci:off`, back with `pnpm ci:on`). Unset or any other value means it runs. A skipped job
 # counts as passed for a required check; `pnpm ci:local` runs the same steps on this machine.
+#
+# Third-party actions are pinned to the commit of a release (the version is in the comment), so a
+# moved tag cannot change what runs. Dependabot proposes newer versions.
 jobs:
   verify:
     name: Lint, typecheck, unit + e2e tests, build
     if: ${{ vars.CI_ENABLED != 'false' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17-alpine
@@ -34,13 +43,13 @@ jobs:
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/telemetry_test
       MQTT_URL: mqtt://localhost:1883
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Start Mosquitto with the repository's broker config
         run: |
           sudo apt-get update -q && sudo apt-get install -y -q mosquitto
           mosquitto -c deploy/mosquitto/mosquitto.conf -d
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -56,12 +65,19 @@ jobs:
     name: Kubernetes manifests
     if: ${{ vars.CI_ENABLED != 'false' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Pinned by version and by checksum (the hashes are the ones the releases publish): a download
+      # that differs from the release the repository was reviewed against fails the job.
       - name: Install kustomize and kubeconform
         run: |
-          curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz | tar xz
-          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz | tar xz
+          curl -fsSLO https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz
+          curl -fsSLO https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
+          echo "ea375e7372f9aa029129d4b2d16c66b7750b7f1213c4f66f910d981c895818d8  kustomize_v5.7.1_linux_amd64.tar.gz" | sha256sum --check
+          echo "c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3  kubeconform-linux-amd64.tar.gz" | sha256sum --check
+          tar xzf kustomize_v5.7.1_linux_amd64.tar.gz
+          tar xzf kubeconform-linux-amd64.tar.gz
       - name: Build and validate
         run: |
           ./kustomize build --load-restrictor LoadRestrictionsNone deploy/k8s/overlays/local > rendered.yaml
@@ -71,7 +87,8 @@ jobs:
     name: Docker images
     if: ${{ vars.CI_ENABLED != 'false' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: verify
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: docker compose --profile demo build
