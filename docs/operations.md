@@ -76,7 +76,24 @@ Throughput reference: ≈ 10 000 messages/s on one replica ([benchmarks](benchma
 
 ## Logs
 
-Standard NestJS logging to stdout. The lines worth knowing:
+The service logs through the built-in NestJS logger, to stdout (`error` and `fatal` go to stderr). `LOG_FORMAT` chooses the format
+([configuration](configuration.md#service-and-database)):
+
+- `text`, the default when the variable is unset (local development): Nest's readable, coloured lines.
+- `json`, which the container image sets: one JSON object per line, with the fields `level`, `pid`, `timestamp` (milliseconds since the epoch), `message` and,
+  when there are any, `context` (the Logger column below), `stack`, `error` (`name`, `message`, `stack` and own properties such as `code`) and `params`.
+  The text of a line in the table below is its `message`.
+
+`NEST_LOG_LEVEL` sets the level in both formats (for example `warn`, `>=debug` or `warn,error`); unset, every level is written.
+
+One line is always text: a configuration error at boot is printed before the format is known, even with `LOG_FORMAT=json`, and the process then exits. During a
+rolling deploy to the JSON image, old and new replicas log in different formats for a few minutes, and a log filter written for the text lines has to be
+updated. To go back, set `LOG_FORMAT=text`.
+
+The built-in logger is used rather than a logging library: its JSON mode gives one line, a level, a context and a serialised error, and it adds no dependency. The
+command center uses `pino`; this repository does not carry it, and choosing it would add a dependency and an adapter for Nest's `Logger`.
+
+The lines worth knowing:
 
 | Logger                        | Line                                                                                                                                                                                   | Means                                                                             |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |

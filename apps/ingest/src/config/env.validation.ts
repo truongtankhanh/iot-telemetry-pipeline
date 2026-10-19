@@ -1,6 +1,7 @@
 import { plainToInstance, Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -182,6 +183,15 @@ export class Env {
   @Transform(toBoolean)
   @IsBoolean()
   API_DOCS_ENABLED = false;
+
+  /**
+   * `json` writes one JSON object per line, for a log aggregator; `text` is the readable, coloured
+   * output of Nest's default logger. The container image sets `json`; the level is set with Nest's
+   * own `NEST_LOG_LEVEL`. A bad value stops the service, but that one error is still printed as
+   * text, because the format is not known yet when the environment fails validation.
+   */
+  @IsIn(['text', 'json'])
+  LOG_FORMAT: 'text' | 'json' = 'text';
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {

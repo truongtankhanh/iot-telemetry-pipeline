@@ -23,7 +23,8 @@ RUN pnpm turbo run build --filter "@itp/ingest..."
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm --filter @itp/ingest deploy --prod --legacy --store-dir /pnpm/store /out
 
 FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
-ENV NODE_ENV=production CONFIG_DIR=/app/config
+# The image logs one JSON object per line for a log aggregator; LOG_FORMAT=text gives readable lines again.
+ENV NODE_ENV=production CONFIG_DIR=/app/config LOG_FORMAT=json
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 USER node
