@@ -1,0 +1,57 @@
+# Dependabot version updates. Weekly, on Monday, one entry per ecosystem the repository uses.
+#
+# Pins are only useful if something moves them: the action SHAs in .github/workflows, the Node image
+# digest in both Dockerfiles, the Compose images and the npm lockfile all go stale otherwise. Each
+# update arrives as a pull request that the ordinary CI workflow checks; majors are never grouped,
+# so a breaking change is reviewed on its own.
+#
+# Not covered: the image in deploy/k8s (Dependabot does not read kustomize manifests), so the broker
+# version there is changed by hand together with docker-compose.yml.
+version: 2
+
+updates:
+  # The SHA pins of the workflows. Dependabot keeps the SHA and rewrites the version comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+
+  # pnpm workspaces (apps/* and packages/*) with one lockfile at the root.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    groups:
+      minor-and-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # The node:24-alpine base of both Dockerfiles, which is pinned by digest.
+  - package-ecosystem: docker
+    directories:
+      - /apps/ingest
+      - /apps/simulator
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(docker)
+
+  # postgres and eclipse-mosquitto in docker-compose.yml.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(docker)

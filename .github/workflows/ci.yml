@@ -44,10 +44,20 @@ jobs:
       MQTT_URL: mqtt://localhost:1883
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: Start Mosquitto with the repository's broker config
+      # The image Compose and Kubernetes deploy, with the repository's config mounted. A `services:`
+      # container cannot do this: GitHub starts it before the checkout, so the file would not exist yet.
+      - name: Start Mosquitto from the deployed image, with the repository's broker config
         run: |
-          sudo apt-get update -q && sudo apt-get install -y -q mosquitto
-          mosquitto -c deploy/mosquitto/mosquitto.conf -d
+          docker run -d --name mosquitto -p 1883:1883 \
+            -v "$PWD/deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" \
+            eclipse-mosquitto:2.0.18
+          for i in $(seq 1 30); do
+            docker exec mosquitto mosquitto_pub -h 127.0.0.1 -t ci/ready -m 1 && exit 0
+            sleep 1
+          done
+          echo 'Mosquitto did not become ready' >&2
+          docker logs mosquitto
+          exit 1
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
