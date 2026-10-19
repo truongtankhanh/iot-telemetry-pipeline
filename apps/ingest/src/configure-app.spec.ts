@@ -4,6 +4,8 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { configureApp } from './configure-app';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 async function appWithDocs(enabled: boolean): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({
     imports: [
@@ -34,5 +36,22 @@ describe('configureApp', () => {
     app = await appWithDocs(false);
     await request(app.getHttpServer()).get('/api/docs').expect(404);
     await request(app.getHttpServer()).get('/api/docs-json').expect(404);
+  });
+
+  it('puts a request id on a response that no handler produced', async () => {
+    app = await appWithDocs(false);
+    const res = await request(app.getHttpServer()).get('/api/nothing').expect(404);
+
+    expect(res.headers['x-request-id']).toMatch(UUID);
+  });
+
+  it('answers with the request id the caller sent, when it is a valid one', async () => {
+    app = await appWithDocs(false);
+    const res = await request(app.getHttpServer())
+      .get('/api/nothing')
+      .set('X-Request-Id', 'caller-1')
+      .expect(404);
+
+    expect(res.headers['x-request-id']).toBe('caller-1');
   });
 });

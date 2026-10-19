@@ -1,4 +1,5 @@
 import { createLogger } from './create-logger';
+import { runWithContext } from './log-context';
 
 const ESC = String.fromCharCode(27);
 
@@ -87,6 +88,44 @@ describe('createLogger', () => {
 
       expect(written(stdout)).toBe('');
       expect(written(stderr)).toContain('loud');
+    });
+  });
+
+  describe('the log context', () => {
+    /** The JSON object of the n-th chunk written to stdout. */
+    const lineAt = (n: number): Record<string, unknown> =>
+      JSON.parse(String(stdout.mock.calls[n]![0]));
+
+    it('adds requestId to a json line written inside a request, and not to one outside', () => {
+      const logger = createLogger('json');
+
+      runWithContext({ requestId: 'r-1' }, () => logger.log('inside', 'Ctx'));
+      logger.log('outside', 'Ctx');
+
+      expect(lineAt(0)).toMatchObject({ message: 'inside', context: 'Ctx', requestId: 'r-1' });
+      expect(lineAt(1)).toMatchObject({ message: 'outside' });
+      expect(lineAt(1)).not.toHaveProperty('requestId');
+    });
+
+    it('keeps the fields Nest writes where they are', () => {
+      runWithContext({ requestId: 'r-1' }, () => createLogger('json').warn('careful', 'Ctx'));
+
+      expect(lineAt(0)).toMatchObject({ level: 'warn', message: 'careful', context: 'Ctx' });
+    });
+
+    it('adds any field of the context, batchId included', () => {
+      runWithContext({ requestId: 'r-1', batchId: '7' }, () =>
+        createLogger('json').log('flushing', 'Ctx'),
+      );
+
+      expect(lineAt(0)).toMatchObject({ requestId: 'r-1', batchId: '7' });
+    });
+
+    it('adds nothing to the text format', () => {
+      runWithContext({ requestId: 'r-1' }, () => createLogger('text').log('inside', 'Ctx'));
+
+      expect(written(stdout)).toContain('inside');
+      expect(written(stdout)).not.toContain('r-1');
     });
   });
 });
