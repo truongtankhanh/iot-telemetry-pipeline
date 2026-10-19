@@ -241,8 +241,9 @@ than discovered. Items 1 and 3 are tracked as
    so the platform-aws `SequenceGaps` alarm on any increase needs no change; it only sees a gap
    `SEQUENCE_GRACE_MS` later (30 s by default). To verify in platform-aws: its alarm period is
    longer than that delay.
-4. **Dashboards and alert rules as code** are not shipped ([ITP-12](roadmap.md)); on AWS the signals
-   go to CloudWatch, on premises nothing is provisioned.
+4. **Dashboards and alert rules as code**: the Prometheus rules and the Grafana dashboard are in
+   `deploy/observability/` ([operations](operations.md#suggested-alerts)); on AWS the signals go to
+   CloudWatch.
 5. **Device provisioning is manual** ([ITP-17](roadmap.md)): a new device is added to `devices.json`
    (and, on AWS, registered by hand as an IoT thing).
 6. **AWS is synthesised and tested, not deployed from a live account**, so IoT policy evaluation and

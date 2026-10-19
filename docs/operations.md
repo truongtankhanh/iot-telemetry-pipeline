@@ -64,6 +64,15 @@ A counter that has never moved shows `0` instead of "No data". The red lines on 
 Shipped as Prometheus rules in [`deploy/observability/prometheus/alerts.yml`](../deploy/observability/prometheus/alerts.yml): one rule for each row, with the same expression, and a `for` duration and a `severity` set there. Starting points, to tune per site.
 A counter with a label (`{result="failed"}`) has no series until its first increment, and Prometheus cannot compute an `increase` from a series' first sample, so the rules for the data-loss and delivery rows also match a series that did not exist a window ago.
 
+To load the rules, point Prometheus at the file in its configuration; the path is where the file is mounted or copied to:
+
+```yaml
+rule_files:
+  - /etc/prometheus/alerts.yml
+```
+
+With the Prometheus operator, the same `groups:` go under `spec:` of a `PrometheusRule` object. Neither way is tested in this repository, which checks the file with `promtool check rules` and keeps it in step with this table with a spec.
+
 | Condition (PromQL)                                                                                                                                                          | Why it matters                                                                                                                                                                 |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `increase(telemetry_readings_total{result="failed"}[5m]) > 0 or (telemetry_readings_total{result="failed"} > 0 unless telemetry_readings_total{result="failed"} offset 5m)` | Readings were **dropped** — rejected by the database, or given up on at shutdown. Data is lost                                                                                 |
