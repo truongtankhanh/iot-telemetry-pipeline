@@ -60,6 +60,10 @@ jobs:
       - run: pnpm test
       - run: pnpm test:e2e
       - run: pnpm build
+      # docs/openapi.json is generated from the built controllers; this fails when a change to a route
+      # or DTO did not regenerate it (`pnpm docs:openapi`). It needs the build just above.
+      - name: OpenAPI document is current
+        run: pnpm --filter @itp/ingest openapi:check
 
   manifests:
     name: Kubernetes manifests
