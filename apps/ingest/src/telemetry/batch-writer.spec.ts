@@ -3,6 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { PoolClient } from 'pg';
 import type { Env } from '../config/env.validation';
 import type { Database } from '../database/database';
+import { currentContext } from '../logging/log-context';
 import { Metrics } from '../metrics/metrics';
 import type { RulesService } from '../rules/rules.service';
 import { BatchWriter } from './batch-writer.service';
@@ -23,6 +24,8 @@ class FakeDatabase {
   down = false;
   /** While set, every transaction throws it, whatever its code. */
   failure?: Error;
+  /** While set, the ledger update fails as PostgreSQL would for a sequence number out of range. */
+  poisonSequences = false;
   transactions = 0;
   beforeTransaction?: (n: number) => void;
   readonly stored: Row[] = [];
@@ -80,6 +83,11 @@ class FakeDatabase {
         }
         if (sql.includes('UPDATE device')) {
           const [ids, lasts] = params as [string[], (number | null)[]];
+          // Only an update that carries a sequence number is refused, so the readings of the same
+          // batch can still be written on their own.
+          if (this.poisonSequences && lasts.some((last) => last !== null)) {
+            throw Object.assign(new Error('sequence number out of range'), { code: '22003' });
+          }
           ids.forEach((id, i) => lasts[i] !== null && ledger.set(id, lasts[i]!));
           return { rows: [] };
         }
@@ -326,6 +334,146 @@ describe('BatchWriter', () => {
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining('Rule evaluation failed unexpectedly: boom'),
       );
+    });
+  });
+
+  describe('batch id', () => {
+    interface Line {
+      level: 'log' | 'warn' | 'error';
+      message: string;
+      batchId: string | undefined;
+    }
+    let lines: Line[];
+
+    /**
+     * Records every line the loggers are asked to write, with the batch id of the context it is
+     * written in. The id is added to the JSON object later, by the installed logger, so the message
+     * string alone cannot show it; the context is read at the moment of the call.
+     */
+    beforeEach(() => {
+      lines = [];
+      const record = (level: Line['level'], message: unknown) =>
+        lines.push({ level, message: String(message), batchId: currentContext().batchId });
+      jest.spyOn(Logger.prototype, 'log').mockImplementation((message: unknown) => {
+        record('log', message);
+      });
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation((message: unknown) => {
+        record('warn', message);
+      });
+      jest.spyOn(Logger.prototype, 'error').mockImplementation((message: unknown) => {
+        record('error', message);
+      });
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    const line = (start: string): Line | undefined =>
+      lines.find((l) => l.message.startsWith(start));
+
+    it('puts an id on the warning of a flush that failed', async () => {
+      const { db, writer } = setup();
+      db.down = true;
+      writer.add([reading(1), reading(2)]);
+
+      await writer.flush();
+
+      expect(line('Flush of 2 readings failed')?.batchId).toMatch(/^\d+$/);
+    });
+
+    it('gives each flush attempt its own id', async () => {
+      const { db, writer } = setup();
+      db.down = true;
+      writer.add([reading(1)]);
+
+      await writer.flush();
+      jest.advanceTimersByTime(10_000);
+      await writer.flush();
+
+      const ids = lines.filter((l) => l.message.startsWith('Flush of')).map((l) => l.batchId);
+      expect(ids).toHaveLength(2);
+      expect(ids[0]).not.toBe(ids[1]);
+    });
+
+    it('does not spend an id on a tick with nothing to write or on one that is backing off', async () => {
+      const { db, writer } = setup();
+      db.down = true;
+
+      await writer.flush(); // nothing buffered
+      writer.add([reading(1)]);
+      await writer.flush(); // the first attempt
+      await writer.flush(); // backing off: returns without trying
+      jest.advanceTimersByTime(10_000);
+      await writer.flush(); // the second attempt
+
+      expect(lines.map((l) => l.batchId)).toEqual(['1', '2']);
+    });
+
+    it('gives the lines of the rules and the drop of one flush the same id', async () => {
+      const { db, writer, rules } = setup();
+      rules.process.mockImplementation(async () => {
+        new Logger('RulesService').warn('Rule evaluation deferred, 1 pending: down');
+      });
+      writer.add([reading(1), reading(2, POISON), reading(3), reading(4)]);
+
+      await writer.flush();
+
+      const dropped = line('Dropped 1 readings');
+      const fromRules = lines.filter((l) => l.message.startsWith('Rule evaluation deferred'));
+      expect(db.stored.map((r) => r.value)).toEqual([1, 3, 4]);
+      expect(dropped?.batchId).toMatch(/^\d+$/);
+      expect(fromRules.length).toBeGreaterThan(0);
+      expect(fromRules.every((l) => l.batchId === dropped?.batchId)).toBe(true);
+    });
+
+    it('puts an id on the drop of sequence numbers and still stores the readings', async () => {
+      const { db, writer } = setup();
+      db.poisonSequences = true;
+      writer.add([reading(1), reading(2)]);
+      writer.observe('d1', 1, 1_000);
+      writer.observe('d1', 2, 2_000);
+
+      await writer.flush();
+
+      expect(line('Sequence numbers of 2 messages dropped')?.batchId).toMatch(/^\d+$/);
+      expect(db.stored.map((r) => r.value)).toEqual([1, 2]);
+    });
+
+    it('puts an id on the drop of a drain', async () => {
+      const { db, writer } = setup();
+      db.down = true;
+      writer.add([reading(1), reading(2), reading(3)]);
+
+      await writer.drain();
+
+      expect(line('Dropped 3 readings')?.batchId).toMatch(/^\d+$/);
+    });
+
+    it('leaves the lines about rule evaluations at shutdown without an id: they are not a flush', async () => {
+      const { writer, rules } = setup();
+      rules.retryPending
+        .mockResolvedValueOnce(3)
+        .mockRejectedValueOnce(new Error('pool is closed'));
+
+      await writer.drain();
+      await writer.drain();
+
+      expect(line('3 rule evaluations still pending at shutdown')).toMatchObject({
+        level: 'error',
+        batchId: undefined,
+      });
+      expect(line('Retrying rule evaluations at shutdown failed')).toMatchObject({
+        level: 'error',
+        batchId: undefined,
+      });
+    });
+
+    it('writes no line for a flush that succeeds, and leaves no context behind', async () => {
+      const { writer } = setup();
+      writer.add([reading(1), reading(2)]);
+
+      await writer.flush();
+
+      expect(lines).toEqual([]);
+      expect(currentContext()).toEqual({});
     });
   });
 

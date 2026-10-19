@@ -5,6 +5,7 @@ import type { Env } from '../config/env.validation';
 import { Database } from '../database/database';
 import { isDataError } from '../database/errors';
 import { nextDelayMs } from '../delivery/backoff';
+import { runWithContext } from '../logging/log-context';
 import { Metrics } from '../metrics/metrics';
 import { RulesService } from '../rules/rules.service';
 import { type Reading, rollup } from './rollup';
@@ -46,6 +47,11 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
   /** Readings (or messages) taken out of the buffer by a flush that has not finished yet. */
   private inFlight = 0;
   private failures = 0;
+  /**
+   * Flush attempts that did work since the process started. Its value names one attempt in the logs
+   * (`batchId`): a retry gets a new one, and it is the same range in every replica.
+   */
+  private flushSeq = 0;
   private retryAt = 0;
   private draining = false;
   private paused = false;
@@ -165,16 +171,19 @@ export class BatchWriter implements OnModuleInit, OnApplicationShutdown {
     this.inFlight = Math.max(batch.length, observed.length);
     this.metrics.buffered.set(0);
 
-    try {
-      await this.commit(batch, observed);
-      this.failures = 0;
-    } catch (error) {
-      if (isDataError(error)) await this.isolate(batch, observed);
-      else this.retryOrDrop(batch, observed, error);
-    } finally {
-      this.inFlight = 0;
-      if (this.paused && this.backlog <= this.ceiling / 2) this.release();
-    }
+    // Every log line written below carries the id, the rule evaluation lines included.
+    await runWithContext({ batchId: String(++this.flushSeq) }, async () => {
+      try {
+        await this.commit(batch, observed);
+        this.failures = 0;
+      } catch (error) {
+        if (isDataError(error)) await this.isolate(batch, observed);
+        else this.retryOrDrop(batch, observed, error);
+      } finally {
+        this.inFlight = 0;
+        if (this.paused && this.backlog <= this.ceiling / 2) this.release();
+      }
+    });
   }
 
   /** One flush: a transaction, then the metrics and the rules for what it stored. Throws on failure. */

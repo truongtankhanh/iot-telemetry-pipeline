@@ -81,7 +81,7 @@ The service logs through the built-in NestJS logger, to stdout (`error` and `fat
 
 - `text`, the default when the variable is unset (local development): Nest's readable, coloured lines.
 - `json`, which the container image sets: one JSON object per line, with the fields `level`, `pid`, `timestamp` (milliseconds since the epoch), `message` and,
-  when there are any, `context` (the Logger column below), `stack`, `error` (`name`, `message`, `stack` and own properties such as `code`), `params` and `requestId`
+  when there are any, `context` (the Logger column below), `stack`, `error` (`name`, `message`, `stack` and own properties such as `code`), `params`, `requestId` and `batchId`
   (see below). The text of a line in the table below is its `message`.
 
 **Request id.** Every HTTP request gets an id: the caller's `X-Request-Id` if it is a valid one, a new UUID otherwise ([API](api.md#request-id)). In the `json` format a line
@@ -89,6 +89,15 @@ written while a request is being served carries it as `requestId`; the `text` fo
 error (HTTP `500`, for example a query cancelled by `DB_STATEMENT_TIMEOUT_MS`), so that is where the id is usually found: a client reports the `X-Request-Id` of its response, and
 `grep` finds the line. Lines written by timers, the MQTT consumer and the boot have no `requestId`. The field means "written while serving this request", not "caused by it": a
 database connection opened for a request can later log an idle-connection warning with that request's id.
+
+**Batch id.** In the `json` format a line written during a flush of the write buffer carries `batchId`: the `BatchWriter` lines (`Flush of N readings failed`, `Dropped N readings`,
+`Sequence numbers of N messages dropped`) and the `RulesService` lines written while the rules are evaluated for that flush (`Rule evaluation deferred`, and the others), so the lines of one
+failing flush can be followed with one `grep`. The id names **one flush attempt**, not the readings: a batch that fails and is retried gets a new id at its next attempt, and the halves that
+are written one by one after a rejected row share the id of the flush that failed. It is a counter that starts at 1 with each process and is the same range in every replica, so use it together
+with the pod name and the timestamp. Like `requestId`, it means "written during this flush", not "caused by it": a rule evaluation deferred by one flush and retried by a later one is logged with the
+later flush's id, and an idle-connection warning of the database pool can carry the id of the flush that opened the connection. Lines written by the other timers, the MQTT consumer and the boot
+have no `batchId`, and neither do the two lines about rule evaluations still pending at shutdown
+(`N rule evaluations still pending at shutdown, not applied` and `Retrying rule evaluations at shutdown failed`): they are written after the last flush, not in it. A flush that succeeds writes no line; the `text` format has no ids.
 
 `NEST_LOG_LEVEL` sets the level in both formats (for example `warn`, `>=debug` or `warn,error`); unset, every level is written.
 
