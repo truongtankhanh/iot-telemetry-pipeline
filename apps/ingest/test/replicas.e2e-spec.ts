@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { telemetryTopic } from '@itp/telemetry-contract';
 import { connectAsync, type MqttClient } from 'mqtt';
 import { Pool } from 'pg';
+import request from 'supertest';
 import { RECONCILE_INTERVAL_MS } from '../src/rules/rules.service';
 import type { Reading } from '../src/telemetry/rollup';
 import { fakeCommandCenter } from './support/fake-command-center';
@@ -262,6 +263,36 @@ describe('Telemetry pipeline with two replicas (e2e)', () => {
     expect(
       occ.calls.some((c) => c.method === 'POST' && c.url === '/api/incidents/incident-1/resolve'),
     ).toBe(true);
+  });
+
+  it('pages through every alert, newest first, one at a time, without skipping a tie', async () => {
+    const { rows } = await db.query<{ id: string }>(
+      'SELECT id::text AS id FROM alert ORDER BY opened_at DESC, id DESC',
+    );
+    const expected = rows.map((r) => r.id);
+    expect(expected.length).toBeGreaterThanOrEqual(3);
+    // The hot and humid rules of dc-env-01 open on the same message, so two alerts share an
+    // instant: the id in the cursor is what keeps the second of them from being skipped.
+    expect(
+      await count(
+        'SELECT count(*) FROM (SELECT opened_at FROM alert GROUP BY opened_at HAVING count(*) > 1) t',
+      ),
+    ).toBeGreaterThanOrEqual(1);
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page <= expected.length; page++) {
+      const res = await request(a.app.getHttpServer())
+        .get('/api/alerts')
+        .query({ limit: 1, ...(cursor ? { before: cursor } : {}) })
+        .expect(200);
+      seen.push(...res.body.map((alert: { id: string }) => alert.id));
+      cursor = res.headers['x-next-cursor'];
+      if (!cursor) break;
+    }
+
+    expect(cursor).toBeUndefined();
+    expect(seen).toEqual(expected);
   });
 
   // This case stops a replica: keep it the last one in the file.
