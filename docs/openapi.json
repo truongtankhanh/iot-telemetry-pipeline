@@ -1,0 +1,107 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/devices": {
+      "get": {
+        "operationId": "DevicesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Registered devices with when they were last heard from.",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/devices/{id}/readings": {
+      "get": {
+        "operationId": "DevicesController_readings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readings for one device and metric over a time range.",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/alerts": {
+      "get": {
+        "operationId": "AlertsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Most recent alerts first, with the delivery state of their latest outbox event. When more\nremain, the response header `X-Next-Cursor` holds the `before` for the next page; the body stays\na plain array.",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "HealthController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Liveness: the process is up. Kubernetes restarts the pod if this fails.",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Readiness: database reachable and subscribed to the broker. `alertSink` is reported for\ninformation only: a service without a command center (`none`) is still ready.",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "IoT Telemetry Pipeline",
+    "description": "Devices, readings, rollups and alerts. Prometheus metrics at /metrics.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "schemas": {}
+  }
+}

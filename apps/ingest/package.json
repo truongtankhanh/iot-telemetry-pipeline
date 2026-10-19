@@ -14,6 +14,8 @@
     "start": "node dist/main.js",
     "lint": "eslint src test",
     "typecheck": "tsc --noEmit",
+    "openapi:generate": "nest build && node dist/openapi/generate-openapi.js",
+    "openapi:check": "node dist/openapi/generate-openapi.js --check",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --config test/jest-e2e.config.js --runInBand"
   },

@@ -31,6 +31,7 @@
     "bench:gaps:loss": "bash deploy/bench/run-gap-check.sh loss",
     "bench:gaps:all": "pnpm bench:gaps && pnpm bench:gaps:loss",
     "bench:baseline": "bash deploy/bench/run-baseline.sh",
+    "docs:openapi": "pnpm --filter @itp/telemetry-contract build && pnpm --filter @itp/ingest openapi:generate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
