@@ -142,9 +142,9 @@ kubeconform and builds the Compose images.
 
 Every workflow has `permissions: contents: read` and a `timeout-minutes` on each job, and uses no secret. Third-party
 actions are pinned to the commit of a release, with the version in a comment (`uses: actions/checkout@<sha> # v4.4.0`).
-Do not edit a pin by hand: Dependabot (`.github/dependabot.yml`, weekly on Monday) proposes the new SHA and rewrites the
+Do not edit a pin by hand: Dependabot (`.github/dependabot.yml`, monthly, at most two open pull requests per ecosystem) proposes the new SHA and rewrites the
 comment, for the actions, the npm lockfile, the `node:24-alpine` digest in both Dockerfiles and the Compose images. It
-ignores major versions of `node` and `postgres`, which are adopted by hand in one pull request. It does not read
+ignores major versions of the npm packages, `node` and `postgres`, which are adopted by hand in one pull request. It does not read
 `deploy/k8s`, `deploy/bench/docker-compose.replicas.yml`, `ci.yml` or `scripts/ci-local.sh`, so a change to the broker image
 tag in `docker-compose.yml` is also made in those four places.
 
