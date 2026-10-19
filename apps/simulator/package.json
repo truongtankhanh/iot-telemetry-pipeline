@@ -17,11 +17,11 @@
   },
   "dependencies": {
     "@itp/telemetry-contract": "workspace:*",
-    "mqtt": "^5.16.0",
+    "mqtt": "^5.16.1",
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@types/node": "^24.19.0",
+    "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
     "typescript": "~5.9.3"
   }
