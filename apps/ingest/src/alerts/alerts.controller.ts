@@ -1,31 +1,10 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Database } from '../database/database';
+import { ErrorResponse } from '../error-response.dto';
+import { AlertResponse, AlertsQueryDto } from './alerts.dto';
 import { decodeCursor, encodeCursor } from './cursor';
-
-const MAX_LIMIT = 200;
-
-export class AlertsQueryDto {
-  @IsOptional()
-  @IsIn(['open', 'cleared'])
-  status?: 'open' | 'cleared';
-
-  /** Alerts per page. Default and maximum: 200. */
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(MAX_LIMIT)
-  limit: number = MAX_LIMIT;
-
-  /** Where the previous page ended: the `X-Next-Cursor` header of its response. Opaque. */
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  before?: string;
-}
 
 @ApiTags('alerts')
 @Controller('alerts')
@@ -38,10 +17,34 @@ export class AlertsController {
    * a plain array.
    */
   @Get()
-  async list(@Query() query: AlertsQueryDto, @Res({ passthrough: true }) res: Response) {
+  @ApiOperation({
+    summary: 'Alerts, newest first, with the delivery state of their latest outbox event',
+    description:
+      'When more alerts follow, the response header `X-Next-Cursor` holds the `before` for the next page. The body is always a plain array.',
+  })
+  @ApiOkResponse({
+    description: 'Up to `limit` alerts.',
+    type: [AlertResponse],
+    headers: {
+      'X-Next-Cursor': {
+        description:
+          'Present when more alerts follow: send it as `before` to get the next page. Opaque.',
+        schema: { type: 'string' },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description:
+      'The query is not valid: `status`, `limit`, or a `before` this API did not return.',
+    type: ErrorResponse,
+  })
+  async list(
+    @Query() query: AlertsQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AlertResponse[]> {
     const after = query.before === undefined ? undefined : decodeCursor(query.before);
     // One row past the limit tells "exactly a page" from "more to come".
-    const { rows } = await this.db.query<{ id: string; openedAt: Date }>(
+    const { rows } = await this.db.query<AlertResponse>(
       `SELECT a.id, a.device_id AS "deviceId", a.rule_id AS "ruleId", a.metric, a.severity, a.title,
               a.status, a.opened_at AS "openedAt", a.opened_value AS "openedValue",
               a.cleared_at AS "clearedAt", a.cleared_value AS "clearedValue",

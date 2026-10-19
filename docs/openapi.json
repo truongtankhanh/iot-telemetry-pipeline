@@ -7,7 +7,17 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Every registered device.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceResponse"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Registered devices with when they were last heard from.",
@@ -27,15 +37,91 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "resolution",
+            "required": false,
+            "in": "query",
+            "description": "`raw` readings, or `1m` per-minute summaries from the rollup table.",
+            "schema": {
+              "default": "1m",
+              "type": "string",
+              "enum": [
+                "raw",
+                "1m"
+              ]
+            }
+          },
+          {
+            "name": "metric",
+            "required": true,
+            "in": "query",
+            "description": "Metric to return, e.g. `temperature_c`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "temperature_c",
+                "humidity_pct",
+                "co2_ppm",
+                "power_kw"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Start of the range (ISO 8601 with a zone, inclusive). Default: one hour before `to`.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "End of the range (ISO 8601 with a zone, exclusive). Default: now.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Readings of the device. Raw readings (up to 5 000, with `truncated` and `nextFrom`) or per-minute summaries, by `resolution`.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/RawReadingsResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RollupReadingsResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The query is not valid: an unknown metric, a timestamp without a zone, a range that ends before it starts, or a 1m range of more than 7 days.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The device is not registered, or does not report that metric.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -49,14 +135,78 @@
     },
     "/api/alerts": {
       "get": {
+        "description": "When more alerts follow, the response header `X-Next-Cursor` holds the `before` for the next page. The body is always a plain array.",
         "operationId": "AlertsController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Alerts per page. Default and maximum: 200.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 200,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "cleared"
+              ]
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "Where the previous page ended: the `X-Next-Cursor` header of its response. Opaque.",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Up to `limit` alerts.",
+            "headers": {
+              "X-Next-Cursor": {
+                "description": "Present when more alerts follow: send it as `before` to get the next page. Opaque.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AlertResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The query is not valid: `status`, `limit`, or a `before` this API did not return.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
-        "summary": "Most recent alerts first, with the delivery state of their latest outbox event. When more\nremain, the response header `X-Next-Cursor` holds the `before` for the next page; the body stays\na plain array.",
+        "summary": "Alerts, newest first, with the delivery state of their latest outbox event",
         "tags": [
           "alerts"
         ]
@@ -68,7 +218,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "The process is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Liveness: the process is up. Kubernetes restarts the pod if this fails.",
@@ -83,7 +240,24 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "The database answers and a broker connection is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database or the broker is down. The body is not the standard error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotReadyResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Readiness: database reachable and subscribed to the broker. `alertSink` is reported for\ninformation only: a service without a command center (`none`) is still ready.",
@@ -102,6 +276,470 @@
   "tags": [],
   "servers": [],
   "components": {
-    "schemas": {}
+    "schemas": {
+      "RawReading": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-16T07:59:02.000Z"
+          },
+          "value": {
+            "type": "number",
+            "example": 24.3
+          }
+        },
+        "required": [
+          "ts",
+          "value"
+        ]
+      },
+      "RawReadingsResponse": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "example": "dc-env-01"
+          },
+          "metric": {
+            "enum": [
+              "temperature_c",
+              "humidity_pct",
+              "co2_ppm",
+              "power_kw"
+            ],
+            "type": "string",
+            "example": "temperature_c"
+          },
+          "resolution": {
+            "enum": [
+              "raw"
+            ],
+            "type": "string",
+            "example": "raw"
+          },
+          "from": {
+            "type": "string",
+            "description": "The start of the range that was read (inclusive).",
+            "format": "date-time",
+            "example": "2026-10-16T07:00:00.000Z"
+          },
+          "to": {
+            "type": "string",
+            "description": "The end of the range that was read (exclusive). Send it again, unchanged, when paging.",
+            "format": "date-time",
+            "example": "2026-10-16T08:00:00.000Z"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "`true` when more readings match than this response holds.",
+            "example": false
+          },
+          "nextFrom": {
+            "type": "string",
+            "nullable": true,
+            "description": "Where the next page starts (send it as `from`), or `null` when nothing is missing.",
+            "format": "date-time",
+            "example": null
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RawReading"
+            }
+          }
+        },
+        "required": [
+          "deviceId",
+          "metric",
+          "resolution",
+          "from",
+          "to",
+          "truncated",
+          "nextFrom",
+          "points"
+        ]
+      },
+      "RollupPoint": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "description": "The start of the minute.",
+            "format": "date-time",
+            "example": "2026-10-16T07:59:00.000Z"
+          },
+          "count": {
+            "type": "integer",
+            "example": 30
+          },
+          "avg": {
+            "type": "number",
+            "example": 24.31
+          },
+          "min": {
+            "type": "number",
+            "example": 23.9
+          },
+          "max": {
+            "type": "number",
+            "example": 24.8
+          }
+        },
+        "required": [
+          "bucket",
+          "count",
+          "avg",
+          "min",
+          "max"
+        ]
+      },
+      "RollupReadingsResponse": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "example": "dc-env-01"
+          },
+          "metric": {
+            "enum": [
+              "temperature_c",
+              "humidity_pct",
+              "co2_ppm",
+              "power_kw"
+            ],
+            "type": "string",
+            "example": "temperature_c"
+          },
+          "resolution": {
+            "enum": [
+              "1m"
+            ],
+            "type": "string",
+            "example": "1m"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-16T07:00:00.000Z"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-16T08:00:00.000Z"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RollupPoint"
+            }
+          }
+        },
+        "required": [
+          "deviceId",
+          "metric",
+          "resolution",
+          "from",
+          "to",
+          "points"
+        ]
+      },
+      "DeviceResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "dc-env-01"
+          },
+          "kind": {
+            "type": "string",
+            "example": "server_room"
+          },
+          "zoneCode": {
+            "type": "string",
+            "example": "BLD-DC"
+          },
+          "name": {
+            "type": "string",
+            "example": "Data center — row A"
+          },
+          "metrics": {
+            "type": "array",
+            "description": "The metrics the device reports.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "temperature_c",
+                "humidity_pct",
+                "co2_ppm",
+                "power_kw"
+              ]
+            },
+            "example": [
+              "temperature_c",
+              "humidity_pct"
+            ]
+          },
+          "lastSeen": {
+            "type": "string",
+            "nullable": true,
+            "description": "The newest measurement time stored for the device, or `null` if none yet.",
+            "format": "date-time",
+            "example": "2026-10-16T08:00:02.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "zoneCode",
+          "name",
+          "metrics",
+          "lastSeen"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 400
+          },
+          "error": {
+            "type": "string",
+            "description": "The name of the status, as Nest writes it.",
+            "example": "Bad Request"
+          },
+          "message": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "example": [
+              "metric must be one of the following values: temperature_c, humidity_pct"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message"
+        ]
+      },
+      "AlertResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A string, because the column is a `bigint`.",
+            "example": "7"
+          },
+          "deviceId": {
+            "type": "string",
+            "example": "dc-env-01"
+          },
+          "ruleId": {
+            "type": "string",
+            "example": "server-room-hot"
+          },
+          "metric": {
+            "type": "string",
+            "example": "temperature_c"
+          },
+          "severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "type": "string",
+            "example": "high"
+          },
+          "title": {
+            "type": "string",
+            "example": "Server room temperature high"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "cleared"
+            ],
+            "type": "string",
+            "example": "cleared"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-16T08:00:26.000Z"
+          },
+          "openedValue": {
+            "type": "number",
+            "example": 29.3
+          },
+          "clearedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "example": "2026-10-16T08:01:30.000Z"
+          },
+          "clearedValue": {
+            "type": "number",
+            "nullable": true,
+            "example": 25.1
+          },
+          "externalRef": {
+            "type": "string",
+            "nullable": true,
+            "description": "The incident id in ops-command-center, once the `opened` event was delivered.",
+            "example": "c3a1…"
+          },
+          "deliveryStatus": {
+            "nullable": true,
+            "description": "State of the alert's latest outbox event.",
+            "enum": [
+              "pending",
+              "delivered",
+              "skipped",
+              "failed"
+            ],
+            "type": "string",
+            "example": "delivered"
+          },
+          "deliveryAttempts": {
+            "type": "integer",
+            "nullable": true,
+            "example": 1
+          },
+          "deliveryError": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          }
+        },
+        "required": [
+          "id",
+          "deviceId",
+          "ruleId",
+          "metric",
+          "severity",
+          "title",
+          "status",
+          "openedAt",
+          "openedValue",
+          "clearedAt",
+          "clearedValue",
+          "externalRef",
+          "deliveryStatus",
+          "deliveryAttempts",
+          "deliveryError"
+        ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "ok"
+            ],
+            "type": "string",
+            "example": "ok"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ReadyResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "ready"
+            ],
+            "type": "string",
+            "example": "ready"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "up"
+            ],
+            "example": "up"
+          },
+          "broker": {
+            "type": "string",
+            "enum": [
+              "up"
+            ],
+            "example": "up"
+          },
+          "alertSink": {
+            "type": "string",
+            "description": "Informational: `none` means no command center is configured, so alerts are recorded and never delivered.",
+            "enum": [
+              "none",
+              "ops-command-center"
+            ],
+            "example": "ops-command-center"
+          }
+        },
+        "required": [
+          "status",
+          "database",
+          "broker",
+          "alertSink"
+        ]
+      },
+      "NotReadyResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "not ready"
+            ],
+            "type": "string",
+            "example": "not ready"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "example": "down"
+          },
+          "broker": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "example": "up"
+          },
+          "alertSink": {
+            "type": "string",
+            "enum": [
+              "none",
+              "ops-command-center"
+            ],
+            "example": "none"
+          }
+        },
+        "required": [
+          "status",
+          "database",
+          "broker",
+          "alertSink"
+        ]
+      }
+    }
   }
 }
