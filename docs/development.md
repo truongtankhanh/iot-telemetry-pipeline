@@ -65,6 +65,7 @@ packages/
 deploy/
   mosquitto/              broker config
   k8s/                    kustomize base + local overlay
+  observability/          Prometheus alert rules and the Grafana dashboard
 docs/                     this documentation
 ```
 
