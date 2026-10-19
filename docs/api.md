@@ -108,11 +108,13 @@ curl "localhost:3100/api/devices/dc-env-01/readings?metric=temperature_c&resolut
 
 ### GET /api/alerts
 
-| Query    | Notes                          |
-| -------- | ------------------------------ |
-| `status` | Optional: `open` or `cleared`. |
+| Query    | Notes                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| `status` | Optional: `open` or `cleared`.                                                                   |
+| `limit`  | Optional: alerts per page, 1 to 200. Default 200.                                                |
+| `before` | Optional: where the previous page ended, taken from its `X-Next-Cursor` header. Do not build it. |
 
-Returns up to **200** alerts, most recently opened first:
+Returns up to `limit` (default **200**) alerts, most recently opened first, as a JSON array:
 
 ```json
 [
@@ -143,6 +145,25 @@ Returns up to **200** alerts, most recently opened first:
 | `deliveryStatus` / `…Attempts` / `…Error` | State of the alert's **latest** outbox event (opened, or cleared if it has cleared): `pending`, `delivered`, `skipped` (no command center configured) or `failed`. |
 
 Ids are returned as strings (they are `bigint` in PostgreSQL).
+
+#### Paging alerts
+
+The body is always the array above. When more alerts follow, the response carries the header
+`X-Next-Cursor`; repeat the request with `before` set to its value, and the same `status` and
+`limit`, until a response has no such header. Alerts opened at the same instant are ordered by id,
+so none is skipped or repeated at a page boundary.
+
+```bash
+curl -i "localhost:3100/api/alerts?limit=2"
+# …X-Next-Cursor: eyJ0IjoiMjAyNi0xMC0xNlQwODowMDoyNi4wMDBaIiwiaWQiOiI3In0
+curl -i "localhost:3100/api/alerts?limit=2&before=eyJ0IjoiMjAyNi0xMC0xNlQwODowMDoyNi4wMDBaIiwiaWQiOiI3In0"
+```
+
+- The cursor is opaque and its format may change: pass it back unchanged, never build one. A `before`
+  that this API did not return is `400`.
+- `limit` and `before` are new. During a rolling deploy an older replica answers `400` to a request
+  that uses them, so do not rely on paging until a deploy has finished. A cursor made by one version
+  means nothing to an older one.
 
 ### GET /api/health and /api/ready
 
@@ -186,7 +207,9 @@ Errors use Nest's standard body: `statusCode`, `error` (the status text) and `me
   ```
 
 - **`400` from a check the handler makes** (for example a range whose `from` is not earlier than
-  `to`): `message` is a **string**.
+  `to`, or a `before` that is not a cursor this API returned): `message` is a **string**. Problems
+  with `limit` (not a whole number from 1 to 200) come from the validation, so their `message` is an
+  array.
 
   ```json
   { "message": "\"from\" must be earlier than \"to\"", "error": "Bad Request", "statusCode": 400 }
