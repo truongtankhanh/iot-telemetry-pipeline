@@ -97,6 +97,60 @@ Design and trade-offs: [architecture](docs/architecture.md) and seven ADRs —
 [client credentials to the command center](docs/adr/0006-client-credentials-to-the-command-center.md) ·
 [the pipeline as the single telemetry source](docs/adr/0007-pipeline-as-the-single-telemetry-source.md).
 
+## Data flow with ops-command-center
+
+**Today (V1) the data goes one way: from the pipeline to the command center, and only alerts cross.**
+Readings, rollups and rule state stay in the pipeline's own database. The command center never
+reads them and never calls this service's HTTP API; it receives incidents.
+
+```mermaid
+sequenceDiagram
+  participant S as Sensors
+  participant P as Pipeline (ingest)
+  participant DB as PostgreSQL (telemetry)
+  participant K as Keycloak (realm occ)
+  participant O as OCC API
+  participant C as Operator console
+
+  S->>P: MQTT readings (via the broker)
+  P->>DB: readings and rollups, rules evaluated
+  Note over P,DB: a breach that persists opens an alert,<br/>and the alert and its outbox row are written together
+  P->>K: client credentials, get a token
+  P->>O: GET /zones (zone code to zone id)
+  P->>O: POST /incidents (Idempotency-Key: telemetry-alert-id)
+  O-->>C: incident in the right zone
+  Note over P,O: when the value recovers, the alert clears<br/>and the worker calls POST /incidents/id/resolve
+```
+
+- **What crosses:** an incident when an alert opens, and its resolution when the alert clears. Field
+  mapping, retries and the idempotency key are in [system-context.md](docs/system-context.md#22-pipeline--command-center-rest--oidc).
+- **What does not cross:** raw readings, rollups, the device registry and the pipeline's HTTP API
+  (`/api/devices`, `/api/alerts`). No known client calls that API yet; it is for operators and dashboards.
+- **Each side works without the other.** With `OCC_API_URL` unset the pipeline still records alerts and
+  marks their outbox rows `skipped`; the command center keeps its own telemetry path (its own broker,
+  topics, rules and simulator) and does not pass through this pipeline.
+
+**Planned, not built (V2 and V3, on hold until the command center's V2 is done):** the pipeline
+becomes the platform's single telemetry source ([ADR-0007](docs/adr/0007-pipeline-as-the-single-telemetry-source.md)).
+The decisions below may still change, because the integration approach is to be researched first.
+
+```mermaid
+flowchart LR
+  occcat[OCC: asset catalogue] -- "synchronised" --> pipe[Pipeline]
+  dev[[Sensors / simulator]] -- MQTT --> pipe
+  pipe -- "stream + latest-state snapshot<br/>(service token)" --> occapi[OCC API]
+  occapi -- "Socket.IO" --> cons([Consoles])
+  pipe -- "incidents, as today" --> occapi
+```
+
+- The command center owns the asset catalogue; the pipeline synchronises it and maps devices onto it.
+- Realtime goes pipeline → OCC API → consoles. Consoles never connect to the pipeline.
+- The command center drops its own MQTT path (V3) and reads telemetry through the pipeline only.
+  Until then both paths coexist ([V1-T05](docs/tasks/v1/V1-T05-overlap-with-occ-telemetry.md)).
+- Both services share one PostgreSQL database with one schema each and no shared tables.
+- The pipeline's API and stream then become service-to-service interfaces with authentication
+  ([V2 tasks](docs/tasks/v2/README.md)).
+
 ## Run it
 
 ```bash
