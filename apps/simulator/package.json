@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@itp/telemetry-contract": "workspace:*",
-    "mqtt": "^5.16.0",
+    "mqtt": "^5.16.1",
     "pg": "^8.23.1"
   },
   "devDependencies": {
