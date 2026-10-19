@@ -25,7 +25,7 @@ services:
       - '${POSTGRES_HOST_PORT:-5433}:5432'
 
   mosquitto:
-    image: eclipse-mosquitto:2.0.18
+    image: eclipse-mosquitto:2.0.22
     volumes:
       - ./deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     ports:
