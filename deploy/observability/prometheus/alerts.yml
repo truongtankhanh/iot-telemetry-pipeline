@@ -1,0 +1,184 @@
+# Prometheus alert rules for the telemetry ingest service.
+#
+# One rule for each row of the "Suggested alerts" table in docs/operations.md, with the same expression
+# (apps/ingest/src/metrics/observability.spec.ts keeps the two in step and checks every metric name
+# against the service). `for` and `severity` are starting points, to tune per site: lost data, lost
+# alerts and a silent pipeline are critical; retries, pause, lag and the like are warnings.
+#
+# Nothing here names a job or an instance, because the scrape configuration of a site decides those
+# (in Kubernetes they come from the pod annotations of deploy/k8s/base/ingest.yaml). A rule over a
+# counter reads zero again after a restart of the process, so an `increase` rule can clear by itself.
+#
+# Layout the spec relies on: each rule is `- alert:`, then `expr: |-` and exactly one line, then `for`.
+groups:
+  - name: data-loss
+    rules:
+      - alert: ReadingsDropped
+        expr: |-
+          increase(telemetry_readings_total{result="failed"}[5m]) > 0 or (telemetry_readings_total{result="failed"} > 0 unless telemetry_readings_total{result="failed"} offset 5m)
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Readings were dropped and are lost
+          description: >-
+            Replica {{ $labels.instance }} dropped readings in the last 5 minutes, because the database rejected
+            them or because the process was leaving. They were acknowledged, so this is data lost. The second
+            half of the expression catches the first drop since the process started, which Prometheus cannot
+            see as an increase. Look for the Dropped lines of the BatchWriter log (docs/operations.md, Logs).
+
+      - alert: SequenceGapsDetected
+        expr: |-
+          rate(telemetry_sequence_gaps_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Messages were lost before or inside the service
+          description: >-
+            Per-device sequence numbers show messages that never arrived, counted across all replicas. It
+            includes a batch that was dropped. A rate above zero right after a restart of the process can be a
+            device that restarted its own counter.
+
+  - name: write-path
+    rules:
+      - alert: FlushRetrying
+        expr: |-
+          increase(telemetry_flush_retries_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: The database is failing and writes are being retried
+          description: >-
+            Replica {{ $labels.instance }} kept failed flushes for another attempt in the last 5 minutes.
+            Nothing is lost yet, but the write buffer is growing. Check the database and the BatchWriter log.
+
+      - alert: ConsumptionPaused
+        expr: |-
+          max_over_time(telemetry_consumption_paused[5m]) == 1
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: The write buffer is full and the broker is queueing
+          description: >-
+            Replica {{ $labels.instance }} holds back acknowledgements because its write buffer reached
+            BUFFER_MAX_READINGS. Data is at risk if the broker queue overflows. Usually the database is slow
+            or down.
+
+      - alert: FlushSlow
+        expr: |-
+          histogram_quantile(0.99, sum by (le) (rate(telemetry_flush_duration_seconds_bucket[5m]))) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: The database is slow to take batches
+          description: >-
+            The 99th percentile of a flush is {{ $value | humanizeDuration }} across all replicas. The buffer
+            will grow if flushes cannot keep up. Check the database before the buffer fills.
+
+      - alert: BufferGrowing
+        expr: |-
+          telemetry_buffered_readings > 5000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: The write buffer is growing faster than it drains
+          description: >-
+            Replica {{ $labels.instance }} holds {{ $value }} readings waiting for a flush. Consumption pauses
+            at BUFFER_MAX_READINGS, 20000 by default, so 5000 is a starting point to tune when that setting
+            is changed.
+
+  - name: ingest
+    rules:
+      - alert: NoMessagesArriving
+        expr: |-
+          sum(rate(telemetry_messages_total[5m])) == 0 or absent(telemetry_messages_total)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: No telemetry message has arrived
+          description: >-
+            No replica received a message in the last 5 minutes, or no replica exposes the metric at all (no
+            message since every replica started, or Prometheus is not scraping them). Check the broker, the
+            devices and the subscription.
+
+      - alert: IngestLagHigh
+        expr: |-
+          histogram_quantile(0.99, sum by (le) (rate(telemetry_ingest_lag_seconds_bucket[5m]))) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Ingest is falling behind
+          description: >-
+            The 99th percentile from measurement to storage is {{ $value | humanizeDuration }} across all
+            replicas. It also grows when device clocks drift or devices buffer readings.
+
+      - alert: RejectionsSeen
+        expr: |-
+          sum by (reason) (rate(telemetry_rejections_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Messages are being rejected
+          description: >-
+            Messages are rejected for the reason {{ $labels.reason }}. That points at a misconfigured device or
+            an unknown one. After onboarding new devices, unknown_device means the registry is behind.
+
+  - name: alerts
+    rules:
+      - alert: AlertDeliveryFailed
+        expr: |-
+          increase(alert_deliveries_total{result="failed"}[15m]) > 0 or (alert_deliveries_total{result="failed"} > 0 unless alert_deliveries_total{result="failed"} offset 15m)
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: An alert gave up being delivered
+          description: >-
+            Replica {{ $labels.instance }} stopped retrying the delivery of an alert to the command center.
+            It needs a human. The second half of the expression catches the first failure since the process
+            started.
+
+      - alert: AlertEvaluationPending
+        expr: |-
+          min_over_time(alerts_evaluation_pending[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: An alert transition waits on the database
+          description: >-
+            Replica {{ $labels.instance }} has rule evaluations it could not apply because the database failed.
+            The alert table does not show them yet. They are retried on the next flush.
+
+      - alert: AlertEvaluationDropped
+        expr: |-
+          increase(alerts_evaluation_dropped_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Alert transitions were given up on
+          description: >-
+            Replica {{ $labels.instance }} gave up on rule evaluations in the last 15 minutes, because the
+            database rejected the data or the pending queue was full. An alert that should have opened or
+            cleared did not. Look for the error lines of RulesService (docs/operations.md, Logs).
+
+      - alert: AlertStateCorrected
+        expr: |-
+          increase(alerts_state_corrections_total[15m]) > 0 or (alerts_state_corrections_total > 0 unless alerts_state_corrections_total offset 15m)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: A replica's cached alert state disagreed with the alert table
+          description: >-
+            Replica {{ $labels.instance }} corrected its cached alert state from the alert table. This is normally
+            zero. Another replica or a manual change opened or cleared alerts behind its back.
