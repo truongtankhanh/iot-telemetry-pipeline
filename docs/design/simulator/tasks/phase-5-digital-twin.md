@@ -7,6 +7,7 @@ approach was confirmed on 2026-10-19; SIM-17 is a spike and can stop the phase.
 ## SIM-17: Spike — layout contract and a measured lazy scene
 
 - **Depends on:** SIM-06
+- **Status:** Not started
 - **Frames:** 14 (part)
 - **Area:** `apps/simulator-ui`, `apps/simulator`
 
@@ -101,6 +102,7 @@ The ticket ends with a go or no-go written into ADR-0012 (amend it with a dated 
 ## SIM-18: Campus scene
 
 - **Depends on:** SIM-17
+- **Status:** Not started
 - **Frames:** 14, 16
 
 ### Scope
@@ -181,6 +183,7 @@ feat(simulator-ui): add the campus twin scene, camera and fallback
 ## SIM-19: Data flow, alert beacons and fault visuals
 
 - **Depends on:** SIM-18, SIM-07
+- **Status:** Not started
 - **Frames:** 14
 
 ### Scope
@@ -260,6 +263,7 @@ feat(simulator-ui): add twin data flow, alert beacons and fault visuals
 ## SIM-20: Building focus and the heat floor
 
 - **Depends on:** SIM-18
+- **Status:** Not started
 - **Frames:** 15
 
 ### Scope
@@ -336,6 +340,7 @@ feat(simulator-ui): add the twin building focus and heat floor
 ## SIM-21: Inject from the scene; camera steps in the guided demo
 
 - **Depends on:** SIM-19, SIM-12, SIM-14
+- **Status:** Not started
 - **Frames:** 14, 15, 08
 
 ### Scope

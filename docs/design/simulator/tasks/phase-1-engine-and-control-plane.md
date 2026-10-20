@@ -5,6 +5,7 @@ Part of the [implementation order](../implementation-order.md). Nothing here has
 ## SIM-02: Extract the engine
 
 - **Depends on:** SIM-00
+- **Status:** Not started
 - **Area:** `apps/simulator`
 
 ### Scope
@@ -86,6 +87,7 @@ The CLI must behave exactly as before: compare its output with `main` by running
 ## SIM-03: Control server
 
 - **Depends on:** SIM-02
+- **Status:** Not started
 - **Area:** `apps/simulator`, docs
 
 ### Scope
@@ -170,6 +172,7 @@ The server must refuse a non-loopback address unless a variable allows it: check
 ## SIM-04: Studio shell
 
 - **Depends on:** SIM-03
+- **Status:** Not started
 - **Frames:** 00, 17
 - **Area:** `apps/simulator-ui`, ops, docs
 

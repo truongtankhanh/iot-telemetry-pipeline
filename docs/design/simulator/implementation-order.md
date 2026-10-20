@@ -51,14 +51,26 @@ pnpm docker:up                                                                  
 (`dev`) or the demo (`docker:demo`) are long-lived: stop them when the check is done. Heavy runs (the benchmark,
 `pnpm ci:local`, the e2e suite) are never started alongside other work.
 
+## Progress
+
+| Ticket           | Status                                           |
+| ---------------- | ------------------------------------------------ |
+| SIM-00           | Done 2026-10-19                                  |
+| SIM-01           | Done 2026-10-20 (PR #46, `bcb036e`)              |
+| SIM-02 to SIM-22 | Not started (SIM-02 is next; SIM-16 is not used) |
+
+Each task in the phase files carries its own **Status** line; update it, and this table, in the pull request that
+finishes the ticket.
+
 ## Phase 0 — Decisions (gate)
 
 | #      | Work                                                                                               | Done when                                                 |
 | ------ | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | SIM-00 | Review the brief; accept ADR-0011; settle the open questions that block SIM-04 (light theme, port) | The ADR says **Accepted** and is listed in the docs index |
 
-**SIM-01 (design brief and mockups, revision 3) is this change.** SIM-00 was settled on 2026-10-19: ADR-0011 and
-ADR-0012 accepted, no light theme, port 3200. SIM-02 can start.
+**SIM-01 (design brief and mockups, revision 12) is done:** merged to `main` on 2026-10-20 as PR #46 (squash,
+`bcb036e`). SIM-00 was settled on 2026-10-19: ADR-0011 and ADR-0012 accepted, no light theme, port 3200. **SIM-02 can
+start.**
 
 ## Phase 1 — Engine and control plane (no UI)
 

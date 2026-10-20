@@ -1,6 +1,6 @@
 # Simulator Studio — design brief
 
-Status: **approved, revision 12** (SIM-01, 2026-10-20). Revision 4 follows Sếp's review of the UI (wide screens, device identity, neon data lines); revision 2 applied the review in
+Status: **approved, revision 12** (SIM-01, 2026-10-20; merged to `main` as PR #46). Revision 4 follows Sếp's review of the UI (wide screens, device identity, neon data lines); revision 2 applied the review in
 [design-note.md](design-note.md) to the first draft. Mockups: [Simulator Studio](https://claude.ai/artifact/8rSkLYmqoPzaF36yBxYLPQ)
 (design canvas, private until shared from its Share menu). Source of every frame: [mockups/](mockups/) —
 `Main.dc.html` is frame 00, the rest are numbered like the frames, and `studio.css` holds the tokens and components
