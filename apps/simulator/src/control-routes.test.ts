@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { BrokerLink } from './broker-link.ts';
 import { systemClock } from './clock.ts';
 import {
   buildStateView,
@@ -37,6 +38,7 @@ async function setup(options: { started?: boolean; wallClock?: boolean } = {}) {
   const { engine, publisher } = setupEngine(wallClock ? { clock: systemClock } : {});
   if (started && !wallClock) await engine.start();
   const store = new ObservationStore();
+  const broker = new BrokerLink('mqtt://u:p@localhost:1883', true);
   const recorded: ObservationDraft[] = [];
   const context: RoutesContext = {
     engine,
@@ -45,6 +47,7 @@ async function setup(options: { started?: boolean; wallClock?: boolean } = {}) {
     store,
     ingest: INGEST,
     config: { ingestUrl: 'http://localhost:3100', consoleUrl: null },
+    broker,
     record: (draft) => recorded.push(draft),
   };
   const handle = createRoutes(context);
@@ -52,7 +55,7 @@ async function setup(options: { started?: boolean; wallClock?: boolean } = {}) {
     const url = new URL(path, 'http://localhost');
     return handle({ method, path: url.pathname, query: url.searchParams, body });
   };
-  return { engine, publisher, store, recorded, context, call };
+  return { engine, publisher, store, broker, recorded, context, call };
 }
 
 const view = (response: RouteResponse) => response.body as StateView;
@@ -94,6 +97,16 @@ describe('GET /api/state', () => {
       simulated: true,
     });
     assert.equal(state.observationCursor, 0);
+  });
+
+  it("reports the simulator's own broker connection, without credentials, and follows it", async () => {
+    const { call, broker } = await setup();
+    const connected = view(await call('GET', '/api/state')).broker;
+    assert.deepEqual(connected, { url: 'mqtt://localhost:1883', port: 1883, connected: true });
+
+    broker.setConnected(false);
+    assert.equal(view(await call('GET', '/api/state')).broker.connected, false);
+    assert.ok(!JSON.stringify(view(await call('GET', '/api/state'))).includes('u:p'));
   });
 
   it('is what buildStateView builds, which the stream sends as its first message', async () => {

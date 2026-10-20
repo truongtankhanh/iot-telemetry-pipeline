@@ -1,4 +1,6 @@
 import { isIPv4 } from 'node:net';
+import { resolve as resolvePath } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** The settings of the control server, resolved and checked. */
 export interface ControlConfig {
@@ -9,6 +11,8 @@ export interface ControlConfig {
   ingestUrl: string;
   /** Base URL of the command center console, without a trailing slash; `null` when none is set. */
   consoleUrl: string | null;
+  /** Absolute path of the directory with the built Studio UI (it may not exist: the UI is not built by every script). */
+  studioDir: string;
   /** True when `CONTROL_ALLOW_NON_LOOPBACK=true` let a non-loopback `host` through. */
   allowNonLoopback: boolean;
 }
@@ -18,6 +22,7 @@ export interface ControlFlags {
   controlHost?: string | undefined;
   controlPort?: string | undefined;
   ingestUrl?: string | undefined;
+  studioDir?: string | undefined;
 }
 
 /** A setting is wrong or refused. The message names the setting to change. */
@@ -31,6 +36,10 @@ export class ControlConfigError extends Error {
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 3200;
 const DEFAULT_INGEST_URL = 'http://localhost:3100';
+/** `apps/simulator-ui/dist`, from `apps/simulator/src`. The image sets `STUDIO_DIR` itself. */
+export const DEFAULT_STUDIO_DIR = fileURLToPath(
+  new URL('../../simulator-ui/dist', import.meta.url),
+);
 
 /**
  * True for the addresses that cannot be reached from another machine: `localhost`, any `127.x.y.z`
@@ -93,6 +102,7 @@ export function resolveControlConfig(input: {
   );
   const ingestSetting = firstSet([flags.ingestUrl, '--ingest-url'], [env.INGEST_URL, 'INGEST_URL']);
   const consoleSetting = firstSet([env.OCC_CONSOLE_URL, 'OCC_CONSOLE_URL']);
+  const studioSetting = firstSet([flags.studioDir, '--studio-dir'], [env.STUDIO_DIR, 'STUDIO_DIR']);
   const allowNonLoopback = env.CONTROL_ALLOW_NON_LOOPBACK === 'true';
 
   if (!isLoopbackHost(host.value) && !allowNonLoopback) {
@@ -110,6 +120,7 @@ export function resolveControlConfig(input: {
       ? parseHttpUrl(ingestSetting.value, ingestSetting.where)
       : DEFAULT_INGEST_URL,
     consoleUrl: consoleSetting ? parseHttpUrl(consoleSetting.value, consoleSetting.where) : null,
+    studioDir: studioSetting ? resolvePath(studioSetting.value) : DEFAULT_STUDIO_DIR,
     allowNonLoopback,
   };
 }

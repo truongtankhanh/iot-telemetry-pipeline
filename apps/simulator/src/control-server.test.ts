@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
+import { BrokerLink } from './broker-link.ts';
 import { ManualClock } from './clock.ts';
 import { ControlServer, type ControlServerOptions } from './control-server.ts';
 import { IngestPoller } from './ingest-poller.ts';
@@ -161,11 +165,13 @@ async function startServer(overrides: Partial<ControlServerOptions> = {}) {
     fetch: ingest.fetch,
     log: () => {},
   });
+  const broker = new BrokerLink('mqtt://user:secret@broker:1883', true);
   const server = new ControlServer({
     engine,
     devices: DEVICES,
     scenarios: SCENARIOS,
     poller,
+    broker,
     config: { host: '127.0.0.1', port: 0, ingestUrl: 'http://ingest:3100', consoleUrl: null },
     now: () => T0,
     log: () => {},
@@ -176,11 +182,11 @@ async function startServer(overrides: Partial<ControlServerOptions> = {}) {
     engine.stop();
     await server.close();
   });
-  const { port } = await server.listen();
+  const { port, studio } = await server.listen();
   await engine.start(); // as main.ts does: after the port is bound
   const tickErrors: Error[] = [];
   engine.on('tick-error', (error) => tickErrors.push(error));
-  return { server, engine, publisher, ingest, pollerClock, port, tickErrors };
+  return { server, engine, publisher, ingest, pollerClock, broker, studio, port, tickErrors };
 }
 
 /** True for the snapshot or the `ingest` event that says ingest answered `/api/ready`. */
@@ -535,6 +541,7 @@ describe('ControlServer listen', () => {
       devices: DEVICES,
       scenarios: SCENARIOS,
       poller,
+      broker: new BrokerLink('mqtt://broker:1883'),
       config: { host: '127.0.0.1', port: taken, ingestUrl: 'http://ingest:3100', consoleUrl: null },
       log: () => {},
     });
@@ -549,5 +556,146 @@ describe('ControlServer listen', () => {
     assert.equal(engine.listenerCount('state'), 0);
     assert.equal(engine.listenerCount('published'), 0);
     assert.equal(engine.snapshot().running, false);
+  });
+});
+
+/** A directory that looks like the output of `vite build`. */
+function builtStudio(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'studio-ui-'));
+  mkdirSync(join(dir, 'assets'));
+  writeFileSync(join(dir, 'index.html'), '<!doctype html><title>Simulator Studio</title>');
+  writeFileSync(join(dir, 'assets', 'index-4f2a9c.js'), 'console.log("studio")');
+  writeFileSync(join(dir, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+
+describe('ControlServer serves the built Studio UI', () => {
+  it('serves the app at the root, and for its routes so that a reload works', async () => {
+    const { port, studio } = await startServer({ studioDir: builtStudio() });
+    assert.equal(studio, true);
+
+    for (const path of ['/', '/fleet', '/lab/scenarios']) {
+      const reply = await get(port, path);
+      assert.equal(reply.status, 200, path);
+      assert.match(reply.text, /Simulator Studio/);
+      assert.match(String(reply.headers['content-type']), /^text\/html/);
+      assert.equal(reply.headers['cache-control'], 'no-cache');
+      assert.match(String(reply.headers['content-security-policy']), /default-src 'self'/);
+      assert.equal(reply.headers['x-content-type-options'], 'nosniff');
+    }
+  });
+
+  it('serves a hashed asset for good, with its type, and answers a missing one with 404', async () => {
+    const { port } = await startServer({ studioDir: builtStudio() });
+    const asset = await get(port, '/assets/index-4f2a9c.js');
+    assert.equal(asset.status, 200);
+    assert.equal(asset.text, 'console.log("studio")');
+    assert.match(String(asset.headers['content-type']), /^text\/javascript/);
+    assert.equal(asset.headers['cache-control'], 'public, max-age=31536000, immutable');
+
+    const missing = await get(port, '/assets/gone-0000.js');
+    assert.equal(missing.status, 404);
+    assert.equal(missing.json().statusCode, 404);
+  });
+
+  it('answers HEAD with the headers and no body', async () => {
+    const { port } = await startServer({ studioDir: builtStudio() });
+    const reply = await request(port, { method: 'HEAD', path: '/' });
+    assert.equal(reply.status, 200);
+    assert.equal(reply.text, '');
+    assert.ok(Number(reply.headers['content-length']) > 0);
+  });
+
+  it('adds no CORS header to a file, and still checks the Host header', async () => {
+    const { port } = await startServer({ studioDir: builtStudio() });
+    nothingCrossOrigin(await get(port, '/', { Origin: 'https://evil.example' }));
+    nothingCrossOrigin(
+      await get(port, '/assets/index-4f2a9c.js', { Origin: 'https://evil.example' }),
+    );
+    assert.equal((await get(port, '/', { Host: 'evil.example' })).status, 403);
+    assert.equal(
+      (await get(port, '/assets/index-4f2a9c.js', { Host: 'evil.example' })).status,
+      403,
+    );
+  });
+
+  it('does not let a file path out of the directory', async () => {
+    const { port } = await startServer({ studioDir: builtStudio() });
+    // An encoded slash stays inside one path segment: the file lookup decodes it and refuses `..`.
+    for (const path of ['/..%2f..%2fetc%2fpasswd', '/assets/..%2f..%2fx.js']) {
+      const reply = await get(port, path);
+      assert.equal(reply.status, 404, path);
+    }
+    // `%2e%2e` is a dot segment for the URL parser, which cannot go above the root: the path becomes
+    // `/etc/passwd`, a route of the app. What matters is that no file outside the directory is read.
+    const reply = await get(port, '/%2e%2e/%2e%2e/etc/passwd');
+    assert.doesNotMatch(reply.text, /root:/);
+  });
+
+  it('leaves the API alone: /api is never the app, and a command to another path is still a 404', async () => {
+    const { port } = await startServer({ studioDir: builtStudio() });
+    assert.equal((await get(port, '/api/state')).status, 200);
+    for (const path of ['/api', '/api/nothing']) {
+      const reply = await get(port, path);
+      assert.equal(reply.status, 404, path);
+      assert.equal(reply.json().statusCode, 404);
+    }
+    const post = await send(port, 'POST', '/fleet');
+    assert.equal(post.status, 404);
+    assert.equal(post.json().statusCode, 404);
+  });
+
+  it('works with a directory that is not built: the API runs and the root says how to build', async () => {
+    const empty = mkdtempSync(join(tmpdir(), 'studio-empty-'));
+    cleanups.push(() => rmSync(empty, { recursive: true, force: true }));
+    const { port, studio } = await startServer({ studioDir: empty });
+    assert.equal(studio, false);
+
+    assert.equal((await get(port, '/api/state')).status, 200);
+    const root = await get(port, '/');
+    assert.equal(root.status, 404);
+    assert.match(String(root.json().message), /pnpm --filter @itp\/simulator-ui build/);
+  });
+
+  it('serves nothing when it was given no directory', async () => {
+    const { port, studio } = await startServer();
+    assert.equal(studio, false);
+    const reply = await get(port, '/');
+    assert.equal(reply.status, 404);
+    assert.equal(reply.json().statusCode, 404);
+  });
+});
+
+describe('ControlServer and the broker', () => {
+  it('reports the broker connection in the state, without credentials', async () => {
+    const { port } = await startServer();
+    const state = (await get(port, '/api/state')).json();
+    assert.deepEqual(state.broker, { url: 'mqtt://broker:1883', port: 1883, connected: true });
+    assert.ok(!JSON.stringify(state).includes('secret'));
+  });
+
+  it('puts the broker in the first message of the stream and announces a change', async () => {
+    const { port, broker } = await startServer();
+    const client = await openStream(port);
+    const snapshot = await client.waitFor((e) => e.event === 'snapshot');
+    assert.deepEqual(snapshot.data.broker, {
+      url: 'mqtt://broker:1883',
+      port: 1883,
+      connected: true,
+    });
+
+    broker.setConnected(false);
+    const lost = await client.waitFor((e) => e.event === 'broker' && e.data.connected === false);
+    assert.equal(lost.data.port, 1883);
+
+    broker.setConnected(true);
+    await client.waitFor((e) => e.event === 'broker' && e.data.connected === true);
+  });
+
+  it('stops announcing the broker after close()', async () => {
+    const { server, broker } = await startServer();
+    await server.close();
+    assert.equal(broker.listenerCount('change'), 0);
   });
 });
