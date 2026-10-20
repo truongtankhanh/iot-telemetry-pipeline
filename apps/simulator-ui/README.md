@@ -9,18 +9,23 @@ static files that the simulator's control server serves at `/`, so there is one 
 
 ## Run it
 
-With the simulator running (it serves the API on `:3200`):
+**The shortest way:** the demo in containers gives Studio everything it reads (PostgreSQL, Mosquitto, ingest and a
+simulator that serves the API on `:3200`), and Vite adds hot reload:
 
 ```bash
-pnpm --filter @itp/simulator start                  # the engine and the control server
-pnpm --filter @itp/simulator-ui dev                 # Vite on :5173, proxying /api (the event stream too) to :3200
+pnpm docker:demo                                    # terminal 1: the whole demo, foreground (Ctrl+C stops it)
+pnpm --filter @itp/simulator-ui dev                 # terminal 2: Vite on :5173, proxying /api (the event stream too) to :3200
 ```
 
-`STUDIO_API_URL` moves the proxy target. Without the dev server, build once and let the simulator serve it:
+Open <http://localhost:5173>. `STUDIO_API_URL` moves the proxy target. The Studio the demo serves itself at `:3200`
+is the build baked into the simulator image. [docs/development.md](../../docs/development.md#run-it-locally) has the
+variant with ingest and the simulator on the host, and why the two must not run together.
+
+**Without the dev server,** build once and let a simulator serve it:
 
 ```bash
 pnpm --filter @itp/simulator-ui build               # tsc, then vite build into dist/
-pnpm --filter @itp/simulator start                  # now also serves http://localhost:3200
+pnpm --filter @itp/simulator start                  # also serves http://localhost:3200 (after pnpm docker:up and an ingest)
 ```
 
 The whole demo in containers is `pnpm docker:demo`; Studio is then at `http://localhost:3200` (`STUDIO_HOST_PORT`).

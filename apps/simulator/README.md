@@ -18,7 +18,7 @@ pnpm docker:up                                        # PostgreSQL + Mosquitto
 Start the ingest service ([its README](../ingest/README.md)), then:
 
 ```bash
-pnpm --filter @itp/simulator start -- --scenario server-room-overheat
+pnpm --filter @itp/simulator start --scenario server-room-overheat
 ```
 
 | Option                  | Meaning                                                                                                         |
