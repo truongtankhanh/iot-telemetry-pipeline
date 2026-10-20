@@ -69,6 +69,31 @@ function profileOf(device: DeviceSpec, metric: MetricName): Profile {
   return PROFILES[device.kind]?.[metric] ?? { base: 50, noise: 1 };
 }
 
+/** What Studio shows of a metric's profile: the baseline, the noise (±) and the daily swing, in the metric's unit. */
+export interface MetricProfile {
+  baseline: number;
+  noise: number;
+  dailySwing: number;
+}
+
+export function metricProfile(device: DeviceSpec, metric: MetricName): MetricProfile {
+  const { base, noise, daily } = profileOf(device, metric);
+  return { baseline: base, noise, dailySwing: daily ?? 0 };
+}
+
+/** The profile of every metric of every device, by device id: the `profiles` of the state view. */
+export function profilesOf(
+  devices: DeviceSpec[],
+): Record<string, Partial<Record<MetricName, MetricProfile>>> {
+  const profiles: Record<string, Partial<Record<MetricName, MetricProfile>>> = {};
+  for (const device of devices) {
+    const byMetric: Partial<Record<MetricName, MetricProfile>> = {};
+    for (const metric of device.metrics) byMetric[metric] = metricProfile(device, metric);
+    profiles[device.id] = byMetric;
+  }
+  return profiles;
+}
+
 /** Noise-free value of a metric at a moment in time: what a ramp or a spike starts from. */
 export function baselineValue(device: DeviceSpec, metric: MetricName, at: Date): number {
   const profile = profileOf(device, metric);

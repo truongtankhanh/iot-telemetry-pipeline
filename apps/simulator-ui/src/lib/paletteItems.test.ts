@@ -1,11 +1,11 @@
 import { telemetryTopic } from '@itp/telemetry-contract';
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { StateView } from '../api/types';
 import { buildPaletteItems, type PaletteGroup } from './paletteItems';
 import { appRoutes } from './routes';
 
-const base = fixture as StateView;
+const base = fixture;
 const routes = appRoutes({ foundations: true });
 const build = (change: (view: StateView) => void = () => {}) => {
   const view = structuredClone(base);
@@ -25,7 +25,10 @@ describe('buildPaletteItems', () => {
   it('lists every page, and says which are not built yet, with their ticket', () => {
     const pages = group(build(), 'pages');
     expect(pages.find((p) => p.target === '/')?.detail).toMatch(/Health of the simulated campus/);
-    expect(pages.find((p) => p.target === '/fleet')?.detail).toBe('Not built yet · SIM-05');
+    expect(pages.find((p) => p.target === '/fleet')?.detail).toMatch(
+      /^Every device, its live values/,
+    );
+    expect(pages.find((p) => p.target === '/alerts')?.detail).toBe('Not built yet · SIM-07');
     expect(pages.find((p) => p.target === '/lab/faults')?.label).toBe('Lab · Faults');
   });
 

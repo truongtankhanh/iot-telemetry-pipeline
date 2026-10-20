@@ -191,3 +191,55 @@ decided on the way, so that SIM-05 onward does not have to infer it:
   amendment announced; the demo posture (no authentication) is unchanged.
 - **Palette actions are listed, not run.** Pause, resume and the scenario runs appear in search with "Available from the Overview
   (SIM-09)" and do nothing until that ticket gives them a place to confirm.
+
+## Amendment, 2026-10-20: rules and profiles for Studio (SIM-05a)
+
+Fleet draws each rule's raise and clear lines and a range bar per metric, and shows the baseline, noise and daily swing of each
+metric. The control API gave neither, so `GET /api/state` has two more parts. What was decided:
+
+- **`rules`** is `{ available, reason, items }`. The simulator reads `rules.json` once at start ([rules-source.ts](../../apps/simulator/src/rules-source.ts);
+  `--rules`, `RULES_FILE`, else the ingest's file) and validates it with the checks of ingest's `parseRules`, copied because that module is NestJS. A missing or
+  invalid file does not stop the simulator; it is said once at start and in the state, and Studio hides what depends on it (the consequence above that said so).
+  A test reads the repository's own `rules.json` through this code, which catches a change of the data that Studio could not read, not a change of the logic.
+- **`profiles`** is the generator's own constants by device and metric ([signals.ts](../../apps/simulator/src/signals.ts)), read-only. Editing a profile would be an
+  engine feature and is not part of this ticket.
+- **The demo image copies `rules.json`** into `/app/registry/` next to `devices.json` and passes `--rules`, instead of the read-only mount that the consequence above
+  describes. Both files come from the same commit as the ingest image built beside it, so they cannot drift; `--rules` and `RULES_FILE` still allow a mount. There is
+  no simulator in the Kubernetes manifests.
+
+## Amendment, 2026-10-20: Fleet as built (SIM-05)
+
+The Fleet (cards up to 12 devices, a table above or on request, the inspector, the bulk bar) is in `apps/simulator-ui`
+(`src/pages/fleet/`). What was decided on the way, so that SIM-06 onward does not have to infer it:
+
+- **The stream's `published` messages are now kept, in the browser, for two minutes.** SIM-04 did not store them. The charts
+  and sparklines need a history, so [history.ts](../../apps/simulator-ui/src/state/history.ts) keeps a bounded ring per device
+  and metric (120 s from the newest reading, at most 600 points), fed by `published` and seeded by the snapshot's publish
+  log, which replaces what was there (so a reconnect does not double it). It is outside React and outside the Zustand store,
+  and tells a component about its key at most once a second: a message arrives about fifteen times a second and nothing
+  renders per message. After a reload a chart holds only what the simulator remembered (the last 200 messages, about a
+  minute at six devices) and says so ("collecting, 40 s of 2 min") instead of drawing a guess. A server-side history
+  was considered and not built.
+- **Charts are hand-written SVG** (`src/ui/charts/`: line chart, sparkline, range bar), drawn at the pixel width of their
+  container so text stays 13 px, with the amber part drawn as the same path through a `clipPath`. No charting dependency;
+  the library question of the brief stays open for the pages that need more.
+- **No alert marker on the charts**, as on Topology: the raise and clear lines, the amber part and the state beside the
+  name carry it.
+- **A device's state is derived, not reported:** the engine says running, paused or stopped; Studio adds _anomaly_ (the
+  newest value is beyond a rule's raise line; with the rules not available, an anomaly the engine is playing now) and
+  _silent_ (running, but nothing heard for three intervals, at least five seconds). A device never heard from since the
+  page opened is not called silent.
+- **The address is the state of the page:** search, zone, class, state tab, sort, grouping, view, page, size and the open
+  device are query parameters, validated with a fall back to the default. Opening the inspector adds a history entry (Back
+  closes it); a filter replaces the entry.
+- **Cards up to 12 devices, a table above; a table can always be asked for.** Filtering, sorting and paging run in the
+  browser over the list the state already holds; server-side paging, which the brief asks for above 60 devices, waits for
+  the catalogue (V2-T05), which is the first thing that can exercise it.
+- **Commands answer with the whole state and the page uses the answer at once.** Bulk commands run one device after
+  another, with progress, a "Stop here", the failures and their reasons, and a question first above ten devices. There is no
+  bulk route.
+- **The inspector and the hold dialog are modal:** the shell behind is inert (a counter in the store), Tab stays inside,
+  Esc closes, focus goes back to what opened it. A value to hold outside the range of the telemetry contract is refused in
+  the control; sending one on purpose is the Faults page's job. Not offered, because the engine has nothing behind them:
+  jitter, QoS and acknowledgement time, resetting `seq`, editing a profile.
+- **The running-scenario strip and the Follow menu are not built here;** they need the run state that SIM-08 adds.

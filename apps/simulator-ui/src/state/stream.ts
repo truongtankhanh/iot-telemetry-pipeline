@@ -1,6 +1,7 @@
 import { getState as fetchState } from '../api/client';
-import type { Snapshot, StateView } from '../api/types';
+import type { PublishedMessage, Snapshot, StateView } from '../api/types';
 import { RateCounter } from '../lib/rate';
+import type { HistoryStore } from './history';
 import type { StudioStore } from './store';
 
 /** The part of `EventSource` the stream uses, so a test can pass a fake (jsdom has none). */
@@ -18,6 +19,8 @@ export interface StreamOptions {
   /** A burst of `state` events is one refetch, this long after the last of them. */
   refetchDelayMs?: number;
   rateWindowMs?: number;
+  /** Where readings are kept for the charts: seeded by each snapshot, fed by each `published` message. */
+  history?: HistoryStore;
   /** How often the publish rate is written to the store. */
   rateEveryMs?: number;
 }
@@ -34,8 +37,10 @@ export interface StreamConnection {
  * - `state` means an operator changed something. The change is a delta of the engine's rules, and
  *   applying it here would be a second copy of them; operator actions are rare, so the whole state is
  *   read again, once for a burst.
- * - `published` is not stored: it only feeds the rate (it arrives about fifteen times a second, and
- *   nothing in the shell may render per message).
+ * - `published` is not stored in the Zustand store: it feeds the rate and, when a `history` is given, that
+ *   history (it arrives about fifteen times a second, and nothing may render per message; the history tells
+ *   its listeners at most once a second). A snapshot seeds the history from its publish log, replacing what was
+ *   there, so a reconnect does not double the readings.
  * - `tick-error` and `observation` are not used by the shell.
  *
  * The browser reconnects an `EventSource` by itself. The link is `live` while it is open and `lost`
@@ -70,7 +75,10 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     });
   }
 
-  on<Snapshot>('snapshot', (data, at) => store.getState().applySnapshot(data, at));
+  on<Snapshot>('snapshot', (data, at) => {
+    store.getState().applySnapshot(data, at);
+    options.history?.seed(Array.isArray(data.publishLog) ? data.publishLog : []);
+  });
   on<StateView['ingest']>('ingest', (data, at) => store.getState().patchSlice('ingest', data, at));
   on<StateView['alerts']>('alerts', (data, at) => store.getState().patchSlice('alerts', data, at));
   on<StateView['metrics']>('metrics', (data, at) =>
@@ -93,6 +101,7 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     }, refetchDelayMs);
   });
 
+  on<PublishedMessage>('published', (message) => options.history?.record(message));
   source.addEventListener('published', () => rate.record(now()));
 
   const rateTimer = setInterval(() => {

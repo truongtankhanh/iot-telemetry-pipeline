@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatClockTime, isoTime } from './time';
+import { formatAgo, formatClockTime, isoTime } from './time';
 
 const MOMENT = Date.parse('2026-10-20T09:14:32.000Z');
 
@@ -22,5 +22,29 @@ describe('formatClockTime', () => {
 describe('isoTime', () => {
   it('is ISO 8601 in UTC', () => {
     expect(isoTime(MOMENT)).toBe('2026-10-20T09:14:32.000Z');
+  });
+});
+
+describe('formatAgo', () => {
+  it('counts seconds up to a minute', () => {
+    expect(formatAgo(MOMENT - 2000, MOMENT)).toBe('2 s ago');
+    expect(formatAgo(MOMENT - 59_000, MOMENT)).toBe('59 s ago');
+  });
+
+  it('counts minutes up to an hour', () => {
+    expect(formatAgo(MOMENT - 60_000, MOMENT)).toBe('1 min ago');
+    expect(formatAgo(MOMENT - 200_000, MOMENT)).toBe('3 min ago');
+    expect(formatAgo(MOMENT - 3_599_000, MOMENT)).toBe('59 min ago');
+  });
+
+  it('gives the clock time once it is an hour or more', () => {
+    const then = MOMENT - 3_600_000;
+    expect(formatAgo(then, MOMENT)).toBe(formatClockTime(then));
+  });
+
+  it('says "just now" for now and for a moment in the future (clocks differ)', () => {
+    expect(formatAgo(MOMENT, MOMENT)).toBe('just now');
+    expect(formatAgo(MOMENT + 500, MOMENT)).toBe('just now');
+    expect(formatAgo(MOMENT + 5000, MOMENT)).toBe('just now');
   });
 });

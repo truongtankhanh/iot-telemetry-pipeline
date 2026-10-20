@@ -8,6 +8,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router';
+import { AnimationBudget } from './lib/animationBudget';
 import { CommandPalette } from './palette/CommandPalette';
 import { readRailPinned, writeRailPinned } from './lib/preferences';
 import { type AppRoute, appRoutes, findRoute } from './lib/routes';
@@ -18,10 +19,12 @@ import { Header } from './shell/Header';
 import { LinkBanner } from './shell/LinkBanner';
 import { Navigation } from './shell/Navigation';
 import { Shell } from './shell/Shell';
+import { HistoryStore } from './state/history';
 import { connectStream } from './state/stream';
 import { createStudioStore } from './state/store';
 import { StudioProvider } from './state/StudioProvider';
 import { useStudio, useStudioStore } from './state/studioContext';
+import { AnimationBudgetProvider } from './ui/AnimationBudget';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import pagesStyles from './pages/pages.module.css';
@@ -31,6 +34,11 @@ import pagesStyles from './pages/pages.module.css';
 const Foundations = __FOUNDATIONS__
   ? lazy(() => import('./pages/Foundations').then((module) => ({ default: module.Foundations })))
   : null;
+
+// The Fleet is its own chunk: it brings the charts, the table and the inspector, which no other page needs yet.
+const Fleet = lazy(() =>
+  import('./pages/fleet/Fleet').then((module) => ({ default: module.Fleet })),
+);
 
 const TITLE = 'Simulator Studio';
 
@@ -53,11 +61,15 @@ function NotFound() {
   );
 }
 
-/** A path under a page that exists (`/fleet/dc-env-01`) is that page, until its ticket gives it a view. */
+/**
+ * A path under a page that exists (`/alerts/7`): a page that is built has no sub-paths, so it goes to the page
+ * itself; one that is not built shows its placeholder.
+ */
 function Fallback({ routes }: { routes: AppRoute[] }) {
   const { pathname } = useLocation();
   const route = findRoute(routes, pathname);
   if (route === undefined) return <NotFound />;
+  if (route.built) return <Navigate to={route.path} replace />;
   return <NotBuilt route={route} />;
 }
 
@@ -66,6 +78,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
     <Routes>
       <Route path="/" element={<Overview />} />
       <Route path="/overview" element={<Navigate to="/" replace />} />
+      <Route
+        path="/fleet"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Fleet />
+          </Suspense>
+        }
+      />
       {Foundations !== null && routes.some((route) => route.path === '/foundations') ? (
         <Route
           path="/foundations"
@@ -100,6 +120,7 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
   const lastDataAt = useStudio((state) => state.lastDataAt);
   const railPinned = useStudio((state) => state.railPinned);
   const paletteOpen = useStudio((state) => state.paletteOpen);
+  const modalOpen = useStudio((state) => state.modalCount > 0);
   const current = findRoute(routes, pathname);
 
   const openPalette = () => store.getState().setPaletteOpen(true);
@@ -158,7 +179,7 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
           ) : null
         }
         pinned={railPinned}
-        inert={paletteOpen}
+        inert={paletteOpen || modalOpen}
       >
         <Pages routes={routes} />
       </Shell>
@@ -173,16 +194,24 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
  */
 export function App() {
   const [store] = useState(() => createStudioStore({ railPinned: readRailPinned() }));
+  const [history] = useState(() => new HistoryStore());
+  // One animation budget for the window (12 animated nodes, 24 glowing lines). Without a provider nothing animates.
+  const [budget] = useState(() => new AnimationBudget());
   useEffect(() => {
-    const connection = connectStream(store);
-    return () => connection.close();
-  }, [store]);
+    const connection = connectStream(store, { history });
+    return () => {
+      connection.close();
+      history.dispose();
+    };
+  }, [store, history]);
 
   return (
-    <StudioProvider store={store}>
-      <BrowserRouter>
-        <StudioFrame />
-      </BrowserRouter>
+    <StudioProvider store={store} history={history}>
+      <AnimationBudgetProvider budget={budget}>
+        <BrowserRouter>
+          <StudioFrame />
+        </BrowserRouter>
+      </AnimationBudgetProvider>
     </StudioProvider>
   );
 }

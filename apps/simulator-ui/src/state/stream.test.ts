@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
-import type { Snapshot, StateView } from '../api/types';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
+import type { PublishedMessage, Snapshot, StateView } from '../api/types';
+import { HistoryStore } from './history';
 import { createStudioStore } from './store';
 import { connectStream, type EventSourceLike } from './stream';
 
-const view = fixture as StateView;
+const view = fixture;
 const T0 = Date.parse('2026-10-20T09:14:30.000Z');
 
 class FakeSource implements EventSourceLike {
@@ -30,11 +31,15 @@ class FakeSource implements EventSourceLike {
   }
 }
 
-function setup(options: { getState?: () => Promise<StateView> } = {}) {
+function setup(options: { getState?: () => Promise<StateView>; history?: HistoryStore } = {}) {
   const store = createStudioStore();
   const source = new FakeSource();
   const getState = options.getState ?? vi.fn(async () => ({ ...view, observationCursor: 99 }));
-  const connection = connectStream(store, { createSource: () => source, getState });
+  const connection = connectStream(store, {
+    createSource: () => source,
+    getState,
+    ...(options.history ? { history: options.history } : {}),
+  });
   return { store, source, getState, connection };
 }
 
@@ -184,5 +189,68 @@ describe('close', () => {
     finish({ ...view, observationCursor: 123 });
     await vi.advanceTimersByTimeAsync(0);
     expect(store.getState().view?.observationCursor).toBe(view.observationCursor);
+  });
+});
+
+describe('the history', () => {
+  const published = (deviceId: string, atMs: number, value: number): PublishedMessage => {
+    const ts = new Date(atMs).toISOString();
+    return {
+      deviceId,
+      topic: `campus/BLD-DC/${deviceId}/telemetry`,
+      payload: JSON.stringify({ seq: 1, ts, metrics: { temperature_c: value } }),
+      seq: 1,
+      ts,
+    };
+  };
+
+  it('is seeded from the publish log of a snapshot', () => {
+    const history = new HistoryStore();
+    const { source } = setup({ history });
+    source.emit('snapshot', {
+      ...view,
+      publishLog: [
+        published('dc-env-01', T0 - 4000, 22.4),
+        published('dc-env-01', T0 - 2000, 22.6),
+      ],
+    });
+    expect(history.series('dc-env-01', 'temperature_c').map((s) => s.v)).toEqual([22.4, 22.6]);
+  });
+
+  it('records each published message', () => {
+    const history = new HistoryStore();
+    const { source } = setup({ history });
+    source.emit('snapshot', { ...view, publishLog: [] });
+    source.emit('published', published('dc-env-01', T0, 29.3));
+    expect(history.series('dc-env-01', 'temperature_c')).toEqual([{ t: T0, v: 29.3 }]);
+    expect(history.lastSeen('dc-env-01')).toBe(T0);
+  });
+
+  it('is seeded again by the snapshot of a reconnect, not doubled', () => {
+    const history = new HistoryStore();
+    const { source } = setup({ history });
+    const log = [published('dc-env-01', T0 - 2000, 22.6)];
+    source.emit('snapshot', { ...view, publishLog: log });
+    source.emit('published', published('dc-env-01', T0, 22.8));
+    source.emit('snapshot', { ...view, publishLog: [...log, published('dc-env-01', T0, 22.8)] });
+    expect(history.series('dc-env-01', 'temperature_c').map((s) => s.v)).toEqual([22.6, 22.8]);
+  });
+
+  it('copes with a snapshot that has no publish log, and with a published message that is not a message', () => {
+    const history = new HistoryStore();
+    const { source } = setup({ history });
+    source.emit('snapshot', view); // the fixture is a state view: it has no publishLog
+    source.emit('published', 'not json');
+    source.emit('published', { seq: 3 });
+    expect(history.series('dc-env-01', 'temperature_c')).toEqual([]);
+    expect(history.lastSeen('dc-env-01')).toBeNull();
+  });
+
+  it('still counts a published message for the rate when there is no history', async () => {
+    const { store, source } = setup();
+    source.emit('snapshot', { ...view, publishLog: [] });
+    for (let i = 0; i < 5; i++) source.emit('published', published('dc-env-01', T0 + i, 1));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(store.getState().publishRate).toBe(5);
   });
 });

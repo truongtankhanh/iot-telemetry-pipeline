@@ -1,0 +1,56 @@
+.box {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--radius-1);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-0);
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+  cursor: pointer;
+  transition:
+    box-shadow 0.12s,
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.box:hover:not(:disabled) {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.box:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.box:checked,
+.box:indeterminate {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: var(--neon-accent);
+}
+
+/* The mark is a shape (a tick, a dash), so the state is not colour alone. */
+.box:checked::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid var(--accent-ink);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+
+.box:indeterminate::after {
+  content: '';
+  width: 10px;
+  height: 2px;
+  background: var(--accent-ink);
+}
+
+.box:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

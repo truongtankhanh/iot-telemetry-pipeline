@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { Snapshot, StateView } from '../api/types';
 import { createStudioStore } from './store';
 
-const view = fixture as StateView;
+const view = fixture;
 const snapshot: Snapshot = {
   ...view,
   publishLog: [
@@ -28,6 +28,18 @@ describe('createStudioStore', () => {
     expect(state.railPinned).toBe(false);
     expect(state.paletteOpen).toBe(false);
     expect(state.publishRate).toBe(0);
+  });
+
+  it('counts the modals that are open, never below zero', () => {
+    const store = createStudioStore();
+    expect(store.getState().modalCount).toBe(0);
+    store.getState().pushModal();
+    store.getState().pushModal();
+    store.getState().popModal();
+    expect(store.getState().modalCount).toBe(1);
+    store.getState().popModal();
+    store.getState().popModal();
+    expect(store.getState().modalCount).toBe(0);
   });
 
   it('can start with the rail pinned', () => {

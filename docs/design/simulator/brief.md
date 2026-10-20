@@ -296,7 +296,7 @@ any change to it.
 
 ## Interaction decisions taken in the mockups
 
-- **Inspectors are sheets**, 480 px, over the page. The page behind does not resize and the selected card keeps its
+- **Inspectors are sheets**, 680 px (the device inspector; 480 px was its first width), over the page. The page behind does not resize and the selected card keeps its
   accent border.
 - **From 1600 px every page uses the icon rail**; below that the navigation is labelled, with sub-items for the Lab.
   The Lab's sub-pages (Workspace, Scenarios, Timeline, Faults) are a segmented control at the top of each.
@@ -345,15 +345,20 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
 5. **Studio's port.** _Decided 2026-10-19: `3200`_ (`3100` ingest, `3000` Grafana, `9090` Prometheus, `5433`
    PostgreSQL are taken in the Compose stack).
 6. **Chart library.** The mockups draw SVG. Candidates for the live charts are a tree-shaken ECharts, uPlot, or
-   hand-drawn SVG; SIM-06 decides after measuring the bundle.
+   hand-drawn SVG; SIM-06 decides after measuring the bundle. _SIM-05 drew its charts (the Fleet line chart, the
+   sparkline and the range bar) as hand-written SVG, with no dependency, because the Fleet comes first; the
+   decision stays open for the charts the later pages need._
 7. **Delivery timestamps.** Showing when the outbox delivered, rather than when Studio saw it, needs ingest to expose
    the time in `/api/alerts`. That is a small change to ingest; it is not assumed here.
 8. **Twin.** _Decided 2026-10-19:_ option C with a spike, devices hand-placed and marked `illustrative`, the Pipeline hub
    drawn as a floating logical object (see [digital-twin.md](digital-twin.md#decisions)). The spike (SIM-17) decides
    whether to continue.
-9. **Alert marker on charts.** Frame 04's device chart shows the state beside the device name and draws no alert marker;
-   frames 01, 02 and 15 still draw a bell, a band and rings. Recommended: remove them from those three, as Sếp asked for
-   frame 04. SIM-05 settles it.
-10. **Hold-value dialog.** The bulk bar's _Hold a value_ has no mockup yet; SIM-05 draws it from the inspector's control.
+9. **Alert marker on charts.** _Settled in SIM-05 (2026-10-20): no marker._ Frame 04's device chart shows the state beside
+   the device name and draws no alert marker; frames 01, 02 and 15 still draw a bell, a band and rings. The Fleet cards and
+   the inspector follow frame 04: the raise and clear lines stay, the part of the line beyond the raise line is amber, and
+   the state is the word and icon beside the name. Frames 01, 02 and 15 differ from the build until they are redrawn.
+10. **Hold-value dialog.** _Drawn in SIM-05 (2026-10-20)_ from the inspector's control, without a mockup: a modal that
+    takes one metric (any metric a selected device reports, the most common first) and one value for all, says before
+    anything is sent how many devices it reaches and which it skips, and hands the work to the page's bulk run.
 11. **Scenario timeline at scale.** Frame 05 draws one lane per device; above 12 anomalies it groups by zone as the Lab's
     dock does (frame 19). SIM-11 draws the grouped state.

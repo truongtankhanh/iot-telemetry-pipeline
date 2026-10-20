@@ -1,0 +1,70 @@
+.control {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+}
+
+.field label {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-2);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-0);
+}
+
+.input:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.input[data-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.input input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  color: var(--text-secondary);
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+}
+
+.hint[data-error='true'] {
+  color: var(--danger);
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+  padding-top: 21px;
+}

@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { type Anomaly, type DeviceSpec, baselineValue, parseAnomaly, sample } from './signals.ts';
+import {
+  type Anomaly,
+  type DeviceSpec,
+  baselineValue,
+  metricProfile,
+  parseAnomaly,
+  profilesOf,
+  sample,
+} from './signals.ts';
 
 const dc: DeviceSpec = {
   id: 'dc-env-01',
@@ -168,5 +176,44 @@ describe('baselineValue', () => {
   it('falls back to a flat profile for a kind or metric it does not know', () => {
     const unknown: DeviceSpec = { id: 'x-01', kind: 'weather_station', zoneCode: 'Z', metrics: [] };
     assert.equal(baselineValue(unknown, 'power_kw', noon), 50);
+  });
+});
+
+describe('metricProfile', () => {
+  it('reports the baseline, the noise and no daily swing for a server room', () => {
+    assert.deepEqual(metricProfile(dc, 'temperature_c'), {
+      baseline: 22.5,
+      noise: 0.3,
+      dailySwing: 0,
+    });
+  });
+
+  it('reports the daily swing of a kind that has one', () => {
+    assert.deepEqual(metricProfile(air, 'co2_ppm'), { baseline: 650, noise: 40, dailySwing: 350 });
+  });
+
+  it('falls back to the flat profile that the generator uses for a metric it does not know', () => {
+    const odd: DeviceSpec = { id: 'x', kind: 'unknown_kind', zoneCode: 'Z', metrics: ['co2_ppm'] };
+    assert.deepEqual(metricProfile(odd, 'co2_ppm'), { baseline: 50, noise: 1, dailySwing: 0 });
+  });
+
+  it('agrees with the values the generator produces: the baseline is the noise-free value at night', () => {
+    const { baseline, noise } = metricProfile(dc, 'temperature_c');
+    assert.equal(baselineValue(dc, 'temperature_c', night), baseline);
+    const value = sample(dc, 'temperature_c', night, 0, [], () => 1);
+    assert.ok(Math.abs(value - (baseline + noise)) <= 0.05 + 1e-9);
+  });
+});
+
+describe('profilesOf', () => {
+  it('has an entry for each device with exactly the metrics it reports', () => {
+    const profiles = profilesOf([dc, air]);
+    assert.deepEqual(Object.keys(profiles), ['dc-env-01', 'lha-air-01']);
+    assert.deepEqual(Object.keys(profiles['dc-env-01'] ?? {}), ['temperature_c']);
+    assert.equal(profiles['lha-air-01']?.co2_ppm?.dailySwing, 350);
+  });
+
+  it('is empty for no devices', () => {
+    assert.deepEqual(profilesOf([]), {});
   });
 });

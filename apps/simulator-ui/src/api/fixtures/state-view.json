@@ -220,6 +220,130 @@
     "lastOkAt": "2026-10-20T09:14:31.000Z",
     "stale": false
   },
+  "rules": {
+    "available": true,
+    "reason": null,
+    "items": [
+      {
+        "id": "server-room-hot",
+        "kind": "server_room",
+        "metric": "temperature_c",
+        "direction": "above",
+        "raise": 27,
+        "clear": 25.5,
+        "for": 3,
+        "severity": "high",
+        "title": "Server room temperature high"
+      },
+      {
+        "id": "server-room-humid",
+        "kind": "server_room",
+        "metric": "humidity_pct",
+        "direction": "above",
+        "raise": 60,
+        "clear": 55,
+        "for": 3,
+        "severity": "medium",
+        "title": "Server room humidity high"
+      },
+      {
+        "id": "indoor-co2",
+        "kind": "indoor_air",
+        "metric": "co2_ppm",
+        "direction": "above",
+        "raise": 1200,
+        "clear": 1000,
+        "for": 3,
+        "severity": "medium",
+        "title": "Poor air quality (CO₂)"
+      },
+      {
+        "id": "power-over-contract",
+        "kind": "power_meter",
+        "metric": "power_kw",
+        "direction": "above",
+        "raise": 180,
+        "clear": 160,
+        "for": 2,
+        "severity": "low",
+        "title": "Power draw above contracted capacity"
+      }
+    ]
+  },
+  "profiles": {
+    "dc-env-01": {
+      "temperature_c": {
+        "baseline": 22.5,
+        "noise": 0.3,
+        "dailySwing": 0
+      },
+      "humidity_pct": {
+        "baseline": 45,
+        "noise": 1.5,
+        "dailySwing": 0
+      }
+    },
+    "dc-env-02": {
+      "temperature_c": {
+        "baseline": 22.5,
+        "noise": 0.3,
+        "dailySwing": 0
+      },
+      "humidity_pct": {
+        "baseline": 45,
+        "noise": 1.5,
+        "dailySwing": 0
+      }
+    },
+    "lib-air-01": {
+      "co2_ppm": {
+        "baseline": 650,
+        "noise": 40,
+        "dailySwing": 350
+      },
+      "temperature_c": {
+        "baseline": 24,
+        "noise": 0.4,
+        "dailySwing": 1.5
+      },
+      "humidity_pct": {
+        "baseline": 55,
+        "noise": 2,
+        "dailySwing": 0
+      }
+    },
+    "lha-air-01": {
+      "co2_ppm": {
+        "baseline": 650,
+        "noise": 40,
+        "dailySwing": 350
+      },
+      "temperature_c": {
+        "baseline": 24,
+        "noise": 0.4,
+        "dailySwing": 1.5
+      }
+    },
+    "stu-air-01": {
+      "co2_ppm": {
+        "baseline": 650,
+        "noise": 40,
+        "dailySwing": 350
+      },
+      "temperature_c": {
+        "baseline": 24,
+        "noise": 0.4,
+        "dailySwing": 1.5
+      }
+    },
+    "hub-power-01": {
+      "power_kw": {
+        "baseline": 120,
+        "noise": 8,
+        "dailySwing": 35
+      }
+    }
+  },
   "config": {
     "ingestUrl": "http://localhost:3100",
     "consoleUrl": null,

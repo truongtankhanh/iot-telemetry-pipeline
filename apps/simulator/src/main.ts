@@ -7,6 +7,7 @@ import { ControlServer } from './control-server.ts';
 import { JsonFileDeviceSource } from './device-source.ts';
 import { Engine } from './engine.ts';
 import { IngestPoller } from './ingest-poller.ts';
+import { loadRules } from './rules-source.ts';
 import { SCENARIOS } from './scenarios.ts';
 import { parseAnomaly } from './signals.ts';
 
@@ -14,6 +15,9 @@ const HELP = `Usage: node src/main.ts [options]
 
   --broker <url>        MQTT broker (default mqtt://localhost:1883)
   --registry <path>     devices.json to simulate (default ../ingest/config/devices.json)
+  --rules <path>        rules.json that Studio draws the raise and clear lines from (default
+                        RULES_FILE, else ../ingest/config/rules.json); a file that cannot be
+                        read is reported, not fatal
   --interval <ms>       publish interval per device (default 2000)
   --anomaly <spec>      device:metric:value:startAt:duration, repeatable
                         e.g. dc-env-01:temperature_c:29.5:20:60
@@ -38,6 +42,7 @@ const { values } = parseArgs({
       type: 'string',
       default: new URL('../../ingest/config/devices.json', import.meta.url).pathname,
     },
+    rules: { type: 'string' },
     interval: { type: 'string', default: '2000' },
     anomaly: { type: 'string', multiple: true, default: [] },
     scenario: { type: 'string' },
@@ -84,6 +89,14 @@ function resolveControl() {
 }
 const control = values['no-control'] ? undefined : resolveControl();
 
+// The rules are for Studio only: a missing or unusable file never stops the simulator, it is said once here
+// and in the state, and Studio hides what depends on it.
+const rulesPath =
+  values.rules ??
+  (process.env.RULES_FILE?.trim() ||
+    new URL('../../ingest/config/rules.json', import.meta.url).pathname);
+const rules = control ? loadRules(rulesPath) : undefined;
+
 const client = await connectAsync(values.broker, {
   protocolVersion: 5,
   clientId: `simulator-${process.pid}`,
@@ -119,6 +132,7 @@ if (control) {
     poller: new IngestPoller({ baseUrl: control.ingestUrl, clock: systemClock }),
     broker: brokerLink,
     studioDir: control.studioDir,
+    ...(rules ? { rules } : {}),
     config: control,
   });
   try {
@@ -129,6 +143,11 @@ if (control) {
       studio
         ? `Studio UI: http://${host}:${port}/`
         : 'Studio UI: not built (run pnpm --filter @itp/simulator-ui build)',
+    );
+    console.log(
+      rules?.available
+        ? `Rules: ${rules.items.length} from ${rulesPath}`
+        : `Rules: not available (${rules?.reason}); Studio hides what depends on them`,
     );
     if (!isLoopbackHost(control.host)) {
       console.log(

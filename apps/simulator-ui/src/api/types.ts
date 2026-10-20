@@ -107,6 +107,38 @@ export interface MetricsFeed {
   stale: boolean;
 }
 
+/** One threshold rule of ingest (`rules.json`), as the simulator reports it for the charts and range bars. */
+export interface RuleInfo {
+  id: string;
+  /** The device kind the rule applies to. */
+  kind: string;
+  metric: MetricName;
+  direction: 'above' | 'below';
+  /** The value that counts as a breach (strictly beyond it). */
+  raise: number;
+  /** The value an open alert must get back past to clear; the hysteresis band lies between the two. */
+  clear: number;
+  /** Consecutive breaching readings needed to open an alert. */
+  for: number;
+  severity: Severity;
+  title: string;
+}
+
+/** The rules the simulator read at boot, or why it has none (the UI then hides what depends on them). */
+export interface RulesView {
+  available: boolean;
+  /** Why the rules are not available, in words; `null` when they are. */
+  reason: string | null;
+  items: RuleInfo[];
+}
+
+/** Baseline, noise (±) and daily swing of one metric of one device, in the metric's unit. Read-only. */
+export interface MetricProfile {
+  baseline: number;
+  noise: number;
+  dailySwing: number;
+}
+
 /** The simulator's own connection to the MQTT broker (credentials already removed). */
 export interface BrokerState {
   url: string;
@@ -123,6 +155,9 @@ export interface StateView {
   broker: BrokerState;
   alerts: AlertsFeed;
   metrics: MetricsFeed;
+  rules: RulesView;
+  /** By device id; a device has an entry for each of its metrics. */
+  profiles: Record<string, Partial<Record<MetricName, MetricProfile>>>;
   config: { ingestUrl: string; consoleUrl: string | null; intervalMs: number; simulated: boolean };
   observationCursor: number;
 }

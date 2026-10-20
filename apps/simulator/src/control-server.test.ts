@@ -322,6 +322,36 @@ describe('ControlServer commands', () => {
     assert.equal(engine.snapshot().devices[0]?.state, 'paused');
   });
 
+  it('reports the rules it was given and the profiles of the devices in the state, and none when it was given no rules', async () => {
+    const rules = {
+      available: true,
+      reason: null,
+      items: [
+        {
+          id: 'r',
+          kind: 'server_room',
+          metric: 'temperature_c' as const,
+          direction: 'above' as const,
+          raise: 27,
+          clear: 25.5,
+          for: 3,
+          severity: 'high' as const,
+          title: 'Hot',
+        },
+      ],
+    };
+    const given = await startServer({ rules });
+    const state = (await get(given.port, '/api/state')).json();
+    assert.deepEqual(state.rules, rules);
+    assert.deepEqual(Object.keys(state.profiles as Json), ['dc-env-01', 'dc-env-02', 'lib-air-01']);
+
+    const none = await startServer();
+    const rulesOfNone = (await get(none.port, '/api/state')).json().rules as Json;
+    assert.equal(rulesOfNone.available, false);
+    assert.deepEqual(rulesOfNone.items, []);
+    assert.equal(typeof rulesOfNone.reason, 'string');
+  });
+
   it('records what happened in the observation store, which a client pages', async () => {
     const { port } = await startServer();
     await send(port, 'POST', '/api/devices/dc-env-01/pause');

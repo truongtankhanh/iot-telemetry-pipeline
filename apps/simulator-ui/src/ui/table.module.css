@@ -37,6 +37,50 @@
   transition: background 0.12s;
 }
 
+.selectCell {
+  width: 1%;
+  padding-right: 0;
+}
+
+/* A sortable header is a button that looks like the header: the arrow shows which way it is sorted. */
+.sortButton {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  border-radius: var(--radius-1);
+}
+
+.sortButton:hover,
+.sortButton[data-sorted] {
+  color: var(--text-primary);
+}
+
+.sortButton:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+/* The header stays in view when the page scrolls; the wrap must not clip it then. */
+.wrap[data-sticky='true'] {
+  overflow: visible;
+}
+
+.wrap[data-sticky='true'] .table th {
+  position: sticky;
+  top: var(--sticky-top, 0);
+  z-index: 1;
+  background: var(--surface-1);
+}
+
+.row[data-selected='true'] td {
+  background: var(--accent-soft);
+}
+
 .table th[data-align='end'],
 .table td[data-align='end'] {
   text-align: right;
