@@ -243,3 +243,70 @@ The Fleet (cards up to 12 devices, a table above or on request, the inspector, t
   the control; sending one on purpose is the Faults page's job. Not offered, because the engine has nothing behind them:
   jitter, QoS and acknowledgement time, resetting `seq`, editing a profile.
 - **The running-scenario strip and the Follow menu are not built here;** they need the run state that SIM-08 adds.
+
+## Amendment, 2026-10-20: Topology as built (SIM-06)
+
+The Topology (the graph, its neon edges, the row under it and the dependency-down states) is in `apps/simulator-ui`
+(`src/pages/topology/`, with its logic in `src/lib/topology*.ts`, `pipeline.ts`, `ingestRates.ts` and `downstreamHops.ts`).
+What was decided on the way:
+
+- **React Flow is adopted for the graph** (decision 2 of the amendment of 2026-10-19, now carried out). `@xyflow/react`
+  12.12.0, licence **MIT**; it brings `@xyflow/system` (with the d3 modules it uses), `classcat` and its own, older
+  Zustand 4 (a second copy of the library, next to Studio's Zustand 5). It is a **lazy chunk**: only a visit to `/topology`
+  downloads it. Measured by Sếp with `pnpm --filter @itp/simulator-ui build` on 2026-10-20, before (at `63df914`, the
+  model only) and after the whole ticket (the SIM-06c working tree, before its commit); the machine was not recorded, and
+  Vite's sizes are as it prints them:
+
+  | Chunk                                                   | Before                  | After (the whole ticket)                                  |
+  | ------------------------------------------------------- | ----------------------- | --------------------------------------------------------- |
+  | First load (`index` + the chunks `index.html` preloads) | 311.95 kB (101.08 gzip) | 316.24 kB (103.83 gzip)                                   |
+  | `Topology-*.js` (new)                                   | —                       | 224.66 kB (72.44 gzip), with its CSS 29.19 kB (5.38 gzip) |
+
+  Part way (the graph, before the row under it was built) the same chunk was 207.66 kB (67.30 gzip) with 24.25 kB of CSS,
+  so the row, the banners and the checks account for about 17 kB of the final figure.
+  The Topology chunk holds React Flow **and** the page's own code; the split between them was not measured. The Fleet
+  visit went from 373.03 kB to 378.2 kB (the first load, `useFleetRows-*.js` and `Fleet-*.js`) because Rolldown moved shared
+  modules into two shared chunks; a visit to `/topology` adds `useFleetRows-*.js` and `Topology-*.js`, about 249 kB (82 kB gzip) of script. Why not a
+  hand-written graph: the graph is fixed (about 20 nodes, nothing is dragged or connected), so a hand-drawn SVG was
+  possible; what React Flow gives and a hand-written one would have to build and make accessible is pan, zoom, fit, the
+  minimap, node focus and selection by keyboard, and edge geometry under zoom. The cost above is what a later decision to
+  replace it would be made against.
+
+- **The chart-library question of the brief (open question 6) is closed: hand-written SVG stays.** The Fleet's line chart,
+  sparkline and range bar draw the detail row as well; the live data is at most a few hundred points per series for two
+  minutes. ECharts (even tree-shaken) and uPlot would add a dependency and a second drawing language for no feature
+  Topology needs.
+- **The graph is derived from the store, never the other way round.** `buildTopology` (a pure function) says which nodes
+  and edges there are, where and in what state; `useTopologyModel` rebuilds it about once a second (the page's clock, the
+  metrics) and `Stable` hands React Flow the **same object** for every node and edge whose content did not change, and every
+  node and edge component is `memo`. That is how a state update re-renders only the nodes that changed; a test counts the
+  renders per node (`TopologyGraph.test.tsx`). The layout is computed by hand (`topologyLayout.ts`): the shape is known, and a
+  layout library would be a second new dependency. The pipeline never moves when a zone opens.
+- **Scale follows the brief:** up to 12 devices every device is a node inside its zone; up to 60 a zone is one node (count,
+  worst state, a chevron that opens it in place to the 6 worst devices and "+ n more"); above 60 a zone shows counts only,
+  worst first, and a device is reached by the search or _Problems only_. A zone that is open for a reason of its own (the
+  selection, a search, "All devices") cannot be closed by its chevron, and says so.
+- **The address is the state:** `?q=`, `?group=`, `?problems=1` and the selection (`?device=`, `?node=` for a stage,
+  `?zone=`, which the palette already linked to). Every change replaces the history entry: a selection is not modal.
+- **Dots come from a small seam outside React** (`state/pulses.ts`): each `published` message of the stream tells a `PulseBus`
+  which device published; an edge animates its dots by hand with `requestAnimationFrame` (at most 4 per edge, none under
+  `prefers-reduced-motion`, none while the tab is hidden, none on an edge that is not lit). Past the broker there is no
+  per-message signal, so a dot on a later edge means that something measurable advanced (the stored-readings counter
+  between two reads of `/metrics`, an alert first seen, a delivery that became `delivered`; `downstreamHops.ts`). The
+  glow is stroke layers and a CSS shadow, never an SVG filter, because a filter box clips under pan and zoom.
+  The `published` messages are still not in the Zustand store.
+- **Only what Studio can know is drawn.** Ingest's lag and rate are the difference of two reads of its counters; "n of for"
+  on the Rules node is Studio's own count of the readings it saw; the command center is never read, so an incident id is all
+  it shows. Not drawn because nothing measures them: a PUBACK time, a buffer size, "Open" for an incident. When ingest does
+  not answer, the stages after it say "Unknown", dated and dimmed.
+- **Left out on purpose:** the _Topology | Twin_ switch (SIM-18), the _Data flow | Alerts_ layer switch, "Show in twin" and
+  "Open in lab", "Retry now" (ingest is asked again every second whatever is pressed), the scenario chip and the Cause row
+  (SIM-08), zone names (the registry has codes only), labels on the edges.
+- **A silent device is grey on Topology, as the frames and the brief draw it, and red in the Fleet** (SIM-05 maps it to a
+  down node). The two are recorded here and not reconciled; changing the Fleet is a one-line change of `deviceStatus` and
+  its tests.
+- **The broker being disconnected is drawn without a frame:** the Broker node is down, the links of the devices are dark
+  wires, a banner says so and the Checks show it in red.
+- **The incident link goes to the console, not to an incident.** Which page of the command center shows an incident is
+  its own route and Studio does not know it; with `OCC_CONSOLE_URL` set (an http or https URL; any other scheme is dropped)
+  the alert card links to the console and names the incident by its id. SIM-07 settles the link.

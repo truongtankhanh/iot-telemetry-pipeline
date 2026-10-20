@@ -40,20 +40,21 @@ fails when the server's `StateView` and that file drift apart.
 
 ## Layout
 
-| Path               | What is there                                                                                                                                                                         |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/App.tsx`      | The store, the stream and the router (`App`), and the frame inside them (`StudioFrame`)                                                                                               |
-| `src/shell/`       | Header, navigation, the lost-link banner, the pills                                                                                                                                   |
-| `src/palette/`     | The command palette (⌘ K, `/`)                                                                                                                                                        |
-| `src/pages/`       | One file per page; `NotBuilt` is the placeholder of a page whose ticket has not landed                                                                                                |
-| `src/pages/fleet/` | The Fleet: cards, table, bulk bar, inspector, hold dialog, and the hooks behind them (`useFleetParams` for the address, `useFleetRows`, `useDeviceCommands`, `useBulkRun`)            |
-| `src/ui/charts/`   | Line chart, sparkline and range bar in hand-written SVG                                                                                                                               |
-| `src/state/`       | One vanilla Zustand store per window, the event-stream connection, the React context, and `history.ts`, the last two minutes of readings (outside React: nothing renders per message) |
-| `src/api/`         | Types of the control API, the fetch client, the fixture                                                                                                                               |
-| `src/ui/`          | The shared components (pills, chips, buttons, tables, device badge, data line); icons only via `icons.ts`                                                                             |
-| `src/lib/`         | Pure logic with tests: routes, shortcuts, palette matching, pill derivation, animation budget, preferences                                                                            |
-| `src/styles/`      | `tokens.css` (the only place a colour, size or timing is defined) and `base.css`                                                                                                      |
-| `scripts/`         | `contrast.ts` (every text and state colour pair against its surface) and `textSize.ts` (13 px minimum)                                                                                |
+| Path                  | What is there                                                                                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/App.tsx`         | The store, the stream and the router (`App`), and the frame inside them (`StudioFrame`)                                                                                                                        |
+| `src/shell/`          | Header, navigation, the lost-link banner, the pills                                                                                                                                                            |
+| `src/palette/`        | The command palette (⌘ K, `/`)                                                                                                                                                                                 |
+| `src/pages/`          | One file per page; `NotBuilt` is the placeholder of a page whose ticket has not landed                                                                                                                         |
+| `src/pages/fleet/`    | The Fleet: cards, table, bulk bar, inspector, hold dialog, and the hooks behind them (`useFleetParams` for the address, `useFleetRows`, `useDeviceCommands`, `useBulkRun`)                                     |
+| `src/pages/topology/` | The Topology: the graph (React Flow: nodes, zones, the neon edge, the dots), the toolbar, the key, the row under it (device, rule evaluation, alerts; a stage; a zone), the dependency-down banners and checks |
+| `src/ui/charts/`      | Line chart, sparkline and range bar in hand-written SVG                                                                                                                                                        |
+| `src/state/`          | One vanilla Zustand store per window, the event-stream connection, the React context, and `history.ts`, the last two minutes of readings (outside React: nothing renders per message)                          |
+| `src/api/`            | Types of the control API, the fetch client, the fixture                                                                                                                                                        |
+| `src/ui/`             | The shared components (pills, chips, buttons, tables, device badge, data line); icons only via `icons.ts`                                                                                                      |
+| `src/lib/`            | Pure logic with tests: routes, shortcuts, palette matching, pill derivation, animation budget, preferences                                                                                                     |
+| `src/styles/`         | `tokens.css` (the only place a colour, size or timing is defined) and `base.css`                                                                                                                               |
+| `scripts/`            | `contrast.ts` (every text and state colour pair against its surface) and `textSize.ts` (13 px minimum)                                                                                                         |
 
 ## Rules the code keeps
 
@@ -64,7 +65,8 @@ fails when the server's `StateView` and that file drift apart.
 - **Motion is capped** by `AnimationBudget`: 12 animated nodes and 24 glowing lines at a time. The cap is checked in tests, and
   `prefers-reduced-motion` turns the motion off in one block of `tokens.css`. Keyframes live in the component's CSS Module.
 - **The address is the state of a list page** (the Fleet's search, filters, sort, page, size and open device), parsed with a fallback to the default and written without what is default.
-- **No page renders per message.** `published` events feed a rate; a page that needs messages reads the stream itself.
+- **No page renders per message.** `published` events feed a rate, the history and the pulse bus; a page that needs messages reads the stream itself.
+- **The graph is derived from the store, never the other way round** (`lib/topology.ts` builds it as data; `Stable` keeps the same object for every node that did not change). The address holds the search, the grouping, _Problems only_ and the selection. Graph drawn with [React Flow](https://reactflow.dev) (MIT), credited in the page's key.
 - **Wall screens**: from 1600 px the navigation is an icon rail, and the whole UI scales ×1.25 at 2560 px and ×1.5 at 3200 px.
 - **Fonts are Latin, Latin Extended and Vietnamese, WOFF2 only** (`src/styles/fonts.css`). The per-subset files of `@fontsource` carry no
   `unicode-range`, so each face is declared there with the range of fontsource's own stylesheet; do not import `@fontsource/*/<subset>-<weight>.css`

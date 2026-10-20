@@ -1,10 +1,13 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { useCallback, useState } from 'react';
+import { dependencyNotes } from '../../lib/dependencyNotes';
 import type { Selection } from '../../lib/topology';
 import { useNow } from '../../state/useNow';
 import { useStudio } from '../../state/studioContext';
 import { Card } from '../../ui/Card';
 import { PageHeader } from '../../ui/PageHeader';
+import { DependencyBanners } from './DependencyBanners';
+import { DetailRow } from './DetailRow';
 import styles from './topology.module.css';
 import { TopologyGraph } from './TopologyGraph';
 import { TopologyLegend } from './TopologyLegend';
@@ -28,7 +31,7 @@ function unknownSelection(selection: Selection | null, deviceIds: Set<string>, z
 }
 
 /**
- * The topology (frames 04 and 10): the toolbar, the graph and its key. The address is the state (search, grouping,
+ * The topology (frames 04 and 10): the banners for what is wrong, the toolbar, the graph, its key and the row under it. The address is the state (search, grouping,
  * _Problems only_, the selected node); the zones the viewer opened are this page's own. It reads the store and the
  * history and keeps no copy of either. Before the first message there is a loading line, with no registered device
  * a card says so, and with the link to the simulator lost the graph keeps the last data, dimmed.
@@ -81,6 +84,8 @@ export function Topology() {
   }
 
   const { topology } = model;
+  const notes = dependencyNotes(view, lastAlertSink);
+  const running = view.engine.devices.filter((d) => d.state === 'running').map((d) => d.id);
   const notice = unknownSelection(
     query.selection,
     new Set(view.devices.map((device) => device.id)),
@@ -97,6 +102,7 @@ export function Topology() {
   return (
     <div className={styles.page} data-stale={link === 'lost' ? 'true' : undefined}>
       <PageHeader title="Topology" description={DESCRIPTION} />
+      <DependencyBanners notes={notes} runningDevices={running} />
       {notice === null ? null : (
         <p role="status" className={styles.notice}>
           {notice}
@@ -140,6 +146,15 @@ export function Topology() {
         </p>
       ) : null}
       <TopologyLegend summary={topology.summary} />
+      <DetailRow
+        view={view}
+        rows={model.rows}
+        stages={model.stages}
+        selection={query.selection}
+        lastAlertSink={lastAlertSink}
+        now={now}
+        onSelect={onSelect}
+      />
     </div>
   );
 }

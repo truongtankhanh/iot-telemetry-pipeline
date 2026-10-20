@@ -5,7 +5,10 @@ import type { Sample } from '../state/history';
 import { buildFleetRows } from './fleetRows';
 import type { FleetRow } from './fleetQuery';
 import {
+  alertsFor,
   breachRun,
+  consoleHref,
+  evaluationTarget,
   primaryReading,
   ruleEvaluation,
   stageChecks,
@@ -275,5 +278,114 @@ describe('rows: primaryReading and zoneSummary', () => {
 
   it('has no summary for a zone with no device', () => {
     expect(zoneSummary(rows, 'BLD-NOPE')).toBeNull();
+  });
+});
+
+describe('consoleHref', () => {
+  it('is the console as a link when it is an http or https URL', () => {
+    expect(consoleHref('https://occ.example.test/')).toBe('https://occ.example.test/');
+    expect(consoleHref('http://localhost:5173')).toBe('http://localhost:5173/');
+  });
+
+  it('is nothing when none is set', () => {
+    expect(consoleHref(null)).toBeNull();
+  });
+
+  it('never lets another scheme reach an href', () => {
+    expect(consoleHref('javascript:alert(1)')).toBeNull();
+    expect(consoleHref('data:text/html,<b>x</b>')).toBeNull();
+    expect(consoleHref('ftp://occ.example.test')).toBeNull();
+  });
+
+  it('is nothing for text that is not a URL', () => {
+    expect(consoleHref('not a url')).toBeNull();
+    expect(consoleHref('')).toBeNull();
+  });
+});
+
+describe('alertsFor and evaluationTarget', () => {
+  // #7 is dc-env-01's (open), #6 is lha-air-01's (cleared, the older one); the list is newest first
+  const view = (): StateView => {
+    const copy = structuredClone(fixture);
+    copy.alerts.alerts = [
+      alert7,
+      {
+        ...alert7,
+        id: '6',
+        deviceId: 'lha-air-01',
+        ruleId: 'indoor-co2',
+        metric: 'co2_ppm',
+        status: 'cleared',
+        clearedAt: '2026-10-20T09:08:36.000Z',
+        title: 'Poor air quality (CO₂)',
+      },
+    ];
+    return copy;
+  };
+
+  it('are the alerts of a device, of the devices of a zone, or all of them', () => {
+    const v = view();
+    expect(alertsFor(v, { type: 'device', id: 'lha-air-01' }).map((a) => a.id)).toEqual(['6']);
+    expect(alertsFor(v, { type: 'zone', id: 'BLD-DC' }).map((a) => a.id)).toEqual(['7']);
+    expect(alertsFor(v, { type: 'zone', id: 'BLD-LHA' }).map((a) => a.id)).toEqual(['6']);
+    expect(alertsFor(v, { type: 'stage', id: 'alert' }).map((a) => a.id)).toEqual(['7', '6']);
+    expect(alertsFor(v, null).map((a) => a.id)).toEqual(['7', '6']);
+  });
+
+  it('are nothing for a zone or a device with no alert', () => {
+    expect(alertsFor(view(), { type: 'zone', id: 'BLD-HUB' })).toEqual([]);
+    expect(alertsFor(view(), { type: 'device', id: 'nobody' })).toEqual([]);
+  });
+
+  it('target, for a device, the rule that raised its alert', () => {
+    const target = evaluationTarget(view(), { type: 'device', id: 'dc-env-01' });
+    expect(target).toMatchObject({ deviceId: 'dc-env-01', rule: { id: 'server-room-hot' } });
+    expect(target?.alert?.id).toBe('7');
+  });
+
+  it('target, for a device with no alert, its first rule and no alert', () => {
+    const target = evaluationTarget(view(), { type: 'device', id: 'dc-env-02' });
+    expect(target).toMatchObject({
+      deviceId: 'dc-env-02',
+      rule: { id: 'server-room-hot' },
+      alert: null,
+    });
+  });
+
+  it('target nothing for a device no rule watches', () => {
+    const v = view();
+    v.rules = { available: true, reason: null, items: [] };
+    expect(evaluationTarget(v, { type: 'device', id: 'dc-env-01' })).toBeNull();
+  });
+
+  it('target nothing when the rules are not available', () => {
+    const v = view();
+    v.rules = { available: false, reason: 'no rules file was given', items: [] };
+    expect(evaluationTarget(v, { type: 'device', id: 'dc-env-01' })).toBeNull();
+    expect(evaluationTarget(v, { type: 'stage', id: 'rules' })).toBeNull();
+  });
+
+  it('target, for a stage, a zone or nothing, the newest alert of what is selected and its rule', () => {
+    const v = view();
+    expect(evaluationTarget(v, { type: 'stage', id: 'alert' })).toMatchObject({
+      deviceId: 'dc-env-01',
+      rule: { id: 'server-room-hot' },
+    });
+    expect(evaluationTarget(v, { type: 'zone', id: 'BLD-LHA' })).toMatchObject({
+      deviceId: 'lha-air-01',
+      rule: { id: 'indoor-co2' },
+    });
+    expect(evaluationTarget(v, null)?.alert?.id).toBe('7');
+  });
+
+  it('target nothing, for a stage or a zone, when no alert was raised', () => {
+    const v = view();
+    v.alerts.alerts = [];
+    expect(evaluationTarget(v, { type: 'stage', id: 'rules' })).toBeNull();
+    expect(evaluationTarget(v, { type: 'zone', id: 'BLD-DC' })).toBeNull();
+  });
+
+  it('target nothing for a device that is not registered', () => {
+    expect(evaluationTarget(view(), { type: 'device', id: 'nobody' })).toBeNull();
   });
 });

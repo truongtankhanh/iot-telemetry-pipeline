@@ -1,9 +1,10 @@
 import type { ObservedAlert, RuleInfo, StateView } from '../api/types';
+import type { Selection } from './topology';
 import type { Sample } from '../state/history';
 import { metricUnit } from './deviceIdentity';
 import { STATUS_ORDER } from './deviceStatus';
 import type { FleetRow } from './fleetQuery';
-import { formatAmount, formatValue, isBeyond } from './rules';
+import { formatAmount, formatValue, isBeyond, rulesFor } from './rules';
 import { formatClockTime } from './time';
 import { deviceTopologyState, type TopologyState, worstOf } from './topologyState';
 
@@ -294,4 +295,66 @@ export function zoneSummary(rows: readonly FleetRow[], zone: string): ZoneSummar
       reading: primaryReading(row)?.text ?? null,
     }));
   return { zone, count: inZone.length, worst, members };
+}
+
+/**
+ * The command center's console as a link, or `null`. The control server validated the setting as an http(s) URL; the
+ * page checks again before it puts a value from the network in an `href` (a `javascript:` URL must never get there).
+ * Which page of the console shows an incident is not known to Studio (it depends on that console's own routes, and
+ * SIM-07 settles it), so the link goes to the console, and the incident is named by its id beside it.
+ */
+export function consoleHref(consoleUrl: string | null): string | null {
+  if (consoleUrl === null) return null;
+  try {
+    const url = new URL(consoleUrl);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The alerts of what is selected, newest first: a device's, the devices of a zone, or every alert (a stage, or nothing). */
+export function alertsFor(view: StateView, selection: Selection | null): ObservedAlert[] {
+  const alerts = view.alerts.alerts;
+  if (selection?.type === 'device')
+    return alerts.filter((alert) => alert.deviceId === selection.id);
+  if (selection?.type === 'zone') {
+    const ids = new Set(view.devices.filter((d) => d.zoneCode === selection.id).map((d) => d.id));
+    return alerts.filter((alert) => ids.has(alert.deviceId));
+  }
+  return alerts;
+}
+
+/** The rule evaluation to show under the graph: for which device, by which rule, and the alert it raised, if any. */
+export interface EvaluationTarget {
+  deviceId: string;
+  rule: RuleInfo;
+  alert: ObservedAlert | null;
+}
+
+/**
+ * What the second column is about. For a device: the rule that raised its newest alert, or else its first rule. For
+ * a stage, a zone or nothing: the newest alert of what is selected and the rule behind it (Q2 of the analysis).
+ * `null` when there is no rule to show: the device has none, the rules are not available, or no alert was raised.
+ */
+export function evaluationTarget(
+  view: StateView,
+  selection: Selection | null,
+): EvaluationTarget | null {
+  const alerts = alertsFor(view, selection);
+  if (selection?.type === 'device') {
+    const device = view.devices.find((d) => d.id === selection.id);
+    if (device === undefined) return null;
+    const rules = device.metrics.flatMap((metric) => rulesFor(view.rules, device, metric));
+    const raised = alerts.find((alert) => rules.some((rule) => rule.id === alert.ruleId));
+    const rule = rules.find((r) => r.id === raised?.ruleId) ?? rules[0];
+    if (rule === undefined) return null;
+    return { deviceId: device.id, rule, alert: raised ?? null };
+  }
+  const newest = alerts[0];
+  if (newest === undefined) return null;
+  const rule = view.rules.available
+    ? view.rules.items.find((r) => r.id === newest.ruleId)
+    : undefined;
+  return rule === undefined ? null : { deviceId: newest.deviceId, rule, alert: newest };
 }

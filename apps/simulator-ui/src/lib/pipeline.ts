@@ -69,7 +69,7 @@ const answers = (status: StateView['ingest']['status']) =>
 const clock = (iso: string) => formatClockTime(Date.parse(iso));
 
 /** The time ingest last answered, as far as Studio knows: the last good read of its alerts or metrics. */
-function lastAnswerAt(view: StateView): number | null {
+export function lastAnswerAt(view: StateView): number | null {
   const iso = view.alerts.lastOkAt ?? view.metrics.lastOkAt;
   return iso === null ? null : Date.parse(iso);
 }
