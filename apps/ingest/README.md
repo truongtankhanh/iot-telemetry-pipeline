@@ -25,7 +25,7 @@ Then:
 
 ```bash
 pnpm --filter @itp/ingest dev                   # nest start --watch (long-lived: stop it when done)
-pnpm --filter @itp/simulator start -- --scenario server-room-overheat   # some traffic
+pnpm --filter @itp/simulator start --scenario server-room-overheat   # some traffic
 ```
 
 `start` runs the built service (`node dist/main.js`), so run `pnpm build` first. The HTTP API listens

@@ -9,8 +9,10 @@ import { Button } from './Button';
 import { Checkbox } from './Checkbox';
 import { Chip } from './Chip';
 import { ColumnChooser } from './ColumnChooser';
+import { CursorPager } from './CursorPager';
 import { DataLine } from './DataLine';
 import { type Column, DataTable } from './DataTable';
+import { DeliveryChip } from './DeliveryChip';
 import { DeviceBadge } from './DeviceBadge';
 import { Icon } from './Icon';
 import { uiIcons } from './icons';
@@ -18,6 +20,7 @@ import { NodeState } from './NodeState';
 import { Pager } from './Pager';
 import { Pill } from './Pill';
 import { Segmented } from './Segmented';
+import { SelectField } from './SelectField';
 import { SeverityBadge } from './SeverityBadge';
 import { tabId } from './tabId';
 import { Tabs } from './Tabs';
@@ -874,6 +877,146 @@ describe('ColumnChooser', () => {
       <ColumnChooser columns={columns} visible={new Set(['zone'])} onChange={() => {}} />,
     );
     await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('DeliveryChip', () => {
+  const chip = (
+    deliveryStatus: string | null,
+    deliveryAttempts: number | null = 1,
+    deliveryError: string | null = null,
+  ) => render(<DeliveryChip alert={{ deliveryStatus, deliveryAttempts, deliveryError }} />);
+
+  it('says delivered with its attempts, in words and with an icon', () => {
+    const { container } = chip('delivered', 2);
+    expect(screen.getByText(/Delivered · 2 attempts/)).toHaveAttribute('data-tone', 'ok');
+    expect(container.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('says pending, failed with ingest’s error, and skipped', () => {
+    const { unmount } = chip('pending', 1);
+    expect(screen.getByText(/Pending · 1 attempt$/)).toHaveAttribute('data-tone', 'warn');
+    unmount();
+
+    const failed = chip('failed', 3, 'HTTP 502');
+    expect(screen.getByText(/Failed · 3 attempts · HTTP 502/)).toHaveAttribute('data-tone', 'bad');
+    failed.unmount();
+
+    chip('skipped', 0);
+    expect(screen.getByText('Skipped')).toBeInTheDocument();
+  });
+
+  it('leaves out the attempts when ingest gives none', () => {
+    chip('delivered', null);
+    expect(screen.getByText('Delivered')).toBeInTheDocument();
+  });
+
+  it('never says delivered for a status it does not know, or for none', () => {
+    const { unmount } = chip('quarantined');
+    expect(screen.getByText('Delivery unknown')).toBeInTheDocument();
+    unmount();
+    chip(null, null);
+    expect(screen.getByText('Delivery unknown')).toBeInTheDocument();
+    expect(screen.queryByText(/Delivered/)).not.toBeInTheDocument();
+  });
+});
+
+describe('SelectField', () => {
+  const options = [
+    { value: 'all', label: 'All severities' },
+    { value: 'high', label: 'high' },
+  ];
+
+  it('is named by its label and reports a choice', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<SelectField label="Severity" value="all" options={options} onChange={onChange} />);
+    await user.selectOptions(screen.getByLabelText('Severity'), 'high');
+    expect(onChange).toHaveBeenCalledWith('high');
+    expect(
+      within(screen.getByLabelText('Severity'))
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['All severities', 'high']);
+  });
+
+  it('shows the value it is given and has no accessibility violation', async () => {
+    const { container } = render(
+      <SelectField label="Severity" value="high" options={options} onChange={() => {}} />,
+    );
+    expect(screen.getByLabelText('Severity')).toHaveValue('high');
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('CursorPager', () => {
+  const props = {
+    size: 25,
+    sizes: [5, 25, 200],
+    position: 'Showing 5 alerts · newest first',
+    canNewer: true,
+    canOlder: true,
+    onSizeChange: vi.fn(),
+    onNewer: vi.fn(),
+    onOlder: vi.fn(),
+  };
+
+  it('is the navigation of the alert pages and says where the page is, politely', () => {
+    render(<CursorPager {...props} note="The API pages with a cursor." />);
+    const nav = screen.getByRole('navigation', { name: 'Alert pages' });
+    expect(within(nav).getByRole('status')).toHaveTextContent('Showing 5 alerts · newest first');
+    expect(within(nav).getByText('The API pages with a cursor.')).toBeVisible();
+  });
+
+  it('has Newer and Older and no page numbers', () => {
+    render(<CursorPager {...props} />);
+    expect(screen.getByRole('button', { name: 'Newer' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Older' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /^Page / })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(2);
+  });
+
+  it('reports a click on either end, and has no light at an end that is not there', async () => {
+    const user = userEvent.setup();
+    const onNewer = vi.fn();
+    const onOlder = vi.fn();
+    const { rerender } = render(<CursorPager {...props} onNewer={onNewer} onOlder={onOlder} />);
+    await user.click(screen.getByRole('button', { name: 'Older' }));
+    await user.click(screen.getByRole('button', { name: 'Newer' }));
+    expect(onOlder).toHaveBeenCalledTimes(1);
+    expect(onNewer).toHaveBeenCalledTimes(1);
+
+    rerender(<CursorPager {...props} canNewer={false} canOlder={false} />);
+    expect(screen.getByRole('button', { name: 'Newer' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Older' })).toBeDisabled();
+  });
+
+  it('changes the page size', async () => {
+    const user = userEvent.setup();
+    const onSizeChange = vi.fn();
+    render(<CursorPager {...props} onSizeChange={onSizeChange} />);
+    await user.selectOptions(screen.getByLabelText('Alerts per page'), '200');
+    expect(onSizeChange).toHaveBeenCalledWith(200);
+    expect(
+      within(screen.getByLabelText('Alerts per page'))
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['5', '25', '200']);
+  });
+
+  it('moves the keyboard to the other step when the one it was on stops being possible', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<CursorPager {...props} />);
+    await user.click(screen.getByRole('button', { name: 'Newer' }));
+    expect(screen.getByRole('button', { name: 'Newer' })).toHaveFocus();
+
+    rerender(<CursorPager {...props} canNewer={false} />);
+    expect(screen.getByRole('button', { name: 'Older' })).toHaveFocus();
+  });
+
+  it('has no accessibility violation', async () => {
+    const { container } = render(<CursorPager {...props} note="Note." />);
     expect(await axeViolations(container)).toEqual([]);
   });
 });

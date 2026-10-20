@@ -1,7 +1,21 @@
 import { METRIC_NAMES, type MetricName } from '@itp/telemetry-contract';
 import { STATUS_CODES } from 'node:http';
+import {
+  type AlertCause,
+  alertCause,
+  parseScenarioRun,
+  type ScenarioRunAnomaly,
+} from './alert-cause.ts';
+import type { IngestAlert, ObservedAlert } from './alert-observer.ts';
 import type { BrokerState } from './broker-link.ts';
-import type { AlertsFeed, IngestState, MetricsFeed } from './ingest-poller.ts';
+import {
+  type AlertsFeed,
+  type AlertsPage,
+  type AlertsPageQuery,
+  IngestReadError,
+  type IngestState,
+  type MetricsFeed,
+} from './ingest-poller.ts';
 import type { Engine, EngineSnapshot } from './engine.ts';
 import { type ObservationDraft, type ObservationStore, PAGE_MAX } from './observation-store.ts';
 import type { RulesView } from './rules-source.ts';
@@ -56,6 +70,10 @@ export interface RoutesContext {
     state(): IngestState;
     alerts(): AlertsFeed;
     metrics(): MetricsFeed;
+    /** One page of ingest's alerts, with its `X-Next-Cursor`; throws `IngestReadError`. */
+    alertsPage(query: AlertsPageQuery): Promise<AlertsPage>;
+    /** One alert as Studio saw it, or `undefined` when it never tracked it. */
+    observedAlert(id: string): ObservedAlert | undefined;
   };
   config: { ingestUrl: string; consoleUrl: string | null };
   /** The simulator's own connection to the MQTT broker. */
@@ -84,6 +102,29 @@ export interface StateView {
   /** Id of the newest observation, where a timeline starts paging back from. */
   observationCursor: number;
 }
+
+/**
+ * An alert of `GET /api/alerts`: what ingest says, plus what only Studio knows. `observed` is empty and
+ * `preexisting` true for an alert Studio never tracked (older than what it read, or from before it started);
+ * `cause` is a scenario Studio started, only when the evidence matches (`alert-cause.ts`), else `null`.
+ */
+export interface PagedAlert extends IngestAlert {
+  preexisting: boolean;
+  observed: ObservedAlert['observed'];
+  cause: AlertCause | null;
+}
+
+/** The most alerts ingest returns in a page (`docs/api.md`). */
+const ALERTS_PAGE_MAX = 200;
+/** The longest `before` ingest accepts (`alerts.dto.ts`); a longer one is refused here without asking. */
+const CURSOR_MAX_LENGTH = 200;
+
+const unobserved = (): ObservedAlert['observed'] => ({
+  openedAt: null,
+  clearedAt: null,
+  delivered: { opened: null, cleared: null },
+  incident: null,
+});
 
 /** The profiles depend only on the registry, which does not change while the process runs. */
 const profileCache = new WeakMap<DeviceSpec[], StateView['profiles']>();
@@ -168,6 +209,28 @@ function integerParam(query: URLSearchParams, name: string, min: number, max: nu
   return value;
 }
 
+function statusParam(query: URLSearchParams): AlertsPageQuery['status'] {
+  const text = query.get('status');
+  if (text === null) return undefined;
+  if (text !== 'open' && text !== 'cleared') {
+    throw new HttpError(400, '"status" must be "open" or "cleared"');
+  }
+  return text;
+}
+
+/** The cursor is ingest's to read: only its presence and length are checked here. */
+function cursorParam(query: URLSearchParams): string | undefined {
+  const text = query.get('before');
+  if (text === null) return undefined;
+  if (text === '' || text.length > CURSOR_MAX_LENGTH) {
+    throw new HttpError(
+      400,
+      `"before" must be the X-Next-Cursor of a previous page (1 to ${CURSOR_MAX_LENGTH} characters)`,
+    );
+  }
+  return text;
+}
+
 function matchSegments(template: string[], actual: string[]): Params | undefined {
   if (template.length !== actual.length) return undefined;
   const params: Record<string, string> = {};
@@ -240,6 +303,44 @@ export function createRoutes(context: RoutesContext) {
       page.events,
       page.next === undefined ? undefined : { 'X-Next-Cursor': String(page.next) },
     );
+  });
+
+  on('GET', '/api/alerts', async (_params, request) => {
+    const status = statusParam(request.query);
+    const limit = integerParam(request.query, 'limit', 1, ALERTS_PAGE_MAX);
+    const before = cursorParam(request.query);
+
+    let page: AlertsPage;
+    try {
+      page = await context.ingest.alertsPage({
+        ...(status !== undefined ? { status } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+        ...(before !== undefined ? { before } : {}),
+      });
+    } catch (error) {
+      if (error instanceof IngestReadError) {
+        // Ingest's own refusal is the caller's request; anything else is ingest not giving a page.
+        throw new HttpError(error.kind === 'refused' ? 400 : 502, error.message);
+      }
+      throw error;
+    }
+
+    const runs = context.store
+      .byKind('scenario-run')
+      .map(parseScenarioRun)
+      .filter((run) => run !== undefined);
+    const simulated = engine.snapshot().simulated;
+    const alerts = page.alerts.map((alert): PagedAlert => {
+      const tracked = context.ingest.observedAlert(alert.id);
+      return {
+        // The page is fresher than anything Studio kept, so its fields win; Studio adds only its own.
+        ...alert,
+        preexisting: tracked?.preexisting ?? true,
+        observed: tracked?.observed ?? unobserved(),
+        cause: alertCause(alert, runs, { simulated }),
+      };
+    });
+    return ok(alerts, page.next === null ? undefined : { 'X-Next-Cursor': page.next });
   });
 
   for (const [action, run] of [
@@ -326,17 +427,29 @@ export function createRoutes(context: RoutesContext) {
     // The presets are written for the start of a run: "20 s in". Run now, they start 20 s from now.
     const offsetS = engine.snapshot().elapsedS;
     const anomalyIds: string[] = [];
+    const anomalies: ScenarioRunAnomaly[] = [];
     try {
       for (const spec of specs) {
         const anomaly = parseAnomaly(spec);
-        anomalyIds.push(engine.addAnomaly({ ...anomaly, startAt: anomaly.startAt + offsetS }));
+        const startAt = anomaly.startAt + offsetS;
+        const id = engine.addAnomaly({ ...anomaly, startAt });
+        anomalyIds.push(id);
+        anomalies.push({
+          id,
+          deviceId: anomaly.deviceId,
+          metric: anomaly.metric,
+          startAt,
+          duration: anomaly.duration,
+        });
       }
     } catch (error) {
       // All or nothing: a preset that names a device this registry does not have adds nothing.
       for (const id of anomalyIds) engine.removeAnomaly(id);
       throw error;
     }
-    context.record({ kind: 'scenario-run', data: { name, anomalyIds, offsetS } });
+    // The anomalies are kept with the run because the engine forgets them on a reset, and the cause of an
+    // alert (`GET /api/alerts`) is worked out from the run, not from what the engine holds now.
+    context.record({ kind: 'scenario-run', data: { name, anomalyIds, offsetS, anomalies } });
     return ok({ anomalyIds, ...view() });
   });
 

@@ -1,0 +1,325 @@
+/* The Alerts page (frame 13): the list and its pager on the left, the alert's detail and trail on the right. Tokens only. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* The link to the simulator is lost, or ingest does not answer: what is shown is the last data, dimmed. */
+.page[data-stale='true'] .content {
+  opacity: 0.6;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.content {
+  min-width: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* A page that is being replaced stays on show, a little dim, so the list never blanks between two requests. */
+.list[aria-busy='true'] {
+  opacity: 0.7;
+}
+
+.note {
+  margin: 0;
+  padding: 0 16px 14px;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.banners {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.banner,
+.notice {
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: var(--fs-body);
+}
+
+.banner[data-tone='bad'],
+.error {
+  border-color: rgba(255, 98, 128, 0.5);
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.banner[data-tone='warn'],
+.notice {
+  border-color: rgba(255, 194, 61, 0.45);
+  box-shadow: inset 2px 0 0 var(--warning);
+}
+
+.error {
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  border-width: 1px;
+  border-style: solid;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bannerText {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- the detail ---- */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.placeholder {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.why {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  background: var(--tint-warn);
+  border: 1px solid rgba(255, 194, 61, 0.35);
+  font-size: var(--fs-body);
+}
+
+.why p {
+  margin: 0;
+}
+
+.whyCause {
+  margin-top: 6px;
+}
+
+.statuses {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* ---- the trail: a vertical line through numbered steps, each with whose clock its time is on ---- */
+.trail {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 10px 0;
+  position: relative;
+}
+
+.step::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 38px;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--flow);
+  box-shadow: 0 0 6px var(--flow);
+}
+
+.step + .step::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 0;
+  height: 10px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--flow);
+  box-shadow: 0 0 6px var(--flow);
+}
+
+.step:last-child::after {
+  display: none;
+}
+
+.mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.mark[data-tone='ok'] {
+  border-color: var(--success);
+  background: var(--tint-ok);
+  color: var(--success);
+}
+
+.mark[data-tone='warn'] {
+  border-color: var(--warning);
+  background: var(--tint-warn);
+  color: var(--warning);
+}
+
+.mark[data-tone='bad'] {
+  border-color: var(--danger);
+  background: var(--tint-bad);
+  color: var(--danger);
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stepTitle {
+  font-weight: 600;
+}
+
+.stepDetail {
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.stepTime {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.stepTime time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.trailNotes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trailNotes p {
+  margin: 0;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+}
+
+.incident {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+}
+
+/* A link that looks like the outline button next to it. */
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-2);
+  border: 1px solid var(--accent-line);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.linkButton:hover {
+  border-color: rgba(71, 215, 255, 0.6);
+  box-shadow: 0 0 8px rgba(71, 215, 255, 0.18);
+}

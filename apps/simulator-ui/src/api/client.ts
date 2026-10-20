@@ -1,4 +1,4 @@
-import type { StateView } from './types';
+import type { AlertsPage, PagedAlert, StateView } from './types';
 
 /** A request the simulator refused or could not answer. `status` is 0 when it did not answer at all. */
 export class ApiError extends Error {
@@ -48,16 +48,11 @@ function isStateView(body: unknown): body is StateView {
   return ['engine', 'devices', 'ingest', 'broker', 'alerts', 'config'].every((key) => key in view);
 }
 
-/** Sends a request and reads the simulator's answer as a state view (the answer of `GET /api/state` and of every command). */
-async function fetchState(
-  url: string,
-  init: RequestInit,
-  options: RequestOptions,
-): Promise<StateView> {
+/** Sends a request. An abort is passed on as it is; any other failure to get an answer is `status: 0`. */
+async function send(url: string, init: RequestInit, options: RequestOptions): Promise<Response> {
   const doFetch = options.fetch ?? fetch;
-  let response: Response;
   try {
-    response = await doFetch(url, {
+    return await doFetch(url, {
       ...init,
       ...(options.signal ? { signal: options.signal } : {}),
     });
@@ -65,6 +60,15 @@ async function fetchState(
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new ApiError(0, 'Cannot reach the simulator');
   }
+}
+
+/** Sends a request and reads the simulator's answer as a state view (the answer of `GET /api/state` and of every command). */
+async function fetchState(
+  url: string,
+  init: RequestInit,
+  options: RequestOptions,
+): Promise<StateView> {
+  const response = await send(url, init, options);
   const body = await readJson(response);
   if (!isStateView(body))
     throw new ApiError(
@@ -99,6 +103,59 @@ function sendCommand(
     },
     options,
   );
+}
+
+export interface AlertsRequest {
+  status?: 'open' | 'cleared';
+  /** 1 to 200, as ingest allows. */
+  limit?: number;
+  /** A cursor taken from the `next` of a previous page. Never built by the caller. */
+  before?: string;
+}
+
+function isPagedAlert(item: unknown): item is PagedAlert {
+  if (typeof item !== 'object' || item === null) return false;
+  const alert = item as Record<string, unknown>;
+  return (
+    typeof alert.id === 'string' &&
+    typeof alert.deviceId === 'string' &&
+    typeof alert.status === 'string' &&
+    typeof alert.openedAt === 'string' &&
+    typeof alert.observed === 'object' &&
+    alert.observed !== null &&
+    'cause' in alert
+  );
+}
+
+/**
+ * `GET /api/alerts`: one page of ingest's alerts, newest first, through the simulator (the browser cannot reach
+ * ingest). The next page is asked for by sending `next` back as `before`; Studio never builds a cursor. A body that
+ * is not the documented array fails loudly instead of rendering as an empty or half-empty list.
+ */
+export async function getAlerts(
+  request: AlertsRequest = {},
+  options: RequestOptions = {},
+): Promise<AlertsPage> {
+  const params = new URLSearchParams();
+  if (request.status !== undefined) params.set('status', request.status);
+  if (request.limit !== undefined) params.set('limit', String(request.limit));
+  if (request.before !== undefined) params.set('before', request.before);
+  const search = params.toString();
+
+  const response = await send(
+    `/api/alerts${search === '' ? '' : `?${search}`}`,
+    { headers: { Accept: 'application/json' } },
+    options,
+  );
+  const body = await readJson(response);
+  if (!Array.isArray(body) || !body.every(isPagedAlert)) {
+    throw new ApiError(
+      response.status,
+      'The simulator answered with alerts Studio does not understand',
+    );
+  }
+  const next = response.headers.get('X-Next-Cursor');
+  return { alerts: body, next: next === null || next === '' ? null : next };
 }
 
 const devicePath = (deviceId: string) => `/api/devices/${encodeURIComponent(deviceId)}`;

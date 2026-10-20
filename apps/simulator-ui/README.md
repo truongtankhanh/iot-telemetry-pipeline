@@ -9,18 +9,23 @@ static files that the simulator's control server serves at `/`, so there is one 
 
 ## Run it
 
-With the simulator running (it serves the API on `:3200`):
+**The shortest way:** the demo in containers gives Studio everything it reads (PostgreSQL, Mosquitto, ingest and a
+simulator that serves the API on `:3200`), and Vite adds hot reload:
 
 ```bash
-pnpm --filter @itp/simulator start                  # the engine and the control server
-pnpm --filter @itp/simulator-ui dev                 # Vite on :5173, proxying /api (the event stream too) to :3200
+pnpm docker:demo                                    # terminal 1: the whole demo, foreground (Ctrl+C stops it)
+pnpm --filter @itp/simulator-ui dev                 # terminal 2: Vite on :5173, proxying /api (the event stream too) to :3200
 ```
 
-`STUDIO_API_URL` moves the proxy target. Without the dev server, build once and let the simulator serve it:
+Open <http://localhost:5173>. `STUDIO_API_URL` moves the proxy target. The Studio the demo serves itself at `:3200`
+is the build baked into the simulator image. [docs/development.md](../../docs/development.md#run-it-locally) has the
+variant with ingest and the simulator on the host, and why the two must not run together.
+
+**Without the dev server,** build once and let a simulator serve it:
 
 ```bash
 pnpm --filter @itp/simulator-ui build               # tsc, then vite build into dist/
-pnpm --filter @itp/simulator start                  # now also serves http://localhost:3200
+pnpm --filter @itp/simulator start                  # also serves http://localhost:3200 (after pnpm docker:up and an ingest)
 ```
 
 The whole demo in containers is `pnpm docker:demo`; Studio is then at `http://localhost:3200` (`STUDIO_HOST_PORT`).
@@ -48,6 +53,7 @@ fails when the server's `StateView` and that file drift apart.
 | `src/pages/`          | One file per page; `NotBuilt` is the placeholder of a page whose ticket has not landed                                                                                                                         |
 | `src/pages/fleet/`    | The Fleet: cards, table, bulk bar, inspector, hold dialog, and the hooks behind them (`useFleetParams` for the address, `useFleetRows`, `useDeviceCommands`, `useBulkRun`)                                     |
 | `src/pages/topology/` | The Topology: the graph (React Flow: nodes, zones, the neon edge, the dots), the toolbar, the key, the row under it (device, rule evaluation, alerts; a stage; a zone), the dependency-down banners and checks |
+| `src/pages/alerts/`   | The Alerts: the list and its cursor pager, the detail with its "why" and delivery trail, and the hooks behind them (`useAlertsParams` for the address, `useAlertsPage` for the page asked of the simulator)    |
 | `src/ui/charts/`      | Line chart, sparkline and range bar in hand-written SVG                                                                                                                                                        |
 | `src/state/`          | One vanilla Zustand store per window, the event-stream connection, the React context, and `history.ts`, the last two minutes of readings (outside React: nothing renders per message)                          |
 | `src/api/`            | Types of the control API, the fetch client, the fixture                                                                                                                                                        |
@@ -65,6 +71,7 @@ fails when the server's `StateView` and that file drift apart.
 - **Motion is capped** by `AnimationBudget`: 12 animated nodes and 24 glowing lines at a time. The cap is checked in tests, and
   `prefers-reduced-motion` turns the motion off in one block of `tokens.css`. Keyframes live in the component's CSS Module.
 - **The address is the state of a list page** (the Fleet's search, filters, sort, page, size and open device), parsed with a fallback to the default and written without what is default.
+- **A cursor is a value the API handed out, kept in memory and handed back unchanged** (`lib/cursorPaging.ts`): the Alerts never builds, reads or edits one, and keeps it out of the address, so a reload opens the newest alerts.
 - **No page renders per message.** `published` events feed a rate, the history and the pulse bus; a page that needs messages reads the stream itself.
 - **The graph is derived from the store, never the other way round** (`lib/topology.ts` builds it as data; `Stable` keeps the same object for every node that did not change). The address holds the search, the grouping, _Problems only_ and the selection. Graph drawn with [React Flow](https://reactflow.dev) (MIT), credited in the page's key.
 - **Wall screens**: from 1600 px the navigation is an icon rail, and the whole UI scales ×1.25 at 2560 px and ×1.5 at 3200 px.

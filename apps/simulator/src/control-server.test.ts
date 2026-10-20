@@ -729,3 +729,84 @@ describe('ControlServer and the broker', () => {
     assert.equal(broker.listenerCount('change'), 0);
   });
 });
+
+describe('ControlServer GET /api/alerts', () => {
+  const wire = (id: string) => ({
+    id,
+    deviceId: 'dc-env-01',
+    ruleId: 'server-room-hot',
+    metric: 'temperature_c',
+    severity: 'high',
+    title: 'Server room temperature high',
+    status: 'open',
+    openedAt: '2026-10-01T05:00:00.000Z',
+    openedValue: 29.3,
+    clearedAt: null,
+    clearedValue: null,
+    externalRef: null,
+    deliveryStatus: 'pending',
+    deliveryAttempts: 0,
+    deliveryError: null,
+  });
+
+  it('serves a page of ingest’s alerts and its cursor to the browser, in a header', async () => {
+    const { port, ingest } = await startServer();
+    ingest.alerts = [wire('3'), wire('2'), wire('1')];
+    ingest.nextCursor = 'eyJ0IjoiMjAyNiIsImlkIjoiMiJ9';
+
+    const reply = await get(port, '/api/alerts?limit=2&status=open&before=abc');
+
+    assert.equal(reply.status, 200);
+    assert.equal(reply.headers['x-next-cursor'], 'eyJ0IjoiMjAyNiIsImlkIjoiMiJ9');
+    const page = JSON.parse(reply.text) as { id: string; cause: unknown; preexisting: boolean }[];
+    assert.deepEqual(
+      page.map((a) => a.id),
+      ['3', '2'],
+    );
+    assert.deepEqual(
+      page.map((a) => [a.preexisting, a.cause]),
+      [
+        [true, null],
+        [true, null],
+      ],
+    );
+    const sent = ingest.alertQueries.find((query) => query.get('limit') === '2');
+    assert.equal(sent?.get('status'), 'open');
+    assert.equal(sent?.get('before'), 'abc');
+    nothingCrossOrigin(reply);
+  });
+
+  it('sends no cursor header on the last page', async () => {
+    const { port, ingest } = await startServer();
+    ingest.alerts = [wire('1')];
+    ingest.nextCursor = null;
+
+    const reply = await get(port, '/api/alerts?limit=5');
+
+    assert.equal(reply.status, 200);
+    assert.equal(reply.headers['x-next-cursor'], undefined);
+  });
+
+  it('answers 502 in the error envelope when ingest gives no page, and 400 when it refuses one', async () => {
+    const { port, ingest } = await startServer();
+
+    ingest.alertsReply = { status: 400, body: { message: 'bad cursor' } };
+    const refused = await get(port, '/api/alerts?before=zzz');
+    assert.equal(refused.status, 400);
+    assert.equal(refused.json().message, 'bad cursor');
+
+    ingest.alertsReply = undefined;
+    ingest.up = false;
+    const down = await get(port, '/api/alerts');
+    assert.equal(down.status, 502);
+    assert.equal(down.json().statusCode, 502);
+    assert.match(String(down.json().message), /ECONNREFUSED/);
+  });
+
+  it('is read-only: a command to it is 405 and says which method is allowed', async () => {
+    const { port } = await startServer();
+    const reply = await send(port, 'POST', '/api/alerts');
+    assert.equal(reply.status, 405);
+    assert.equal(reply.headers.allow, 'GET');
+  });
+});

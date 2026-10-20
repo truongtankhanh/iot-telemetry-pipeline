@@ -18,7 +18,7 @@ pnpm docker:up                                        # PostgreSQL + Mosquitto
 Start the ingest service ([its README](../ingest/README.md)), then:
 
 ```bash
-pnpm --filter @itp/simulator start -- --scenario server-room-overheat
+pnpm --filter @itp/simulator start --scenario server-room-overheat
 ```
 
 | Option                  | Meaning                                                                                                         |
@@ -66,19 +66,20 @@ address (`403` otherwise). A body is at most 16 KiB (`413`).
 **Routes.** Errors use ingest's envelope (`statusCode`, `error`, `message`). A command answers with
 the state, as `GET /api/state` returns it.
 
-| Method and path                                       | What it does                                                                                                       |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/state`                                      | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, rules, profiles, config               |
-| `GET /api/stream`                                     | The event stream (below); at most 20 clients, then `503`                                                           |
-| `GET /api/observations?before=&limit=`                | The observation store, newest first, `limit` 1 to 500 (default 100); `X-Next-Cursor` holds the next `before`       |
-| `POST /api/devices/:id/start`, `/pause`, `/stop`      | Device state; `404` for an unknown device                                                                          |
-| `PUT /api/devices/:id/interval`                       | `{ "intervalMs": 500 }`, or `null` for the engine's interval                                                       |
-| `PUT /api/devices/:id/holds/:metric`                  | `{ "value": 31.5 }`: publish exactly that until released; `DELETE` on the same path releases it                    |
-| `GET /api/anomalies`, `POST /api/anomalies`           | List; add `{ deviceId, metric, value, duration, shape?, startAt?, startIn? }` (`startIn`: seconds from now; `201`) |
-| `DELETE /api/anomalies/:id`                           | Remove one                                                                                                         |
-| `GET /api/scenarios`, `POST /api/scenarios/:name/run` | The presets of `--scenario`; run one so that its "20 s in" is 20 s from now (all of its anomalies, or none)        |
-| `POST /api/reset`                                     | Clear anomalies and held values, restart the anomaly clock                                                         |
-| `POST /api/step`                                      | One publish interval on the simulated clock; `409` on the wall clock, which is what `start` uses                   |
+| Method and path                                       | What it does                                                                                                                                |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/state`                                      | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, rules, profiles, config                                        |
+| `GET /api/stream`                                     | The event stream (below); at most 20 clients, then `503`                                                                                    |
+| `GET /api/observations?before=&limit=`                | The observation store, newest first, `limit` 1 to 500 (default 100); `X-Next-Cursor` holds the next `before`                                |
+| `GET /api/alerts?status=&limit=&before=`              | A page of ingest's alerts, newest first, with what Studio saw and the scenario that caused each (below); `X-Next-Cursor` as ingest sends it |
+| `POST /api/devices/:id/start`, `/pause`, `/stop`      | Device state; `404` for an unknown device                                                                                                   |
+| `PUT /api/devices/:id/interval`                       | `{ "intervalMs": 500 }`, or `null` for the engine's interval                                                                                |
+| `PUT /api/devices/:id/holds/:metric`                  | `{ "value": 31.5 }`: publish exactly that until released; `DELETE` on the same path releases it                                             |
+| `GET /api/anomalies`, `POST /api/anomalies`           | List; add `{ deviceId, metric, value, duration, shape?, startAt?, startIn? }` (`startIn`: seconds from now; `201`)                          |
+| `DELETE /api/anomalies/:id`                           | Remove one                                                                                                                                  |
+| `GET /api/scenarios`, `POST /api/scenarios/:name/run` | The presets of `--scenario`; run one so that its "20 s in" is 20 s from now (all of its anomalies, or none)                                 |
+| `POST /api/reset`                                     | Clear anomalies and held values, restart the anomaly clock                                                                                  |
+| `POST /api/step`                                      | One publish interval on the simulated clock; `409` on the wall clock, which is what `start` uses                                            |
 
 **The stream.** Every message is `event: <name>` and `data: <json>`. The first one is `snapshot`
 (the state, plus `publishLog`: the last 200 published messages), so a page opened mid-demo is not
@@ -111,6 +112,25 @@ an alert open or clear, its delivery become `delivered` and an incident id appea
 of the truth. Alerts already in ingest when the simulator started are listed as `preexisting`, with
 no observed times. The store keeps the last 5,000 observations of the session in memory (state
 changes, alerts, deliveries, incidents, ingest changes; not published messages).
+
+**Paging alerts.** The browser cannot reach ingest (the Content-Security-Policy allows only this origin and
+no CORS header is sent), so `GET /api/alerts` asks ingest for one page and answers with it: `status` (`open` or
+`cleared`), `limit` (1 to 200) and `before` go to ingest as they are, `before` URL-encoded and otherwise unread.
+It must be a value taken from a previous `X-Next-Cursor`, which is passed back to the caller unchanged and is
+absent on the last page; Studio never builds one. The body is ingest's array, newest first, and each alert also
+has `preexisting` and `observed` (as in the state, empty for an alert Studio never tracked) and `cause`. A
+request ingest refuses (an older replica that does not know `limit` or `before`, a cursor it did not issue) is a
+`400` with its message; ingest not answering in 3 s, answering with another status, or answering with
+something that is not the documented array is a `502`. It does not change the poll or the state.
+
+**The cause of an alert.** `POST /api/scenarios/:name/run` records, in its `scenario-run` observation, the
+anomalies it added (`id`, `deviceId`, `metric`, `startAt`, `duration`), so that they outlive a reset of the
+engine. An alert has `cause: { scenario, startedAt }` when such a run added an anomaly on the alert's device
+and metric and the alert opened from when that anomaly started until 30 s after it ended (the newest run
+wins); otherwise `cause` is `null`. It is a match by device, metric and time, not a proof: a hand-added
+anomaly on the same metric inside a run's window would be taken for the run's. An alert raised by the CLI's
+`--scenario` or by anything else has no cause, and an engine on the simulated clock never claims one (its
+time is not wall time).
 
 ## Benchmark
 
@@ -185,6 +205,7 @@ src/
   event-stream.ts    server-sent-events fan-out that cannot throw into the engine
   ingest-poller.ts   reads ingest's /api/ready, /api/alerts and /metrics about once a second
   alert-observer.ts  turns those reads into the times Studio first saw things happen
+  alert-cause.ts     the scenario Studio started that an alert came from, worked out from the runs (or none)
   observation-store.ts  the last 5,000 observations of the session, and a ring buffer
   prometheus-text.ts parses the /metrics text and keeps the series Studio forwards
   static-files.ts    resolves a request to a file of the built UI: routes, assets, cache and policy headers

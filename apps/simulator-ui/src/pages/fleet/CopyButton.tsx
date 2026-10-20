@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Button } from '../../ui/Button';
 import { uiIcons } from '../../ui/icons';
 
@@ -34,6 +34,8 @@ export interface CopyButtonProps {
   text: string;
   /** What it is, for the button's name and the confirmation ("topic", "last payload"). */
   label: string;
+  /** Visible words on the button ("Copy as JSON"). Without them it is an icon button named "Copy the <label>". */
+  children?: ReactNode;
 }
 
 /**
@@ -41,7 +43,7 @@ export interface CopyButtonProps {
  * and, when nothing worked, it says to select the text and copy it by hand: a copy button that fails silently
  * is worse than none.
  */
-export function CopyButton({ text, label }: CopyButtonProps) {
+export function CopyButton({ text, label, children }: CopyButtonProps) {
   const [message, setMessage] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -62,9 +64,12 @@ export function CopyButton({ text, label }: CopyButtonProps) {
         variant="ghost"
         size="sm"
         icon={uiIcons.copy}
-        aria-label={`Copy the ${label}`}
+        // With words on the button they are its name; a different `aria-label` would contradict them.
+        {...(children ? {} : { 'aria-label': `Copy the ${label}` })}
         onClick={() => void copy()}
-      />
+      >
+        {children}
+      </Button>
       <span className="visually-hidden" role="status">
         {message}
       </span>

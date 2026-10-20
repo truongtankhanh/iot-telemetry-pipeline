@@ -28,14 +28,51 @@ shared by both apps and by the e2e suite. `pnpm docker:down` stops it (the data 
 use`), change `POSTGRES_HOST_PORT` / `MQTT_HOST_PORT` in the root `.env` and use the same ports in
 the apps' `.env`.
 
-Run the service and some traffic:
+## Run it locally
+
+Pick the way that fits what you are changing. Every long-lived command below runs in its own terminal.
+
+**Studio (`apps/simulator-ui`): the demo in containers, and Vite on the host.** This is the shortest way
+to a working Studio, with PostgreSQL, Mosquitto, ingest and a simulator already running:
 
 ```bash
-pnpm --filter @itp/ingest dev                                         # nest start --watch
-pnpm --filter @itp/simulator start -- --scenario server-room-overheat
+pnpm docker:demo                      # terminal 1: builds and starts the whole demo (foreground; Ctrl+C stops it)
+pnpm --filter @itp/simulator-ui dev   # terminal 2: Vite on :5173 with hot reload
 ```
 
-`dev` is a long-lived watch process; stop it when you are done.
+Open <http://localhost:5173>. The demo publishes ingest on `:3100` and the simulator's control API on
+`127.0.0.1:3200` (`STUDIO_HOST_PORT`), and Vite proxies `/api`, the event stream included, to `:3200`
+(`apps/simulator-ui/vite.config.ts`; `STUDIO_API_URL` moves the target). The Studio at `:3200` is the build
+baked into the simulator image: a change to the UI shows at `:5173`, or at `:3200` after
+`pnpm docker:demo` rebuilds the image. The demo's simulator plays `server-room-overheat` once, when it starts
+(`docker-compose.yml`): the alert opens about 25 s in and clears about a minute later. To get another one
+without restarting, run the scenario again:
+
+```bash
+curl -s -X POST localhost:3200/api/scenarios/server-room-overheat/run -H 'Content-Type: application/json'
+```
+
+Alerts are recorded in the database volume, so they survive `docker:demo:down`; Studio lists the ones from an earlier
+run as already there when it started. With `OCC_API_URL` empty (the default) their delivery is `skipped`.
+
+**Ingest or the simulator: processes on the host.** Only PostgreSQL and Mosquitto in containers:
+
+```bash
+pnpm docker:up                                                        # PostgreSQL and Mosquitto
+pnpm --filter @itp/ingest dev                                         # terminal 1: nest start --watch
+pnpm --filter @itp/simulator start --scenario server-room-overheat    # terminal 2
+pnpm --filter @itp/simulator-ui dev                                   # terminal 3, if you also work on Studio
+```
+
+Do not run the two ways at once: the demo's containers hold `:3100` and `:3200`. Stop them first with
+`pnpm docker:demo:down` (it removes the ingest and simulator containers; PostgreSQL and Mosquitto keep running).
+Studio says "Ingest is unreachable" until an ingest answers on `:3100`.
+
+Give the simulator its flags **without** a `--` before them: `pnpm --filter @itp/simulator start --scenario …`. A
+`--` is passed on to Node, whose argument parser then reads every flag after it as a positional argument and
+stops with `Unexpected argument '--scenario'`.
+
+`dev` and `docker:demo` are long-lived; stop them when you are done.
 
 ## Repository layout
 
@@ -377,7 +414,7 @@ center API, its Keycloak and the pipeline's client credentials.
 
    The log should say `Alert sink: ops-command-center`.
 
-4. **Traffic:** `pnpm --filter @itp/simulator start -- --scenario server-room-overheat`.
+4. **Traffic:** `pnpm --filter @itp/simulator start --scenario server-room-overheat`.
 5. **Expect:** about 25 seconds after the simulator starts, an incident "Server room temperature
    high" appears in the console, reported by `service-account-telemetry-pipeline`; about a minute
    later it is resolved without anyone touching it. `GET /api/alerts` shows a `deliveryStatus` of

@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import alertsPageFixture from './fixtures/alerts-page.json';
 import { stateViewFixture as fixture } from './fixtures/stateView';
 import {
   ApiError,
+  getAlerts,
   getState,
   holdValue,
   pauseDevice,
@@ -318,5 +320,99 @@ describe('device commands', () => {
     await startDevice('dc-env-01', { fetch: asFetch(fetchFn), signal: controller.signal });
     const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.signal).toBe(controller.signal);
+  });
+});
+
+describe('getAlerts', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+  const page = alertsPageFixture;
+  const replyPage = (body: unknown, init: ResponseInit = {}) =>
+    vi.fn(async () => new Response(JSON.stringify(body), init));
+  const urlOf = (fn: ReturnType<typeof replyPage>) => (fn.mock.calls[0] as unknown as [string])[0];
+
+  it('asks for the page the request describes, with the cursor encoded and unread', async () => {
+    const fetchFn = replyPage(page);
+    await getAlerts({ status: 'open', limit: 5, before: 'ab+/=' }, { fetch: asFetch(fetchFn) });
+    expect(urlOf(fetchFn)).toBe('/api/alerts?status=open&limit=5&before=ab%2B%2F%3D');
+
+    const plain = replyPage(page);
+    await getAlerts({}, { fetch: asFetch(plain) });
+    expect(urlOf(plain)).toBe('/api/alerts');
+  });
+
+  it('returns the alerts and the cursor exactly as the simulator sent it', async () => {
+    const fetchFn = replyPage(page, { headers: { 'X-Next-Cursor': 'eyJ0IjoiMjAyNiJ9' } });
+    const result = await getAlerts({ limit: 2 }, { fetch: asFetch(fetchFn) });
+    expect(result.alerts.map((alert) => alert.id)).toEqual(['7', '6']);
+    expect(result.next).toBe('eyJ0IjoiMjAyNiJ9');
+  });
+
+  it('has no next cursor on the last page', async () => {
+    const result = await getAlerts({}, { fetch: asFetch(replyPage(page)) });
+    expect(result.next).toBeNull();
+  });
+
+  it('turns a refusal of the simulator into an ApiError with its message', async () => {
+    const refused = replyPage(
+      { statusCode: 502, error: 'Bad Gateway', message: 'ECONNREFUSED' },
+      { status: 502 },
+    );
+    const failure = await getAlerts({}, { fetch: asFetch(refused) }).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(502);
+    expect((failure as ApiError).message).toBe('ECONNREFUSED');
+  });
+
+  it('fails loudly on a body that is not the documented array', async () => {
+    for (const body of [{ alerts: [] }, [{ id: 7 }], [null], 'nope']) {
+      const failure = await getAlerts({}, { fetch: asFetch(replyPage(body)) }).catch(
+        (e: unknown) => e,
+      );
+      expect(failure).toBeInstanceOf(ApiError);
+      expect((failure as ApiError).message).toMatch(/does not understand/);
+    }
+  });
+
+  it('reports a simulator that does not answer with status 0, and passes an abort on', async () => {
+    const down = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const failure = await getAlerts({}, { fetch: asFetch(down) }).catch((e: unknown) => e);
+    expect((failure as ApiError).status).toBe(0);
+
+    const controller = new AbortController();
+    const fetchFn = replyPage(page);
+    await getAlerts({}, { fetch: asFetch(fetchFn), signal: controller.signal });
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.signal).toBe(controller.signal);
+  });
+
+  it('declares the keys of the fixture, which the simulator’s own test also compares', () => {
+    const keys = (value: object) => Object.keys(value).sort();
+    expect(keys(page[0]!)).toEqual(
+      [
+        'cause',
+        'clearedAt',
+        'clearedValue',
+        'deliveryAttempts',
+        'deliveryError',
+        'deliveryStatus',
+        'deviceId',
+        'externalRef',
+        'id',
+        'metric',
+        'observed',
+        'openedAt',
+        'openedValue',
+        'preexisting',
+        'ruleId',
+        'severity',
+        'status',
+        'title',
+      ].sort(),
+    );
+    expect(keys(page[0]!.observed)).toEqual(['clearedAt', 'delivered', 'incident', 'openedAt']);
+    expect(keys(page[0]!.cause!)).toEqual(['scenario', 'startedAt']);
+    expect(page[1]!.cause).toBeNull();
   });
 });

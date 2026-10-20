@@ -110,12 +110,12 @@ describe('navigation', () => {
     renderStudio();
     await userEvent.click(
       within(screen.getByRole('navigation', { name: 'Pages' })).getByRole('link', {
-        name: /Alerts/,
+        name: /Twin/,
       }),
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Alerts' })).toBeInTheDocument();
-    expect(screen.getByText('Coming with SIM-07')).toBeInTheDocument();
-    expect(document.title).toBe('Alerts · Simulator Studio');
+    expect(screen.getByRole('heading', { level: 1, name: 'Twin' })).toBeInTheDocument();
+    expect(screen.getByText('Coming with SIM-18')).toBeInTheDocument();
+    expect(document.title).toBe('Twin · Simulator Studio');
   });
 
   it('moves focus to the page when the route changes, and marks the current page', async () => {
@@ -125,12 +125,9 @@ describe('navigation', () => {
       'aria-current',
       'page',
     );
-    await userEvent.click(within(nav).getByRole('link', { name: /Alerts/ }));
+    await userEvent.click(within(nav).getByRole('link', { name: /Twin/ }));
     expect(document.getElementById('main')).toHaveFocus();
-    expect(within(nav).getByRole('link', { name: /Alerts/ })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    expect(within(nav).getByRole('link', { name: /Twin/ })).toHaveAttribute('aria-current', 'page');
   });
 
   it('shows the sub-pages of the Lab only on the Lab, each a link', () => {
@@ -144,8 +141,8 @@ describe('navigation', () => {
   });
 
   it('treats a path under a page that is not built as that page, one under a built page as the page, and an unknown path as not found', async () => {
-    const first = renderStudio({ path: '/alerts/7' });
-    expect(screen.getByText('Coming with SIM-07')).toBeInTheDocument();
+    const first = renderStudio({ path: '/twin/7' });
+    expect(screen.getByText('Coming with SIM-18')).toBeInTheDocument();
     first.unmount();
     const built = renderStudio({ path: '/fleet/dc-env-01' });
     expect(
@@ -244,7 +241,7 @@ describe('accessibility', () => {
     expect(await axeViolations(overview.container)).toEqual([]);
     overview.unmount();
 
-    const placeholder = renderStudio({ path: '/alerts' });
+    const placeholder = renderStudio({ path: '/twin' });
     expect(await axeViolations(placeholder.container)).toEqual([]);
     placeholder.unmount();
 

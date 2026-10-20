@@ -352,3 +352,28 @@ describe('parseAlerts', () => {
     assert.equal(parseAlerts([null]), undefined);
   });
 });
+
+describe('AlertObserver.get', () => {
+  it('returns one tracked alert with its observed times, or undefined', () => {
+    const observer = baselined();
+    observer.observe([alert({ id: '7' })], T(5));
+
+    const found = observer.get('7');
+    assert.equal(found?.id, '7');
+    assert.equal(found?.preexisting, false);
+    assert.equal(found?.observed.openedAt, T(5));
+    assert.equal(observer.get('99'), undefined);
+  });
+
+  it('returns a copy: changing it does not change what the observer keeps', () => {
+    const observer = baselined();
+    observer.observe([alert({ id: '7' })], T(5));
+
+    const found = observer.get('7');
+    assert.ok(found);
+    found.observed.delivered.opened = 'tampered';
+    found.title = 'tampered';
+    assert.equal(observer.get('7')?.observed.delivered.opened, null);
+    assert.equal(observer.get('7')?.title, 'Server room temperature high');
+  });
+});

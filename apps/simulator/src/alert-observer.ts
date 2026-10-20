@@ -141,6 +141,12 @@ const compareIds = (a: string, b: string) => a.length - b.length || compareText(
 const oldestFirst = (a: IngestAlert, b: IngestAlert) =>
   compareText(a.openedAt, b.openedAt) || compareIds(a.id, b.id);
 
+/** A copy a caller may keep: the nested objects are not shared with the observer's own. */
+const copyOf = (view: ObservedAlert): ObservedAlert => ({
+  ...view,
+  observed: { ...view.observed, delivered: { ...view.observed.delivered } },
+});
+
 const WATCHED = [
   'status',
   'clearedAt',
@@ -190,10 +196,13 @@ export class AlertObserver {
       (a, b) => compareText(b.view.openedAt, a.view.openedAt) || compareIds(b.view.id, a.view.id),
     );
     for (const { view } of sorted.slice(ALERT_CAP)) this.tracked.delete(view.id);
-    return sorted.slice(0, ALERT_CAP).map(({ view }) => ({
-      ...view,
-      observed: { ...view.observed, delivered: { ...view.observed.delivered } },
-    }));
+    return sorted.slice(0, ALERT_CAP).map(({ view }) => copyOf(view));
+  }
+
+  /** One tracked alert as Studio saw it, or `undefined`. Read-only: it forgets nothing, unlike `view()`. */
+  get(id: string): ObservedAlert | undefined {
+    const tracked = this.tracked.get(id);
+    return tracked ? copyOf(tracked.view) : undefined;
   }
 
   private baseline(alert: IngestAlert): Tracked {

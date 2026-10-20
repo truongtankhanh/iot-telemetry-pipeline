@@ -46,6 +46,11 @@ const Topology = lazy(() =>
   import('./pages/topology/Topology').then((module) => ({ default: module.Topology })),
 );
 
+// The Alerts is its own chunk: it brings the list, the trail and the paging, which no other page needs.
+const Alerts = lazy(() =>
+  import('./pages/alerts/Alerts').then((module) => ({ default: module.Alerts })),
+);
+
 const TITLE = 'Simulator Studio';
 
 // One array for the life of the window: the shortcuts and the palette's items are derived from it.
@@ -97,6 +102,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Topology />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/alerts"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Alerts />
           </Suspense>
         }
       />

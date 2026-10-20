@@ -186,7 +186,7 @@ for d in . apps/ingest apps/simulator; do cp -n "$d/.env.example" "$d/.env"; don
 pnpm install && pnpm build
 pnpm docker:up           # PostgreSQL and Mosquitto only
 pnpm --filter @itp/ingest start
-pnpm --filter @itp/simulator start -- --scenario server-room-overheat
+pnpm --filter @itp/simulator start --scenario server-room-overheat
 ```
 
 Each app has its own README with its settings and commands: [ingest](apps/ingest/README.md),

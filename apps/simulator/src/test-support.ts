@@ -62,12 +62,19 @@ export const READY_BODY = {
   alertSink: 'ops-command-center',
 };
 
-/** A fake ingest for the poller: reachable or not, with the alerts and metrics it is told to return. */
+/**
+ * A fake ingest for the poller: reachable or not, with the alerts and metrics it is told to return.
+ * `GET /api/alerts` honours `status` and `limit` like ingest does, answers `X-Next-Cursor` with `nextCursor` when
+ * one is set, and records every query it was sent; `alertsReply` replaces the whole answer (an error, say).
+ */
 export class FakeIngest {
   up = true;
   alerts: unknown[] = [];
   metrics = 'telemetry_sequence_gaps_total 0\n';
   requests = 0;
+  nextCursor: string | null = null;
+  alertsReply: { status: number; body: unknown } | undefined;
+  readonly alertQueries: URLSearchParams[] = [];
 
   readonly fetch: FetchLike = async (url) => {
     this.requests++;
@@ -80,7 +87,24 @@ export class FakeIngest {
     }
     const path = new URL(url).pathname;
     if (path === '/api/ready') return new Response(JSON.stringify(READY_BODY));
-    if (path === '/api/alerts') return new Response(JSON.stringify(this.alerts));
+    if (path === '/api/alerts') return this.alertsResponse(new URL(url).searchParams);
     return new Response(this.metrics);
   };
+
+  private alertsResponse(query: URLSearchParams): Response {
+    this.alertQueries.push(query);
+    if (this.alertsReply) {
+      return new Response(JSON.stringify(this.alertsReply.body), {
+        status: this.alertsReply.status,
+      });
+    }
+    const status = query.get('status');
+    const limit = query.has('limit') ? Number(query.get('limit')) : this.alerts.length;
+    const rows = this.alerts
+      .filter((alert) => status === null || (alert as { status?: string }).status === status)
+      .slice(0, limit);
+    return new Response(JSON.stringify(rows), {
+      ...(this.nextCursor === null ? {} : { headers: { 'X-Next-Cursor': this.nextCursor } }),
+    });
+  }
 }

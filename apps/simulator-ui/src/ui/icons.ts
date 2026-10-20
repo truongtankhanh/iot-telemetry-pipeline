@@ -24,6 +24,7 @@ import {
   Cpu,
   Database,
   Droplets,
+  ExternalLink,
   FlaskConical,
   Focus,
   Gauge,
@@ -59,6 +60,7 @@ import {
 } from 'lucide-react';
 import type { Severity } from '../api/types';
 import type { DeviceGlyph, MetricIconName } from '../lib/deviceIdentity';
+import type { TrailGlyph } from '../lib/alertTrail';
 import type { StageId } from '../lib/pipeline';
 import type { NavIconName } from '../lib/routes';
 
@@ -134,6 +136,7 @@ export const uiIcons = {
   minus: Minus,
   fit: Focus,
   chevronDown: ChevronDown,
+  external: ExternalLink,
 } satisfies Record<string, Glyph>;
 
 /** The glyph of each stage of the pipeline in the topology. */
@@ -145,4 +148,14 @@ export const stageGlyphs: Record<StageId, Glyph> = {
   alert: Bell,
   outbox: Inbox,
   commandCenter: Shield,
+};
+
+/** The mark of each step of an alert's trail (the Alerts page). */
+export const trailGlyphs: Record<TrailGlyph, Glyph> = {
+  reading: Thermometer,
+  rule: Scale,
+  alert: Bell,
+  outbox: Inbox,
+  incident: Shield,
+  clear: CircleCheck,
 };
