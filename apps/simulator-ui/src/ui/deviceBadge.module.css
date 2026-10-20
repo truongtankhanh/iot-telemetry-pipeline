@@ -1,0 +1,107 @@
+/* Device identity: the shape carries the kind, the edge light carries the state. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/*
+ * The light is a drop-shadow on this wrapper, outside the shape: a box-shadow on a clipped hexagon
+ * would be cut off with it. The face inside has the shape, the fill and the inset ring.
+ */
+.glyph {
+  display: inline-flex;
+  flex: none;
+  filter: drop-shadow(0 0 3px rgba(71, 215, 255, 0.35));
+}
+
+.glyph[data-state='healthy'] {
+  filter: drop-shadow(0 0 4px rgba(61, 240, 174, 0.7));
+}
+
+.glyph[data-state='anomaly'] {
+  filter: drop-shadow(0 0 5px rgba(255, 194, 61, 0.85));
+}
+
+.glyph[data-state='down'] {
+  filter: drop-shadow(0 0 5px rgba(255, 98, 128, 0.8));
+}
+
+.glyph[data-state='paused'] {
+  filter: none;
+}
+
+.glyph[data-state='selected'] {
+  filter: drop-shadow(0 0 4px rgba(149, 155, 255, 0.7));
+}
+
+.face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px rgba(71, 215, 255, 0.3);
+}
+
+.badge[data-size='lg'] .face {
+  width: 48px;
+  height: 48px;
+}
+
+.face[data-shape='rounded-square'] {
+  border-radius: 9px;
+}
+
+.face[data-shape='circle'] {
+  border-radius: 50%;
+}
+
+.face[data-shape='rounded'] {
+  border-radius: 14px;
+}
+
+.face[data-shape='hexagon'] {
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+}
+
+.face[data-state='healthy'] {
+  background: rgba(61, 240, 174, 0.14);
+  color: var(--success);
+  box-shadow: inset 0 0 0 1px rgba(61, 240, 174, 0.55);
+}
+
+.face[data-state='anomaly'] {
+  background: rgba(255, 194, 61, 0.16);
+  color: var(--warning);
+  box-shadow: inset 0 0 0 1px rgba(255, 194, 61, 0.6);
+}
+
+.face[data-state='down'] {
+  background: rgba(255, 98, 128, 0.14);
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px rgba(255, 98, 128, 0.6);
+}
+
+.face[data-state='paused'] {
+  background: rgba(145, 165, 180, 0.12);
+  color: var(--text-tertiary);
+  box-shadow: inset 0 0 0 1px rgba(145, 165, 180, 0.3);
+}
+
+.face[data-state='selected'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(149, 155, 255, 0.5);
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}

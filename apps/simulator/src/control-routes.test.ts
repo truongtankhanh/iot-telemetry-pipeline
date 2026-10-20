@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { BrokerLink } from './broker-link.ts';
 import { systemClock } from './clock.ts';
@@ -546,5 +547,40 @@ describe('routing and errors', () => {
       body: undefined,
     });
     assertEnvelope(response, 500, /^Internal error$/);
+  });
+});
+
+describe('the state view and the fixture of the UI', () => {
+  // apps/simulator-ui types the state it reads against this file (a real GET /api/state body); if the
+  // simulator changes the keys of the state view, this fails until the file and the UI's types follow.
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../../simulator-ui/src/api/fixtures/state-view.json', import.meta.url),
+      'utf8',
+    ),
+  ) as Record<string, unknown>;
+  const keys = (value: unknown) => Object.keys(value as object).sort();
+
+  it('has the same keys, section by section', async () => {
+    const { context } = await setup();
+    const actual = buildStateView(context) as unknown as Record<string, unknown>;
+
+    assert.deepEqual(keys(actual), keys(fixture), 'the state view');
+    for (const section of ['engine', 'broker', 'ingest', 'alerts', 'metrics', 'config']) {
+      assert.deepEqual(keys(actual[section]), keys(fixture[section]), section);
+    }
+    const first = (view: Record<string, unknown>, section: string) =>
+      (view[section] as { devices: unknown[] }).devices[0];
+    assert.deepEqual(
+      keys(first(actual, 'engine')),
+      keys(first(fixture, 'engine')),
+      'engine.devices[0]',
+    );
+  });
+
+  it('describes the devices with the fields of the registry (the name is optional here)', async () => {
+    const { context } = await setup();
+    const fromFixture = keys((fixture.devices as unknown[])[0]).filter((key) => key !== 'name');
+    assert.deepEqual(keys(buildStateView(context).devices[0]), fromFixture);
   });
 });
