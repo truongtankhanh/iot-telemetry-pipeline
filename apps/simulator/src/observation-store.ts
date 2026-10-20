@@ -97,6 +97,11 @@ export class ObservationStore {
     return this.lastId;
   }
 
+  /** Every kept event of one kind, oldest first. For the rare kinds (a scenario run); not a way to page the store. */
+  byKind(kind: ObservationKind): ObservationEvent[] {
+    return this.ring.toArray().filter((event) => event.kind === kind);
+  }
+
   /** `before` is exclusive; `limit` is clamped to 1 to 500 and defaults to 100. */
   page(options: { before?: number | undefined; limit?: number | undefined } = {}): ObservationPage {
     const limit = Number.isFinite(options.limit)

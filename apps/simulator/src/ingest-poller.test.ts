@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { ManualClock } from './clock.ts';
-import { type FetchLike, IngestPoller, type IngestState } from './ingest-poller.ts';
+import {
+  type FetchLike,
+  IngestPoller,
+  IngestReadError,
+  type IngestState,
+} from './ingest-poller.ts';
 import type { ObservationDraft } from './observation-store.ts';
 
 const T0 = Date.parse('2026-10-20T08:00:00.000Z');
@@ -51,7 +56,7 @@ const wireAlert = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-function setup(options: { timeoutMs?: number } = {}) {
+function setup(options: { timeoutMs?: number; pageTimeoutMs?: number } = {}) {
   const clock = new ManualClock(T0);
   const handlers: Record<Endpoint, Handler> = {
     ready: respond(READY),
@@ -403,5 +408,141 @@ describe('IngestPoller listeners', () => {
     assert.equal(seen.alerts.length, 1); // the alerts and metrics of the same cycle still went out
     assert.equal(seen.metrics.length, 1);
     assert.ok(logs.some((line) => line.includes('"ingest" listener threw')));
+  });
+});
+
+const withCursor =
+  (body: unknown, cursor: string | null, status = 200): Handler =>
+  () =>
+    Promise.resolve(
+      new Response(JSON.stringify(body), {
+        status,
+        ...(cursor === null ? {} : { headers: { 'X-Next-Cursor': cursor } }),
+      }),
+    );
+
+const readError = (kind: IngestReadError['kind'], message: string | RegExp) => (error: unknown) => {
+  assert.ok(error instanceof IngestReadError, 'an IngestReadError');
+  assert.equal(error.kind, kind);
+  if (typeof message === 'string') assert.equal(error.message, message);
+  else assert.match(error.message, message);
+  return true;
+};
+
+describe('IngestPoller alertsPage', () => {
+  it('sends the query to ingest, with the cursor URL-encoded and otherwise unread', async () => {
+    const { poller, handlers, calls } = setup();
+    handlers.alerts = withCursor([], null);
+
+    await poller.alertsPage({ status: 'open', limit: 5, before: 'ab+/=?&x=1' });
+    await poller.alertsPage();
+
+    assert.deepEqual(calls, [
+      `${BASE}/api/alerts?status=open&limit=5&before=ab%2B%2F%3D%3F%26x%3D1`,
+      `${BASE}/api/alerts`,
+    ]);
+  });
+
+  it('returns the alerts and the cursor exactly as ingest sent it', async () => {
+    const { poller, handlers } = setup();
+    handlers.alerts = withCursor([wireAlert({ id: '9' })], 'eyJ0IjoiMjAyNi0xMC0xNiJ9');
+
+    const page = await poller.alertsPage({ limit: 1 });
+
+    assert.deepEqual(
+      page.alerts.map((a) => a.id),
+      ['9'],
+    );
+    assert.equal(page.next, 'eyJ0IjoiMjAyNi0xMC0xNiJ9');
+  });
+
+  it('has no next cursor on the last page, whether the header is absent or empty', async () => {
+    const { poller, handlers } = setup();
+    handlers.alerts = withCursor([wireAlert()], null);
+    assert.equal((await poller.alertsPage()).next, null);
+    handlers.alerts = withCursor([wireAlert()], '');
+    assert.equal((await poller.alertsPage()).next, null);
+  });
+
+  it('turns ingest’s 400 into a refusal with its message, one string or several', async () => {
+    const { poller, handlers } = setup();
+    handlers.alerts = respond(
+      { statusCode: 400, error: 'Bad Request', message: 'bad cursor' },
+      400,
+    );
+    await assert.rejects(poller.alertsPage({ before: 'x' }), readError('refused', 'bad cursor'));
+
+    handlers.alerts = respond(
+      {
+        statusCode: 400,
+        error: 'Bad Request',
+        message: ['limit must not be greater than 200', 'x'],
+      },
+      400,
+    );
+    await assert.rejects(
+      poller.alertsPage({ limit: 500 }),
+      readError('refused', 'limit must not be greater than 200; x'),
+    );
+
+    handlers.alerts = respond('<html>', 400);
+    await assert.rejects(poller.alertsPage(), readError('refused', 'ingest refused the request'));
+  });
+
+  it('treats any other status as unreachable, with the status', async () => {
+    const { poller, handlers } = setup();
+    handlers.alerts = respond({}, 503);
+    await assert.rejects(poller.alertsPage(), readError('unreachable', 'HTTP 503'));
+  });
+
+  it('says why when ingest does not answer, and when it answers too late', async () => {
+    const { poller, handlers } = setup({ pageTimeoutMs: 10 });
+    handlers.alerts = refused;
+    await assert.rejects(poller.alertsPage(), readError('unreachable', 'ECONNREFUSED'));
+
+    handlers.alerts = hang;
+    await assert.rejects(poller.alertsPage(), readError('unreachable', 'no answer within 10 ms'));
+  });
+
+  it('refuses a reply that is not the documented shape, as a whole', async () => {
+    const { poller, handlers } = setup();
+    for (const body of ['not json', '{"alerts":[]}', JSON.stringify([wireAlert(), { id: 7 }])]) {
+      handlers.alerts = respond(body);
+      await assert.rejects(
+        poller.alertsPage(),
+        readError('unreachable', 'unexpected reply from /api/alerts'),
+      );
+    }
+  });
+
+  it('uses its own timeout, not the poll’s', async () => {
+    // The poll would give up after 5 ms; a person paging 200 rows has longer.
+    const { poller, handlers } = setup({ timeoutMs: 5, pageTimeoutMs: 1000 });
+    handlers.alerts = () =>
+      new Promise<Response>((resolve) =>
+        setTimeout(() => resolve(new Response(JSON.stringify([wireAlert()]))), 30),
+      );
+    assert.equal((await poller.alertsPage()).alerts.length, 1);
+  });
+
+  it('changes no feed and emits nothing: it is not part of the poll', async () => {
+    const { poller, handlers, seen } = setup();
+    handlers.alerts = withCursor([wireAlert()], 'c');
+    await poller.alertsPage();
+    assert.equal(poller.alerts().stale, true);
+    assert.deepEqual(poller.alerts().alerts, []);
+    assert.equal(seen.alerts.length, 0);
+    assert.equal(seen.observation.length, 0);
+  });
+});
+
+describe('IngestPoller observedAlert', () => {
+  it('gives what the observer tracked, and undefined for an alert it never saw', async () => {
+    const { poller, handlers } = setup();
+    handlers.alerts = respond([wireAlert({ id: '4' })]);
+    await poller.pollOnce();
+
+    assert.equal(poller.observedAlert('4')?.preexisting, true);
+    assert.equal(poller.observedAlert('5'), undefined);
   });
 });

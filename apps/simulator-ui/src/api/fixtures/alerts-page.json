@@ -1,0 +1,58 @@
+[
+  {
+    "id": "7",
+    "deviceId": "dc-env-01",
+    "ruleId": "server-room-hot",
+    "metric": "temperature_c",
+    "severity": "high",
+    "title": "Server room temperature high",
+    "status": "cleared",
+    "openedAt": "2026-10-20T08:00:26.000Z",
+    "openedValue": 29.3,
+    "clearedAt": "2026-10-20T08:01:30.000Z",
+    "clearedValue": 25.1,
+    "externalRef": "c3a1f0d2-5b7e-4c1a-9e0f-2d6a8b4c7e11",
+    "deliveryStatus": "delivered",
+    "deliveryAttempts": 1,
+    "deliveryError": null,
+    "preexisting": false,
+    "observed": {
+      "openedAt": "2026-10-20T08:00:27.100Z",
+      "clearedAt": "2026-10-20T08:01:31.200Z",
+      "delivered": {
+        "opened": "2026-10-20T08:00:28.300Z",
+        "cleared": "2026-10-20T08:01:32.100Z"
+      },
+      "incident": "2026-10-20T08:00:28.300Z"
+    },
+    "cause": {
+      "scenario": "server-room-overheat",
+      "startedAt": "2026-10-20T07:59:55.000Z"
+    }
+  },
+  {
+    "id": "6",
+    "deviceId": "lib-air-01",
+    "ruleId": "poor-air-quality",
+    "metric": "co2_ppm",
+    "severity": "medium",
+    "title": "Poor air quality (CO₂)",
+    "status": "open",
+    "openedAt": "2026-10-19T17:06:41.000Z",
+    "openedValue": 1450,
+    "clearedAt": null,
+    "clearedValue": null,
+    "externalRef": null,
+    "deliveryStatus": "skipped",
+    "deliveryAttempts": 0,
+    "deliveryError": null,
+    "preexisting": true,
+    "observed": {
+      "openedAt": null,
+      "clearedAt": null,
+      "delivered": { "opened": null, "cleared": null },
+      "incident": null
+    },
+    "cause": null
+  }
+]

@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
+import { AlertObserver, type IngestAlert } from './alert-observer.ts';
 import { BrokerLink } from './broker-link.ts';
 import { systemClock } from './clock.ts';
 import {
   buildStateView,
   createRoutes,
+  type PagedAlert,
   type RouteResponse,
   type RoutesContext,
   type StateView,
 } from './control-routes.ts';
+import { type AlertsPage, type AlertsPageQuery, IngestReadError } from './ingest-poller.ts';
 import { type ObservationDraft, ObservationStore } from './observation-store.ts';
 import { type RulesView, rulesUnavailable } from './rules-source.ts';
 import { DEVICES, setupEngine } from './test-support.ts';
@@ -50,6 +53,8 @@ const INGEST = {
   }),
   alerts: () => ({ alerts: [], lastOkAt: '2026-10-01T05:00:01.000Z', stale: false }),
   metrics: () => ({ samples: [], lastOkAt: '2026-10-01T05:00:01.000Z', stale: false }),
+  alertsPage: (): Promise<AlertsPage> => Promise.resolve({ alerts: [], next: null }),
+  observedAlert: () => undefined,
 };
 
 /** The routes over an engine on a manual clock, started, with the engine's pieces to look at. */
@@ -443,7 +448,19 @@ describe('scenario commands', () => {
       ],
     );
     assert.deepEqual(recorded, [
-      { kind: 'scenario-run', data: { name: 'both', anomalyIds: ['a1', 'a2'], offsetS: 10 } },
+      {
+        kind: 'scenario-run',
+        data: {
+          name: 'both',
+          anomalyIds: ['a1', 'a2'],
+          offsetS: 10,
+          // What the engine holds after the run, kept because a reset empties the engine.
+          anomalies: [
+            { id: 'a1', deviceId: 'dc-env-01', metric: 'temperature_c', startAt: 30, duration: 60 },
+            { id: 'a2', deviceId: 'lib-air-01', metric: 'co2_ppm', startAt: 20, duration: 30 },
+          ],
+        },
+      },
     ]);
   });
 
@@ -658,5 +675,279 @@ describe('the state view and the fixture of the UI', () => {
     const { context } = await setup();
     const fromFixture = keys((fixture.devices as unknown[])[0]).filter((key) => key !== 'name');
     assert.deepEqual(keys(buildStateView(context).devices[0]), fromFixture);
+  });
+});
+
+const RUN_AT = '2026-10-20T08:00:00.000Z';
+const at = (secondsAfterRun: number) =>
+  new Date(Date.parse(RUN_AT) + secondsAfterRun * 1000).toISOString();
+
+const wireAlert = (overrides: Partial<IngestAlert> = {}): IngestAlert => ({
+  id: '7',
+  deviceId: 'dc-env-01',
+  ruleId: 'server-room-hot',
+  metric: 'temperature_c',
+  severity: 'high',
+  title: 'Server room temperature high',
+  status: 'open',
+  openedAt: at(44),
+  openedValue: 29.3,
+  clearedAt: null,
+  clearedValue: null,
+  externalRef: null,
+  deliveryStatus: 'pending',
+  deliveryAttempts: 0,
+  deliveryError: null,
+  ...overrides,
+});
+
+/** The routes with a fake ingest that serves the page it is told to, or throws the error it is told to. */
+async function setupAlerts(options: { wallClock?: boolean } = {}) {
+  const base = await setup({ wallClock: options.wallClock ?? false });
+  const queries: AlertsPageQuery[] = [];
+  const answer: { page: AlertsPage | Error } = { page: { alerts: [], next: null } };
+  const observer = new AlertObserver();
+  const handle = createRoutes({
+    ...base.context,
+    ingest: {
+      ...INGEST,
+      alertsPage: (query) => {
+        queries.push(query);
+        return answer.page instanceof Error
+          ? Promise.reject(answer.page)
+          : Promise.resolve(answer.page);
+      },
+      observedAlert: (id) => observer.get(id),
+    },
+  });
+  const call = (method: string, path: string): Promise<RouteResponse> => {
+    const url = new URL(path, 'http://localhost');
+    return handle({ method, path: url.pathname, query: url.searchParams, body: undefined });
+  };
+  /** A scenario run as the route records it: the run endpoint's `startAt` already has the offset added. */
+  const recordRun = (
+    name = 'overheat',
+    anomalies = [
+      { id: 'a1', deviceId: 'dc-env-01', metric: 'temperature_c', startAt: 20, duration: 60 },
+    ],
+  ) =>
+    base.store.append(
+      {
+        kind: 'scenario-run',
+        data: { name, anomalyIds: anomalies.map((a) => a.id), offsetS: 0, anomalies },
+      },
+      RUN_AT,
+    );
+  return { ...base, call, queries, answer, observer, recordRun };
+}
+
+const paged = (response: RouteResponse) => response.body as PagedAlert[];
+
+describe('GET /api/alerts', () => {
+  it('asks ingest for what the query says and answers its page with its cursor unchanged', async () => {
+    const { call, queries, answer } = await setupAlerts();
+    answer.page = { alerts: [wireAlert({ id: '9' })], next: 'eyJ0IjoiMjAyNiJ9' };
+
+    const response = await call('GET', '/api/alerts?status=open&limit=5&before=abc%2B%2Fdef');
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(queries, [{ status: 'open', limit: 5, before: 'abc+/def' }]);
+    assert.deepEqual(response.headers, { 'X-Next-Cursor': 'eyJ0IjoiMjAyNiJ9' });
+    assert.deepEqual(
+      paged(response).map((a) => a.id),
+      ['9'],
+    );
+  });
+
+  it('sends no query part that the caller left out, and no header on the last page', async () => {
+    const { call, queries, answer } = await setupAlerts();
+    answer.page = { alerts: [wireAlert()], next: null };
+
+    const response = await call('GET', '/api/alerts');
+
+    assert.deepEqual(queries, [{}]);
+    assert.equal(response.headers, undefined);
+  });
+
+  it('refuses a query ingest would refuse, before asking ingest', async () => {
+    const { call, queries } = await setupAlerts();
+    assertEnvelope(await call('GET', '/api/alerts?status=closed'), 400, /"status"/);
+    assertEnvelope(await call('GET', '/api/alerts?limit=0'), 400, /"limit"/);
+    assertEnvelope(await call('GET', '/api/alerts?limit=201'), 400, /"limit"/);
+    assertEnvelope(await call('GET', '/api/alerts?limit=ten'), 400, /"limit"/);
+    assertEnvelope(await call('GET', '/api/alerts?before='), 400, /"before"/);
+    assertEnvelope(await call('GET', `/api/alerts?before=${'x'.repeat(201)}`), 400, /"before"/);
+    assert.deepEqual(queries, []);
+  });
+
+  it('accepts the edges: limit 1 and 200, a cursor of 200 characters; and ignores unknown parameters', async () => {
+    const { call, queries } = await setupAlerts();
+    assert.equal((await call('GET', '/api/alerts?limit=1')).status, 200);
+    assert.equal((await call('GET', '/api/alerts?limit=200')).status, 200);
+    assert.equal((await call('GET', `/api/alerts?before=${'x'.repeat(200)}`)).status, 200);
+    assert.equal((await call('GET', '/api/alerts?severity=high&page=2')).status, 200);
+    assert.deepEqual(queries.at(-1), {});
+  });
+
+  it('answers 400 with ingest’s message when ingest refuses, and 502 when it gives no page', async () => {
+    const { call, answer } = await setupAlerts();
+    answer.page = new IngestReadError('refused', 'bad cursor');
+    assertEnvelope(await call('GET', '/api/alerts?before=zzz'), 400, /^bad cursor$/);
+
+    answer.page = new IngestReadError('unreachable', 'ECONNREFUSED');
+    const response = await call('GET', '/api/alerts');
+    assertEnvelope(response, 502, /^ECONNREFUSED$/);
+    assert.equal((response.body as { error: string }).error, 'Bad Gateway');
+  });
+
+  it('turns an error that is not ingest’s into a 500 without its message', async () => {
+    const { call, answer } = await setupAlerts();
+    answer.page = new TypeError('secret detail');
+    assertEnvelope(await call('GET', '/api/alerts'), 500, /^Internal error$/);
+  });
+
+  it('adds what Studio saw to an alert it tracked, and nothing invented to one it did not', async () => {
+    const { call, answer, observer } = await setupAlerts();
+    observer.observe([], at(10));
+    observer.observe([wireAlert({ id: '7' })], at(46));
+    answer.page = { alerts: [wireAlert({ id: '7' }), wireAlert({ id: '3' })], next: null };
+
+    const [tracked, untracked] = paged(await call('GET', '/api/alerts'));
+
+    assert.equal(tracked?.preexisting, false);
+    assert.equal(tracked?.observed.openedAt, at(46));
+    assert.equal(untracked?.preexisting, true);
+    assert.deepEqual(untracked?.observed, {
+      openedAt: null,
+      clearedAt: null,
+      delivered: { opened: null, cleared: null },
+      incident: null,
+    });
+  });
+
+  it('takes the alert’s own fields from the page, which is fresher than what Studio kept', async () => {
+    const { call, answer, observer } = await setupAlerts();
+    observer.observe([], at(10));
+    observer.observe([wireAlert({ status: 'open' })], at(46));
+    answer.page = {
+      alerts: [wireAlert({ status: 'cleared', clearedAt: at(90), clearedValue: 25.1 })],
+      next: null,
+    };
+
+    const [alert] = paged(await call('GET', '/api/alerts'));
+
+    assert.equal(alert?.status, 'cleared');
+    assert.equal(alert?.clearedValue, 25.1);
+  });
+
+  it('does not hand out the observer’s own objects', async () => {
+    const { call, answer, observer } = await setupAlerts();
+    observer.observe([], at(10));
+    observer.observe([wireAlert()], at(46));
+    answer.page = { alerts: [wireAlert()], next: null };
+
+    const [first] = paged(await call('GET', '/api/alerts'));
+    assert.ok(first);
+    first.observed.delivered.opened = 'tampered';
+
+    assert.equal(observer.get('7')?.observed.delivered.opened, null);
+  });
+});
+
+describe('GET /api/alerts: the cause', () => {
+  it('names the scenario Studio started when its anomaly played on the alert’s device and metric', async () => {
+    const { call, answer, recordRun } = await setupAlerts({ wallClock: true });
+    recordRun();
+    answer.page = { alerts: [wireAlert({ openedAt: at(44) })], next: null };
+
+    const [alert] = paged(await call('GET', '/api/alerts'));
+
+    assert.deepEqual(alert?.cause, { scenario: 'overheat', startedAt: RUN_AT });
+  });
+
+  it('claims no cause for an alert raised by anything else', async () => {
+    const { call, answer, recordRun } = await setupAlerts({ wallClock: true });
+    // No run at all: the CLI’s --scenario and a hand-added anomaly leave none.
+    answer.page = { alerts: [wireAlert()], next: null };
+    assert.equal(paged(await call('GET', '/api/alerts'))[0]?.cause, null);
+
+    // A run, but on another device, on another metric, or long before the alert.
+    recordRun();
+    answer.page = {
+      alerts: [
+        wireAlert({ id: '1', deviceId: 'dc-env-02' }),
+        wireAlert({ id: '2', metric: 'humidity_pct' }),
+        wireAlert({ id: '3', openedAt: at(600) }),
+      ],
+      next: null,
+    };
+    assert.deepEqual(
+      paged(await call('GET', '/api/alerts')).map((a) => a.cause),
+      [null, null, null],
+    );
+  });
+
+  it('still names the scenario after a reset: the run holds its anomalies, not the engine', async () => {
+    const { call, answer, recordRun } = await setupAlerts({ wallClock: true });
+    recordRun();
+    await call('POST', '/api/reset');
+    answer.page = { alerts: [wireAlert()], next: null };
+
+    assert.equal(paged(await call('GET', '/api/alerts'))[0]?.cause?.scenario, 'overheat');
+  });
+
+  it('never names one on a simulated engine, whose clock is not wall time', async () => {
+    const { call, answer, recordRun } = await setupAlerts();
+    recordRun();
+    answer.page = { alerts: [wireAlert()], next: null };
+
+    assert.equal(paged(await call('GET', '/api/alerts'))[0]?.cause, null);
+  });
+
+  it('ignores a run recorded before runs carried their anomalies', async () => {
+    const { call, answer, store } = await setupAlerts({ wallClock: true });
+    store.append(
+      { kind: 'scenario-run', data: { name: 'old', anomalyIds: ['a1'], offsetS: 0 } },
+      RUN_AT,
+    );
+    answer.page = { alerts: [wireAlert()], next: null };
+
+    assert.equal(paged(await call('GET', '/api/alerts'))[0]?.cause, null);
+  });
+});
+
+describe('GET /api/alerts and the fixture of the UI', () => {
+  // apps/simulator-ui types the alerts it reads against this file (a real body of this route); if the route
+  // changes the keys of an alert, this fails until the file and the UI's types follow.
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../../simulator-ui/src/api/fixtures/alerts-page.json', import.meta.url),
+      'utf8',
+    ),
+  ) as Record<string, unknown>[];
+  const keys = (value: unknown) => Object.keys(value as object).sort();
+
+  it('has the same keys as the fixture, whether the alert was tracked or not', async () => {
+    const { call, answer, observer, recordRun } = await setupAlerts({ wallClock: true });
+    recordRun();
+    observer.observe([], at(10));
+    observer.observe([wireAlert({ id: '7' })], at(46));
+    answer.page = { alerts: [wireAlert({ id: '7' }), wireAlert({ id: '6' })], next: null };
+
+    const actual = paged(await call('GET', '/api/alerts')) as unknown as Record<string, unknown>[];
+
+    assert.equal(actual.length, fixture.length);
+    for (const [i, alert] of actual.entries()) {
+      assert.deepEqual(keys(alert), keys(fixture[i]), `alert ${i}`);
+      assert.deepEqual(keys(alert.observed), keys(fixture[i]?.observed), `alert ${i}: observed`);
+      assert.deepEqual(
+        keys((alert.observed as { delivered: unknown }).delivered),
+        keys((fixture[i]?.observed as { delivered: unknown }).delivered),
+        `alert ${i}: observed.delivered`,
+      );
+    }
+    // The fixture shows a cause in one alert and none in the other; the keys of a cause are the route's.
+    assert.deepEqual(keys(actual[0]?.cause), keys(fixture[0]?.cause));
+    assert.equal(fixture[1]?.cause, null);
   });
 });

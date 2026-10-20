@@ -147,3 +147,30 @@ describe('ObservationStore.page', () => {
     assert.equal(last.next, undefined);
   });
 });
+
+describe('ObservationStore.byKind', () => {
+  it('returns the events of one kind, oldest first, and none of the others', () => {
+    const store = new ObservationStore();
+    store.append({ kind: 'engine-state', data: { n: 1 } }, AT);
+    store.append({ kind: 'scenario-run', data: { name: 'a' } }, AT);
+    store.append({ kind: 'alert-opened', data: {} }, AT);
+    store.append({ kind: 'scenario-run', data: { name: 'b' } }, AT);
+
+    assert.deepEqual(
+      store.byKind('scenario-run').map((e) => [e.id, e.data.name]),
+      [
+        [2, 'a'],
+        [4, 'b'],
+      ],
+    );
+    assert.deepEqual(store.byKind('incident'), []);
+  });
+
+  it('forgets an event with the ring, like page() does', () => {
+    const store = new ObservationStore(2);
+    store.append({ kind: 'scenario-run', data: { name: 'old' } }, AT);
+    store.append({ kind: 'engine-state', data: {} }, AT);
+    store.append({ kind: 'engine-state', data: {} }, AT);
+    assert.deepEqual(store.byKind('scenario-run'), []);
+  });
+});

@@ -54,6 +54,36 @@ export type PollerEvents = {
   observation: [draft: ObservationDraft, at: string];
 };
 
+/** The query of `GET /api/alerts` that Studio may send on (docs/api.md). Every part is optional. */
+export interface AlertsPageQuery {
+  status?: 'open' | 'cleared';
+  limit?: number;
+  /** A value ingest returned in `X-Next-Cursor`. Opaque: passed on unread, URL-encoded. */
+  before?: string;
+}
+
+/** One page of ingest's alerts, newest first, and where the next one starts. */
+export interface AlertsPage {
+  alerts: IngestAlert[];
+  /** Ingest's `X-Next-Cursor`, unchanged; `null` on the last page. */
+  next: string | null;
+}
+
+/**
+ * Ingest could not give a page. `refused` is ingest's own `400` (an older replica that does not know
+ * `limit` or `before`, a cursor it did not issue): the request is at fault. `unreachable` is everything
+ * else: no answer, a timeout, another status, a reply that is not the documented shape.
+ */
+export class IngestReadError extends Error {
+  readonly kind: 'refused' | 'unreachable';
+
+  constructor(kind: 'refused' | 'unreachable', message: string) {
+    super(message);
+    this.name = 'IngestReadError';
+    this.kind = kind;
+  }
+}
+
 export interface IngestPollerOptions {
   /** Base URL of ingest, without a trailing slash. */
   baseUrl: string;
@@ -64,6 +94,8 @@ export interface IngestPollerOptions {
   intervalMs?: number;
   /** Per request. Shorter than `intervalMs`, so a cycle never outlasts its slot. */
   timeoutMs?: number;
+  /** For one page read for a person (`alertsPage`): up to 200 rows, so longer than a poll's. */
+  pageTimeoutMs?: number;
   alertsLimit?: number;
   observer?: AlertObserver;
   /** One line per change of the state of ingest. Defaults to `console.log`. */
@@ -110,6 +142,22 @@ function parseReady(text: string): ReadyBody | undefined {
   return { status, database, broker, alertSink };
 }
 
+/** The reason in the body of an error of ingest's API (`{ statusCode, error, message }`), short and plain. */
+function ingestMessage(text: string): string {
+  const fallback = 'ingest refused the request';
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+  const message = (body as { message?: unknown } | null)?.message;
+  const joined = Array.isArray(message)
+    ? message.filter((m) => typeof m === 'string').join('; ')
+    : message;
+  return typeof joined === 'string' && joined !== '' ? joined.slice(0, 200) : fallback;
+}
+
 /**
  * Reads ingest the way Studio needs to: `GET /api/ready`, `GET /api/alerts` and `/metrics`, about
  * once a second, each with a short timeout. Ingest is not modified and never asked for more than
@@ -129,6 +177,7 @@ export class IngestPoller extends EventEmitter<PollerEvents> {
   private readonly fetchFn: FetchLike;
   private readonly intervalMs: number;
   private readonly timeoutMs: number;
+  private readonly pageTimeoutMs: number;
   private readonly alertsLimit: number;
   private readonly observer: AlertObserver;
   private readonly log: (line: string) => void;
@@ -155,6 +204,7 @@ export class IngestPoller extends EventEmitter<PollerEvents> {
     this.fetchFn = options.fetch ?? ((url, init) => fetch(url, init));
     this.intervalMs = options.intervalMs ?? 1000;
     this.timeoutMs = options.timeoutMs ?? 800;
+    this.pageTimeoutMs = options.pageTimeoutMs ?? 3000;
     this.alertsLimit = options.alertsLimit ?? 100;
     this.observer = options.observer ?? new AlertObserver();
     this.log = options.log ?? ((line) => console.log(line));
@@ -170,6 +220,48 @@ export class IngestPoller extends EventEmitter<PollerEvents> {
 
   metrics(): MetricsFeed {
     return { ...this.metricsFeed };
+  }
+
+  /** One alert as Studio saw it open, clear and deliver, or `undefined` when it never tracked it. */
+  observedAlert(id: string): ObservedAlert | undefined {
+    return this.observer.get(id);
+  }
+
+  /**
+   * One page of ingest's alerts for a person who is paging: the query goes to ingest as it is and the
+   * cursor comes back as ingest sent it, so Studio never builds one. Independent of the poll cycle: it
+   * reads and parses, and changes no feed and emits no event. Throws `IngestReadError`.
+   */
+  async alertsPage(query: AlertsPageQuery = {}): Promise<AlertsPage> {
+    const params = new URLSearchParams();
+    if (query.status !== undefined) params.set('status', query.status);
+    if (query.limit !== undefined) params.set('limit', String(query.limit));
+    if (query.before !== undefined) params.set('before', query.before);
+    const search = params.toString();
+
+    let reply: { status: number; body: string; headers: Headers };
+    try {
+      reply = await this.get(
+        `/api/alerts${search === '' ? '' : `?${search}`}`,
+        this.abort.signal,
+        this.pageTimeoutMs,
+      );
+    } catch (error) {
+      throw new IngestReadError('unreachable', describeFailure(error, this.pageTimeoutMs));
+    }
+    if (reply.status === 400) throw new IngestReadError('refused', ingestMessage(reply.body));
+    if (reply.status !== 200) throw new IngestReadError('unreachable', `HTTP ${reply.status}`);
+
+    let json: unknown;
+    try {
+      json = JSON.parse(reply.body);
+    } catch {
+      throw new IngestReadError('unreachable', 'unexpected reply from /api/alerts');
+    }
+    const alerts = parseAlerts(json);
+    if (!alerts) throw new IngestReadError('unreachable', 'unexpected reply from /api/alerts');
+    const next = reply.headers.get('X-Next-Cursor');
+    return { alerts, next: next === null || next === '' ? null : next };
   }
 
   /** Runs the first cycle at once and keeps polling. Resolves when that cycle has ended. */
@@ -216,13 +308,17 @@ export class IngestPoller extends EventEmitter<PollerEvents> {
     this.cancelTimer = this.clock.setTimer(wait, () => this.loop());
   }
 
-  private async get(path: string, signal: AbortSignal): Promise<{ status: number; body: string }> {
-    const timeout = AbortSignal.timeout(this.timeoutMs);
+  private async get(
+    path: string,
+    signal: AbortSignal,
+    timeoutMs: number = this.timeoutMs,
+  ): Promise<{ status: number; body: string; headers: Headers }> {
+    const timeout = AbortSignal.timeout(timeoutMs);
     const res = await this.fetchFn(`${this.baseUrl}${path}`, {
       signal: AbortSignal.any([signal, timeout]),
     });
     // The timeout covers reading the body too, so a reply that stalls half way still ends.
-    return { status: res.status, body: await res.text() };
+    return { status: res.status, body: await res.text(), headers: res.headers };
   }
 
   private async read<T>(
