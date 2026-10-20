@@ -128,3 +128,36 @@ later tickets build on it and nobody has to infer it from the code:
 - **One intended change to the command line.** An `--interval` that is not a positive number now stops with a `RangeError`;
   before, `--interval abc` made the loop publish every millisecond. Everything else about the flags, output and exit
   behaviour is as before.
+
+## Amendment, 2026-10-20: control server as built (SIM-03)
+
+The control plane of decision 2 is in `apps/simulator` ([control-server.ts](../../apps/simulator/src/control-server.ts) and the files
+the [README](../../apps/simulator/README.md#control-server) lists); the README has the routes and the events. What was decided on
+the way, so that SIM-04 onward does not have to infer it:
+
+- **On by default, off with `--no-control`.** `pnpm --filter @itp/simulator start` runs the server; the Compose `demo` command needs
+  no change to serve Studio later. `bench.ts` never starts it. The settings are `CONTROL_HOST` (`127.0.0.1`), `CONTROL_PORT` (`3200`),
+  `INGEST_URL`, `OCC_CONSOLE_URL` and `CONTROL_ALLOW_NON_LOOPBACK`; a flag overrides the first three.
+- **Loopback is enforced, and checked before anything is sent.** Only `localhost`, `127.0.0.0/8` and `::1` are accepted without
+  `CONTROL_ALLOW_NON_LOOPBACK=true`; otherwise the process says so and exits 1 before it contacts the broker. The port is bound before
+  the first publish, so an unusable port ends the process with nothing sent. The Compose `demo` profile will need a non-loopback bind
+  _inside_ the container (SIM-04), with the host side of the published port limited to `127.0.0.1`.
+- **No authentication, but no cross-site reach.** No CORS header is ever sent; commands must be `Content-Type: application/json`; the
+  `Host` header must name this machine (against DNS rebinding). This is on the new surface only; the broker and ingest are as they were.
+- **Ingest state is decided by `/api/ready` alone.** A `503` from it is an answer (which dependency is down); anything else that is not a
+  usable reply is `unreachable` on the first failed poll. A failing `/api/alerts` or `/metrics` keeps the last data, marked stale.
+  Polling is once a second with an 800 ms timeout, and a cycle never starts before the last one ended.
+- **Observed times are honest about what they are.** The first read of `/api/alerts` is a baseline: alerts already in ingest are listed
+  as `preexisting` with no observed times and no events. Delivery is tracked per alert and per phase (opened, cleared), because
+  `deliveryStatus` describes only the latest outbox event. Times come from the poller's wall clock, never the engine's, which may be
+  simulated. The store keeps 5,000 observations in memory and not the published messages.
+- **The publish log is SIM-03's, republish is SIM-13's.** The server keeps the last 200 published messages and sends them in the first
+  message of the stream; there is no resume, a reconnecting client gets a new snapshot.
+- **Nothing a listener does can stop a publish.** The engine emits `published` from the promise of a publish that succeeded, so an
+  exception in a listener would turn it into a failed tick. Every listener the server adds is wrapped, and tests cover a client that
+  disappears and a store that throws.
+- **Step is not reachable in a real process yet.** The engine's simulated-clock mode is chosen when it is built and `main.ts` builds the
+  wall-clock engine, so `POST /api/step` answers `409` there. The ticket that first needs Step in a running process adds a startup flag.
+- **Ingest metric names are copied, not shared.** The contract package does not export them; the list is `FORWARDED_METRICS` in
+  [prometheus-text.ts](../../apps/simulator/src/prometheus-text.ts), noted beside the metric table in
+  [operations.md](../operations.md#metrics). Nothing checks it against ingest.

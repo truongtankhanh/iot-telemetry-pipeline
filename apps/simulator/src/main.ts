@@ -1,7 +1,11 @@
 import { connectAsync } from 'mqtt';
 import { parseArgs } from 'node:util';
+import { systemClock } from './clock.ts';
+import { ControlConfigError, isLoopbackHost, resolveControlConfig } from './control-config.ts';
+import { ControlServer } from './control-server.ts';
 import { JsonFileDeviceSource } from './device-source.ts';
 import { Engine } from './engine.ts';
+import { IngestPoller } from './ingest-poller.ts';
 import { SCENARIOS } from './scenarios.ts';
 import { parseAnomaly } from './signals.ts';
 
@@ -14,6 +18,14 @@ const HELP = `Usage: node src/main.ts [options]
                         e.g. dc-env-01:temperature_c:29.5:20:60
   --scenario <name>     preset anomalies: server-room-overheat | crowded-lecture
   --duration <s>        stop after this many seconds (default: run until Ctrl+C)
+
+Control server (HTTP commands and an event stream; no authentication):
+  --control-host <addr> listen address (default CONTROL_HOST, else 127.0.0.1; another
+                        address needs CONTROL_ALLOW_NON_LOOPBACK=true)
+  --control-port <port> listen port (default CONTROL_PORT, else 3200)
+  --ingest-url <url>    ingest to read alerts, readiness and metrics from
+                        (default INGEST_URL, else http://localhost:3100)
+  --no-control          run without the control server, as a plain publisher
 `;
 
 const { values } = parseArgs({
@@ -27,6 +39,10 @@ const { values } = parseArgs({
     anomaly: { type: 'string', multiple: true, default: [] },
     scenario: { type: 'string' },
     duration: { type: 'string' },
+    'control-host': { type: 'string' },
+    'control-port': { type: 'string' },
+    'ingest-url': { type: 'string' },
+    'no-control': { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
 });
@@ -43,6 +59,25 @@ const anomalies = [
 ].map(parseAnomaly);
 if (values.scenario && !SCENARIOS[values.scenario])
   throw new Error(`Unknown scenario ${values.scenario}`);
+
+// A refused or unusable control address stops the process here, before it connects or publishes.
+function resolveControl() {
+  try {
+    return resolveControlConfig({
+      env: process.env,
+      flags: {
+        controlHost: values['control-host'],
+        controlPort: values['control-port'],
+        ingestUrl: values['ingest-url'],
+      },
+    });
+  } catch (error) {
+    if (!(error instanceof ControlConfigError)) throw error;
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+const control = values['no-control'] ? undefined : resolveControl();
 
 const client = await connectAsync(values.broker, {
   protocolVersion: 5,
@@ -63,10 +98,37 @@ for (const a of anomalies) {
   );
 }
 
+// The port is bound before the first publish, so an unusable port ends the process with nothing sent.
+let controlServer: ControlServer | undefined;
+if (control) {
+  controlServer = new ControlServer({
+    engine,
+    devices,
+    scenarios: SCENARIOS,
+    poller: new IngestPoller({ baseUrl: control.ingestUrl, clock: systemClock }),
+    config: control,
+  });
+  try {
+    const { address, port } = await controlServer.listen();
+    const host = address.includes(':') ? `[${address}]` : address;
+    console.log(`Control server on http://${host}:${port}, reading ingest at ${control.ingestUrl}`);
+    if (!isLoopbackHost(control.host)) {
+      console.log(
+        `  warning: the control API has no authentication and listens on ${control.host}`,
+      );
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    await client.endAsync();
+    process.exit(1);
+  }
+}
+
 const report = setInterval(() => console.log(`published ${engine.published} messages`), 10_000);
 
 async function stop(): Promise<void> {
   engine.stop();
+  await controlServer?.close();
   clearInterval(report);
   await client.endAsync();
   console.log(`stopped after ${engine.published} messages`);

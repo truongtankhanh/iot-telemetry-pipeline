@@ -5,7 +5,7 @@ Part of the [implementation order](../implementation-order.md). Nothing here has
 ## SIM-02: Extract the engine
 
 - **Depends on:** SIM-00
-- **Status:** In review 2026-10-20 (branch `feat/sim-02-extract-engine`)
+- **Status:** Done 2026-10-20 (PR #49, `1edc97f`)
 - **Area:** `apps/simulator`
 
 ### Scope
@@ -87,7 +87,7 @@ The CLI must behave exactly as before: compare its output with `main` by running
 ## SIM-03: Control server
 
 - **Depends on:** SIM-02
-- **Status:** Not started
+- **Status:** In review 2026-10-20 (branch `feat/sim-03-control-server`)
 - **Area:** `apps/simulator`, docs
 
 ### Scope
@@ -155,10 +155,21 @@ pnpm format:check && pnpm docs:links
 ```bash
 pnpm docker:up                                    # PostgreSQL + Mosquitto
 pnpm --filter @itp/ingest dev                     # terminal 1, long-lived (Ctrl+C when done)
-pnpm --filter @itp/simulator start                # terminal 2; the listen address, port and flags are fixed by this ticket
+pnpm --filter @itp/simulator start                # terminal 2; control server on 127.0.0.1:3200 (--control-host, --control-port, --ingest-url, --no-control)
 curl -s localhost:3100/api/ready                  # what the control server polls
 curl -s "localhost:3100/api/alerts?limit=5"
+curl -s localhost:3200/api/state | head -c 600    # the control server's own view: engine, devices, ingest, alerts
+curl -N localhost:3200/api/stream                 # terminal 3, long-lived (Ctrl+C when done): snapshot, then state, published, ingest, metrics
+curl -s -X POST -H 'Content-Type: application/json' -d '{}' localhost:3200/api/scenarios/server-room-overheat/run   # an alert opens in about 25 s
 # then, with ingest stopped (Ctrl+C in terminal 1), the stream must report it unreachable within the polling interval
+# (an `ingest` event with "status":"unreachable", about two seconds at most) and `published` events must go on
+```
+
+The refusal and the headless mode (stop the simulator first; each must exit or run as described):
+
+```bash
+CONTROL_HOST=0.0.0.0 pnpm --filter @itp/simulator start        # must refuse, name CONTROL_ALLOW_NON_LOOPBACK, exit 1, before the broker
+pnpm --filter @itp/simulator start -- --no-control --scenario server-room-overheat --duration 30   # output as before SIM-03
 ```
 
 **Commit message** (draft; Sếp commits it)
