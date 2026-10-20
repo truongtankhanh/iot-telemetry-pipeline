@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/state-view.json';
+import { stateViewFixture as fixture } from './fixtures/stateView';
 import { ApiError, getState } from './client';
-import type { StateView } from './types';
 
 // A real `GET /api/state` body (see types.ts for how both sides are kept in step).
-const view = fixture as StateView;
+const view = fixture;
 const keys = (value: object) => Object.keys(value).sort();
 
 const reply = (body: unknown, init: ResponseInit = {}) =>
@@ -20,6 +19,20 @@ describe('the state fixture', () => {
     expect(view.config.simulated).toBe(true);
     expect(view.scenarios).toEqual(['server-room-overheat', 'crowded-lecture']);
   });
+
+  it('carries the four rules of ingest and a profile for every metric of every device', () => {
+    expect(view.rules.available).toBe(true);
+    expect(view.rules.reason).toBeNull();
+    expect(view.rules.items.map((rule) => rule.id)).toEqual([
+      'server-room-hot',
+      'server-room-humid',
+      'indoor-co2',
+      'power-over-contract',
+    ]);
+    for (const device of view.devices) {
+      expect(keys(view.profiles[device.id]!)).toEqual([...device.metrics].sort());
+    }
+  });
 });
 
 describe('the types and the fixture', () => {
@@ -33,6 +46,8 @@ describe('the types and the fixture', () => {
       'ingest',
       'metrics',
       'observationCursor',
+      'profiles',
+      'rules',
       'scenarios',
     ]);
     expect(keys(view.engine)).toEqual([
@@ -88,6 +103,26 @@ describe('the types and the fixture', () => {
     ]);
     expect(keys(view.metrics)).toEqual(['lastOkAt', 'samples', 'stale']);
     expect(keys(view.metrics.samples[0]!)).toEqual(['labels', 'name', 'value']);
+    expect(keys(view.rules)).toEqual(['available', 'items', 'reason']);
+    expect(keys(view.rules.items[0]!)).toEqual([
+      'clear',
+      'direction',
+      'for',
+      'id',
+      'kind',
+      'metric',
+      'raise',
+      'severity',
+      'title',
+    ]);
+    expect(keys(view.profiles)).toEqual(
+      keys(Object.fromEntries(view.devices.map((d) => [d.id, 0]))),
+    );
+    expect(keys(view.profiles['dc-env-01']!.temperature_c!)).toEqual([
+      'baseline',
+      'dailySwing',
+      'noise',
+    ]);
   });
 });
 

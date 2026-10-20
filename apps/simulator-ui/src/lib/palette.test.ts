@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
-import type { StateView } from '../api/types';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
+
 import { GROUP_LIMIT, matchPalette, normalize, parseQuery, score, visibleItems } from './palette';
 import { buildPaletteItems, type PaletteGroup, type PaletteItem } from './paletteItems';
 import { appRoutes } from './routes';
 
 const items = buildPaletteItems({
-  view: fixture as StateView,
+  view: fixture,
   routes: appRoutes({ foundations: true }),
 });
 const labels = (matches: ReturnType<typeof matchPalette>, group: PaletteGroup) =>

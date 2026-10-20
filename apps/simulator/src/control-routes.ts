@@ -4,7 +4,15 @@ import type { BrokerState } from './broker-link.ts';
 import type { AlertsFeed, IngestState, MetricsFeed } from './ingest-poller.ts';
 import type { Engine, EngineSnapshot } from './engine.ts';
 import { type ObservationDraft, type ObservationStore, PAGE_MAX } from './observation-store.ts';
-import { type Anomaly, type AnomalyShape, type DeviceSpec, parseAnomaly } from './signals.ts';
+import type { RulesView } from './rules-source.ts';
+import {
+  type Anomaly,
+  type AnomalyShape,
+  type DeviceSpec,
+  type MetricProfile,
+  parseAnomaly,
+  profilesOf,
+} from './signals.ts';
 
 /** A request, after the HTTP layer has checked the headers and parsed the body. */
 export interface RouteRequest {
@@ -52,6 +60,8 @@ export interface RoutesContext {
   config: { ingestUrl: string; consoleUrl: string | null };
   /** The simulator's own connection to the MQTT broker. */
   broker: { state(): BrokerState };
+  /** The threshold rules read at boot (or why there are none); they do not change while the process runs. */
+  rules: RulesView;
   /** Stores an observation made by a command (a scenario run) and tells the stream about it. */
   record(draft: ObservationDraft): void;
 }
@@ -66,9 +76,25 @@ export interface StateView {
   broker: BrokerState;
   alerts: AlertsFeed;
   metrics: MetricsFeed;
+  /** The rules ingest applies, as the charts and range bars of Studio draw them. */
+  rules: RulesView;
+  /** Baseline, noise and daily swing of every metric of every device, by device id (read-only). */
+  profiles: Record<string, Partial<Record<MetricName, MetricProfile>>>;
   config: { ingestUrl: string; consoleUrl: string | null; intervalMs: number; simulated: boolean };
   /** Id of the newest observation, where a timeline starts paging back from. */
   observationCursor: number;
+}
+
+/** The profiles depend only on the registry, which does not change while the process runs. */
+const profileCache = new WeakMap<DeviceSpec[], StateView['profiles']>();
+
+function profilesFor(devices: DeviceSpec[]): StateView['profiles'] {
+  let profiles = profileCache.get(devices);
+  if (!profiles) {
+    profiles = profilesOf(devices);
+    profileCache.set(devices, profiles);
+  }
+  return profiles;
 }
 
 export function buildStateView(context: RoutesContext): StateView {
@@ -81,6 +107,8 @@ export function buildStateView(context: RoutesContext): StateView {
     broker: context.broker.state(),
     alerts: context.ingest.alerts(),
     metrics: context.ingest.metrics(),
+    rules: context.rules,
+    profiles: profilesFor(context.devices),
     config: {
       ingestUrl: context.config.ingestUrl,
       consoleUrl: context.config.consoleUrl,

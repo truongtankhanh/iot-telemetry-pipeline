@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { StateView } from '../api/types';
 import { dependencyNotes } from './dependencyNotes';
 
-const base = fixture as StateView;
+const base = fixture;
 const notes = (
   change: (view: StateView) => void = () => {},
   lastAlertSink: string | null = 'ops-command-center',

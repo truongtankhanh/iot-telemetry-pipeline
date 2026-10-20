@@ -21,19 +21,20 @@ Start the ingest service ([its README](../ingest/README.md)), then:
 pnpm --filter @itp/simulator start -- --scenario server-room-overheat
 ```
 
-| Option                  | Meaning                                                                                                  |
-| ----------------------- | -------------------------------------------------------------------------------------------------------- |
-| `--broker <url>`        | MQTT broker (default `MQTT_URL`, else `mqtt://localhost:1883`)                                           |
-| `--registry <path>`     | `devices.json` to simulate (default the ingest service's)                                                |
-| `--interval <ms>`       | Publish interval per device (default 2000); above 0                                                      |
-| `--anomaly <spec>`      | `device:metric:value:startAt:duration`, repeatable, e.g. `dc-env-01:temperature_c:29.5:20:60`            |
-| `--scenario <name>`     | Preset anomalies: `server-room-overheat`, `crowded-lecture`                                              |
-| `--duration <s>`        | Stop after this many seconds (default: until Ctrl+C)                                                     |
-| `--control-host <addr>` | Control server address (default `CONTROL_HOST`, else `127.0.0.1`); see [Control server](#control-server) |
-| `--control-port <port>` | Control server port (default `CONTROL_PORT`, else `3200`)                                                |
-| `--ingest-url <url>`    | Ingest the control server reads (default `INGEST_URL`, else `http://localhost:3100`)                     |
-| `--studio-dir <path>`   | Directory with the built Studio UI to serve at `/` (default `STUDIO_DIR`, else `apps/simulator-ui/dist`) |
-| `--no-control`          | Run without the control server, as a plain publisher                                                     |
+| Option                  | Meaning                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `--broker <url>`        | MQTT broker (default `MQTT_URL`, else `mqtt://localhost:1883`)                                                  |
+| `--registry <path>`     | `devices.json` to simulate (default the ingest service's)                                                       |
+| `--interval <ms>`       | Publish interval per device (default 2000); above 0                                                             |
+| `--anomaly <spec>`      | `device:metric:value:startAt:duration`, repeatable, e.g. `dc-env-01:temperature_c:29.5:20:60`                   |
+| `--scenario <name>`     | Preset anomalies: `server-room-overheat`, `crowded-lecture`                                                     |
+| `--duration <s>`        | Stop after this many seconds (default: until Ctrl+C)                                                            |
+| `--control-host <addr>` | Control server address (default `CONTROL_HOST`, else `127.0.0.1`); see [Control server](#control-server)        |
+| `--control-port <port>` | Control server port (default `CONTROL_PORT`, else `3200`)                                                       |
+| `--ingest-url <url>`    | Ingest the control server reads (default `INGEST_URL`, else `http://localhost:3100`)                            |
+| `--studio-dir <path>`   | Directory with the built Studio UI to serve at `/` (default `STUDIO_DIR`, else `apps/simulator-ui/dist`)        |
+| `--rules <path>`        | `rules.json` that Studio draws the raise and clear lines from (default `RULES_FILE`, else the ingest service's) |
+| `--no-control`          | Run without the control server, as a plain publisher                                                            |
 
 `server-room-overheat` opens the "Server room temperature high" alert about 25 s in and clears it
 about a minute later.
@@ -67,7 +68,7 @@ the state, as `GET /api/state` returns it.
 
 | Method and path                                       | What it does                                                                                                       |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/state`                                      | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, config                                |
+| `GET /api/state`                                      | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, rules, profiles, config               |
 | `GET /api/stream`                                     | The event stream (below); at most 20 clients, then `503`                                                           |
 | `GET /api/observations?before=&limit=`                | The observation store, newest first, `limit` 1 to 500 (default 100); `X-Next-Cursor` holds the next `before`       |
 | `POST /api/devices/:id/start`, `/pause`, `/stop`      | Device state; `404` for an unknown device                                                                          |
@@ -139,11 +140,20 @@ the file.
 | `OCC_CONSOLE_URL`            | empty (no incident link)                                | `start`          |
 | `CONTROL_ALLOW_NON_LOOPBACK` | unset; only the exact value `true` allows               | `start`          |
 | `STUDIO_DIR`                 | `apps/simulator-ui/dist`                                | `start`          |
+| `RULES_FILE`                 | `apps/ingest/config/rules.json`                         | `start`          |
 
 `OCC_CONSOLE_URL` is the base URL of the command center console; the control server carries it to
 the UI, which builds the incident link from it (the plain id is shown without it). An empty value
 in the file counts as not set. `STUDIO_DIR` is the directory of the built UI; a relative path is taken from where
 the simulator was started, and a directory that is not built is not an error (see above).
+
+`RULES_FILE` (or `--rules`) is the ingest's `rules.json`. The simulator reads it once at start, checks it with
+the same rules as ingest ([rules-source.ts](src/rules-source.ts)) and reports it in the `rules` part of
+`GET /api/state`: `{ available, reason, items }`, where `items` carries each rule's metric, direction, `raise`,
+`clear`, `for`, severity and title. A file that is missing or invalid does not stop the simulator: `available` is
+`false`, `reason` says why, and Studio hides what depends on the rules. The `profiles` part of the state gives,
+for each device and metric, the baseline, the noise (±) and the daily swing the generator uses
+([signals.ts](src/signals.ts)); they are read-only. The demo image copies `rules.json` next to `devices.json`.
 
 If you moved a Compose port in the root `.env`, use the same port here.
 

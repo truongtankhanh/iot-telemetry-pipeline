@@ -191,3 +191,18 @@ decided on the way, so that SIM-05 onward does not have to infer it:
   amendment announced; the demo posture (no authentication) is unchanged.
 - **Palette actions are listed, not run.** Pause, resume and the scenario runs appear in search with "Available from the Overview
   (SIM-09)" and do nothing until that ticket gives them a place to confirm.
+
+## Amendment, 2026-10-20: rules and profiles for Studio (SIM-05a)
+
+Fleet draws each rule's raise and clear lines and a range bar per metric, and shows the baseline, noise and daily swing of each
+metric. The control API gave neither, so `GET /api/state` has two more parts. What was decided:
+
+- **`rules`** is `{ available, reason, items }`. The simulator reads `rules.json` once at start ([rules-source.ts](../../apps/simulator/src/rules-source.ts);
+  `--rules`, `RULES_FILE`, else the ingest's file) and validates it with the checks of ingest's `parseRules`, copied because that module is NestJS. A missing or
+  invalid file does not stop the simulator; it is said once at start and in the state, and Studio hides what depends on it (the consequence above that said so).
+  A test reads the repository's own `rules.json` through this code, which catches a change of the data that Studio could not read, not a change of the logic.
+- **`profiles`** is the generator's own constants by device and metric ([signals.ts](../../apps/simulator/src/signals.ts)), read-only. Editing a profile would be an
+  engine feature and is not part of this ticket.
+- **The demo image copies `rules.json`** into `/app/registry/` next to `devices.json` and passes `--rules`, instead of the read-only mount that the consequence above
+  describes. Both files come from the same commit as the ingest image built beside it, so they cannot drift; `--rules` and `RULES_FILE` still allow a mount. There is
+  no simulator in the Kubernetes manifests.

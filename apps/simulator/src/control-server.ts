@@ -15,6 +15,7 @@ import type { Engine, PublishedMessage, StateChange } from './engine.ts';
 import { EventStream, type EventStreamOptions } from './event-stream.ts';
 import type { IngestPoller } from './ingest-poller.ts';
 import { type ObservationDraft, ObservationStore, RingBuffer } from './observation-store.ts';
+import { type RulesView, rulesUnavailable } from './rules-source.ts';
 import type { DeviceSpec } from './signals.ts';
 import { resolveStatic, studioIsBuilt } from './static-files.ts';
 
@@ -38,6 +39,8 @@ export interface ControlServerOptions {
    * (or with a directory that is not built) the API works and every other path is a `404`.
    */
   studioDir?: string;
+  /** The threshold rules (or why there are none). Without them the state says they are not available. */
+  rules?: RulesView;
   store?: ObservationStore;
   /** Wall clock for the time of an observation. Not the engine's clock, which may be simulated. */
   now?: () => number;
@@ -111,6 +114,7 @@ export class ControlServer {
       ingest: options.poller,
       config: { ingestUrl: options.config.ingestUrl, consoleUrl: options.config.consoleUrl },
       broker: options.broker,
+      rules: options.rules ?? rulesUnavailable('no rules file was given'),
       // A command that has done its work must not fail because the timeline could not note it.
       record: this.safely('record', (draft: ObservationDraft) => this.observe(draft)),
     };

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { Snapshot, StateView } from '../api/types';
 import { createStudioStore } from './store';
 
-const view = fixture as StateView;
+const view = fixture;
 const snapshot: Snapshot = {
   ...view,
   publishLog: [

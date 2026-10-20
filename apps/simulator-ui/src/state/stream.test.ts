@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { Snapshot, StateView } from '../api/types';
 import { createStudioStore } from './store';
 import { connectStream, type EventSourceLike } from './stream';
 
-const view = fixture as StateView;
+const view = fixture;
 const T0 = Date.parse('2026-10-20T09:14:30.000Z');
 
 class FakeSource implements EventSourceLike {

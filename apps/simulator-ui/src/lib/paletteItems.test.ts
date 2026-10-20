@@ -1,11 +1,11 @@
 import { telemetryTopic } from '@itp/telemetry-contract';
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { StateView } from '../api/types';
 import { buildPaletteItems, type PaletteGroup } from './paletteItems';
 import { appRoutes } from './routes';
 
-const base = fixture as StateView;
+const base = fixture;
 const routes = appRoutes({ foundations: true });
 const build = (change: (view: StateView) => void = () => {}) => {
   const view = structuredClone(base);

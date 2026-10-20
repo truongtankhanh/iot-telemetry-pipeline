@@ -2,8 +2,8 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
-import type { StateView } from '../api/types';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
+
 import { appRoutes } from '../lib/routes';
 import { createStudioStore } from '../state/store';
 import { StudioProvider } from '../state/StudioProvider';
@@ -19,7 +19,7 @@ function Where() {
 
 function renderPalette() {
   const store = createStudioStore();
-  store.getState().setView(structuredClone(fixture as StateView), 0);
+  store.getState().setView(structuredClone(fixture), 0);
   const result = render(
     <StudioProvider store={store}>
       <MemoryRouter>

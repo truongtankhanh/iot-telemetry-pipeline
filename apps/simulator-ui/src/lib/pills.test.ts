@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { StateView } from '../api/types';
 import { derivePills, type Pill, type PillInput, portOf } from './pills';
 
-const base = fixture as StateView;
+const base = fixture;
 
 function pills(change: (view: StateView) => void = () => {}, input: Partial<PillInput> = {}) {
   const view = structuredClone(base);

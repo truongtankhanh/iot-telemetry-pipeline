@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fixture from './api/fixtures/state-view.json';
+import { stateViewFixture as fixture } from './api/fixtures/stateView';
 import type { StateView } from './api/types';
 import { StudioFrame } from './App';
 import { appRoutes } from './lib/routes';
@@ -10,7 +10,7 @@ import { createStudioStore, type StudioStore } from './state/store';
 import { StudioProvider } from './state/StudioProvider';
 import { axeViolations } from './test-axe';
 
-const base = fixture as StateView;
+const base = fixture;
 const NOW = Date.parse('2026-10-20T09:15:00.000Z');
 
 const viewWith = (change: (view: StateView) => void = () => {}) => {

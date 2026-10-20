@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '../api/fixtures/state-view.json';
-import type { DeviceInfo, StateView } from '../api/types';
+import { stateViewFixture as fixture } from '../api/fixtures/stateView';
+import type { DeviceInfo } from '../api/types';
 import { deviceCode, kindIdentity, metricIcon, metricUnit } from './deviceIdentity';
 
-const devices = (fixture as StateView).devices;
+const devices = fixture.devices;
 
 describe('kindIdentity', () => {
   it('gives each kind of the registry its own shape and glyph', () => {

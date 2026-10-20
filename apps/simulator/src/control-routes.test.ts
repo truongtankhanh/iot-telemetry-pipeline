@@ -11,12 +11,31 @@ import {
   type StateView,
 } from './control-routes.ts';
 import { type ObservationDraft, ObservationStore } from './observation-store.ts';
+import { type RulesView, rulesUnavailable } from './rules-source.ts';
 import { DEVICES, setupEngine } from './test-support.ts';
 
 const SCENARIOS = {
   overheat: ['dc-env-01:temperature_c:29.2:20:60'],
   both: ['dc-env-01:temperature_c:29:20:60', 'lib-air-01:co2_ppm:1450:10:30'],
   broken: ['dc-env-01:temperature_c:29:20:60', 'ghost-01:temperature_c:1:0:5'],
+};
+
+const RULES: RulesView = {
+  available: true,
+  reason: null,
+  items: [
+    {
+      id: 'server-room-hot',
+      kind: 'server_room',
+      metric: 'temperature_c',
+      direction: 'above',
+      raise: 27,
+      clear: 25.5,
+      for: 3,
+      severity: 'high',
+      title: 'Server room temperature high',
+    },
+  ],
 };
 
 const INGEST = {
@@ -34,8 +53,8 @@ const INGEST = {
 };
 
 /** The routes over an engine on a manual clock, started, with the engine's pieces to look at. */
-async function setup(options: { started?: boolean; wallClock?: boolean } = {}) {
-  const { started = true, wallClock = false } = options;
+async function setup(options: { started?: boolean; wallClock?: boolean; rules?: RulesView } = {}) {
+  const { started = true, wallClock = false, rules = RULES } = options;
   const { engine, publisher } = setupEngine(wallClock ? { clock: systemClock } : {});
   if (started && !wallClock) await engine.start();
   const store = new ObservationStore();
@@ -49,6 +68,7 @@ async function setup(options: { started?: boolean; wallClock?: boolean } = {}) {
     ingest: INGEST,
     config: { ingestUrl: 'http://localhost:3100', consoleUrl: null },
     broker,
+    rules,
     record: (draft) => recorded.push(draft),
   };
   const handle = createRoutes(context);
@@ -113,6 +133,46 @@ describe('GET /api/state', () => {
   it('is what buildStateView builds, which the stream sends as its first message', async () => {
     const { call, context } = await setup();
     assert.deepEqual((await call('GET', '/api/state')).body, buildStateView(context));
+  });
+});
+
+describe('GET /api/state: rules and profiles', () => {
+  it('carries the rules that were read, as they are', async () => {
+    const { call } = await setup();
+    assert.deepEqual(view(await call('GET', '/api/state')).rules, RULES);
+  });
+
+  it('says why when there are no rules, and lists none', async () => {
+    const { call } = await setup({ rules: rulesUnavailable('cannot read /x/rules.json (ENOENT)') });
+    assert.deepEqual(view(await call('GET', '/api/state')).rules, {
+      available: false,
+      reason: 'cannot read /x/rules.json (ENOENT)',
+      items: [],
+    });
+  });
+
+  it('carries the profile of every metric of every device, read-only', async () => {
+    const { call } = await setup();
+    const { profiles } = view(await call('GET', '/api/state'));
+    assert.deepEqual(Object.keys(profiles), ['dc-env-01', 'dc-env-02', 'lib-air-01']);
+    assert.deepEqual(profiles['dc-env-01']?.temperature_c, {
+      baseline: 22.5,
+      noise: 0.3,
+      dailySwing: 0,
+    });
+    assert.deepEqual(Object.keys(profiles['lib-air-01'] ?? {}), [
+      'co2_ppm',
+      'temperature_c',
+      'humidity_pct',
+    ]);
+    assert.equal(profiles['lib-air-01']?.co2_ppm?.dailySwing, 350);
+  });
+
+  it('keeps the same profiles when the engine state changes', async () => {
+    const { call } = await setup();
+    const before = view(await call('GET', '/api/state')).profiles;
+    const after = view(await call('POST', '/api/devices/dc-env-01/pause')).profiles;
+    assert.deepEqual(after, before);
   });
 });
 
@@ -566,7 +626,7 @@ describe('the state view and the fixture of the UI', () => {
     const actual = buildStateView(context) as unknown as Record<string, unknown>;
 
     assert.deepEqual(keys(actual), keys(fixture), 'the state view');
-    for (const section of ['engine', 'broker', 'ingest', 'alerts', 'metrics', 'config']) {
+    for (const section of ['engine', 'broker', 'ingest', 'alerts', 'metrics', 'rules', 'config']) {
       assert.deepEqual(keys(actual[section]), keys(fixture[section]), section);
     }
     const first = (view: Record<string, unknown>, section: string) =>
@@ -576,6 +636,22 @@ describe('the state view and the fixture of the UI', () => {
       keys(first(fixture, 'engine')),
       'engine.devices[0]',
     );
+    const rule = (view: Record<string, unknown>) => (view.rules as { items: unknown[] }).items[0];
+    assert.deepEqual(keys(rule(actual)), keys(rule(fixture)), 'rules.items[0]');
+  });
+
+  it('has the same keys in a metric profile as the fixture, and an entry for every device of the fixture', async () => {
+    const { context } = await setup();
+    const actual = buildStateView(context).profiles;
+    const profiles = fixture.profiles as StateView['profiles'];
+    const firstProfile = (all: StateView['profiles']) => {
+      const [byMetric] = Object.values(all);
+      const [profile] = Object.values(byMetric ?? {});
+      return profile;
+    };
+    assert.deepEqual(keys(firstProfile(actual)), keys(firstProfile(profiles)), 'profiles');
+    const fixtureDevices = (fixture.devices as { id: string }[]).map((d) => d.id).sort();
+    assert.deepEqual(Object.keys(profiles).sort(), fixtureDevices, 'profiles by device');
   });
 
   it('describes the devices with the fields of the registry (the name is optional here)', async () => {
