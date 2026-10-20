@@ -57,8 +57,9 @@ pnpm docker:up                                                                  
 | ---------------- | ---------------------------------------------------------- |
 | SIM-00           | Done 2026-10-19                                            |
 | SIM-01           | Done 2026-10-20 (PR #46, `bcb036e`)                        |
-| SIM-02           | In review 2026-10-20 (branch `feat/sim-02-extract-engine`) |
-| SIM-03 to SIM-22 | Not started (SIM-03 is next; SIM-16 is not used)           |
+| SIM-02           | Done 2026-10-20 (PR #49, `1edc97f`)                        |
+| SIM-03           | In review 2026-10-20 (branch `feat/sim-03-control-server`) |
+| SIM-04 to SIM-22 | Not started (SIM-04 is next; SIM-16 is not used)           |
 
 Each task in the phase files carries its own **Status** line; update it, and this table, in the pull request that
 finishes the ticket.
@@ -134,7 +135,8 @@ start.**
 | SIM-14 | Guided demo and presenter mode | 08     | SIM-08, SIM-09 | simulator-ui        |
 | SIM-15 | Analytics and the benchmark    | 09     | SIM-03         | simulator, ui, docs |
 
-- **SIM-13** keeps the last 200 published messages in memory and offers "republish"; a republish keeps its `seq`.
+- **SIM-13** adds "republish" to the 200-entry publish log that the control server (SIM-03) already keeps in memory and sends as
+  part of the first message of the stream; a republish keeps its `seq`.
 - **SIM-14**: scripted steps with an awaited event, narration, keyboard control. The first script is
   "overheat to incident".
 - **SIM-15**: session charts of rate, lag and rejections, and the benchmark run from the UI after a confirmation. It
