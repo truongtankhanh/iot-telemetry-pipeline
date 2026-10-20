@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Digital twin building</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:1100px){.row2{grid-template-columns:1fr}}
+.h0{fill:var(--heat-0)}.h1{fill:var(--heat-1)}.h2{fill:var(--heat-2)}.h3{fill:var(--heat-3)}.h4{fill:var(--heat-4)}.h5{fill:var(--heat-5)}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--border-subtle);font-size:14px;color:var(--text-secondary)}
+.kv:first-child{border-top:0}
+.kv b{color:var(--text-primary);font-weight:500;text-align:right}
+.fk{display:flex;flex-wrap:wrap;gap:6px}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect><rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-chevron-r" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M12 5v14"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"></path></symbol>
+<symbol id="i-focus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path></symbol>
+<symbol id="i-rotl" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></symbol>
+<symbol id="i-rotr" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></symbol>
+<filter id="neon" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+<filter id="neon-soft" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+<symbol id="i-rack" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M8 6h.01"></path><path d="M8 12h.01"></path><path d="M8 18h.01"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item is-active" type="button" aria-label="Digital twin" title="Digital twin" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h">
+<div>
+<div class="row faint" style="font-size:14px;gap:4px">Digital twin<svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron-r"></use></svg>Campus<svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron-r"></use></svg><span style="color:var(--text-primary)">Data Center</span></div>
+<h2 class="page-t">Data Center <span class="chip is-warn" style="vertical-align:middle;margin-left:6px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Anomaly</span></h2>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:12px">
+<span class="faint" style="font-size:14px"><span class="kbd">Esc</span> returns to Campus</span>
+<div class="seg" role="group" aria-label="Camera"><button type="button">Campus</button><button class="is-on" type="button">Data Center</button><button type="button">Top</button></div>
+</div>
+</div>
+
+<div class="row2">
+<section class="tw-stage" aria-label="Data Center interior">
+<svg class="scene" viewBox="0 50 591 400" role="img" aria-label="The Data Center with see-through walls. Row A, where dc-env-01 stands, is the hottest part of the floor; Row B, with dc-env-02, is cooler.">
+<!-- logical pipeline hub above the building -->
+<ellipse class="tw-hub" cx="295" cy="62" rx="46" ry="15"></ellipse>
+<g class="tel is-warn"><path class="te-halo" d="M219,237 Q215,120 270,72"></path><path class="te-core" d="M219,237 Q215,120 270,72"></path><path class="te-flow" d="M219,237 Q215,120 270,72"></path></g>
+<g class="tel"><path class="te-halo" d="M372,224 Q370,120 322,72"></path><path class="te-core" d="M372,224 Q370,120 322,72"></path><path class="te-flow" d="M372,224 Q370,120 322,72"></path></g>
+<circle class="fd warn" r="3.5"><animateMotion dur="1.6s" repeatCount="indefinite" path="M219,237 Q215,120 270,72"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="1.6s" begin="0.5s" repeatCount="indefinite" path="M372,224 Q370,120 322,72"></animateMotion></circle>
+
+<!-- far walls, floor, heat -->
+<polygon points="251,70 531,210 531,330 251,190" fill="rgba(42,70,88,0.30)" stroke="#46627a" stroke-width="1"></polygon>
+<polygon points="60,165 251,70 251,190 60,285" fill="rgba(42,70,88,0.24)" stroke="#46627a" stroke-width="1"></polygon>
+<polygon points="60,285 340,425 531,330 251,190" fill="#0f2230" stroke="#46627a" stroke-width="1"></polygon>
+<polygon class="h3" points="219,206 254,223 286,207 251,190"></polygon><polygon class="h3" points="187,222 222,239 254,223 219,206"></polygon><polygon class="h2" points="254,223 289,241 321,225 286,207"></polygon><polygon class="h3" points="155,237 190,255 222,239 187,222"></polygon><polygon class="h3" points="222,239 257,257 289,241 254,223"></polygon><polygon class="h2" points="289,241 324,258 356,242 321,225"></polygon>
+<polygon class="h4" points="124,253 159,271 190,255 155,237"></polygon><polygon class="h3" points="190,255 225,272 257,257 222,239"></polygon><polygon class="h2" points="257,257 292,274 324,258 289,241"></polygon><polygon class="h1" points="324,258 359,276 391,260 356,242"></polygon>
+<polygon class="h4" points="92,269 127,287 159,271 124,253"></polygon><polygon class="h4" points="159,271 194,288 225,272 190,255"></polygon><polygon class="h3" points="225,272 260,290 292,274 257,257"></polygon><polygon class="h2" points="292,274 327,292 359,276 324,258"></polygon><polygon class="h1" points="359,276 394,293 426,277 391,260"></polygon>
+<polygon class="h4" points="60,285 95,303 127,287 92,269"></polygon><polygon class="h4" points="127,287 162,304 194,288 159,271"></polygon><polygon class="h4" points="194,288 229,306 260,290 225,272"></polygon><polygon class="h2" points="260,290 295,307 327,292 292,274"></polygon><polygon class="h1" points="327,292 362,309 394,293 359,276"></polygon><polygon class="h1" points="394,293 429,311 461,295 426,277"></polygon>
+<polygon class="h4" points="95,303 130,320 162,304 127,287"></polygon><polygon class="h4" points="162,304 197,322 229,306 194,288"></polygon><polygon class="h4" points="229,306 264,323 295,307 260,290"></polygon><polygon class="h1" points="295,307 330,325 362,309 327,292"></polygon><polygon class="h1" points="362,309 397,327 429,311 394,293"></polygon><polygon class="h1" points="429,311 464,328 496,312 461,295"></polygon>
+<polygon class="h4" points="130,320 165,338 197,322 162,304"></polygon><polygon class="h4" points="197,322 232,339 264,323 229,306"></polygon><polygon class="h3" points="264,323 299,341 330,325 295,307"></polygon><polygon class="h1" points="330,325 365,342 397,327 362,309"></polygon><polygon class="h1" points="397,327 432,344 464,328 429,311"></polygon><polygon class="h1" points="464,328 499,346 531,330 496,312"></polygon>
+<polygon class="h4" points="165,338 200,355 232,339 197,322"></polygon><polygon class="h4" points="232,339 267,357 299,341 264,323"></polygon><polygon class="h2" points="299,341 334,358 365,342 330,325"></polygon><polygon class="h1" points="365,342 400,360 432,344 397,327"></polygon><polygon class="h1" points="432,344 467,362 499,346 464,328"></polygon>
+<polygon class="h4" points="200,355 235,373 267,357 232,339"></polygon><polygon class="h3" points="267,357 302,374 334,358 299,341"></polygon><polygon class="h2" points="334,358 369,376 400,360 365,342"></polygon><polygon class="h2" points="400,360 435,377 467,362 432,344"></polygon>
+<polygon class="h3" points="235,373 270,390 302,374 267,357"></polygon><polygon class="h2" points="302,374 337,392 369,376 334,358"></polygon><polygon class="h2" points="369,376 404,393 435,377 400,360"></polygon><polygon class="h3" points="270,390 305,408 337,392 302,374"></polygon><polygon class="h2" points="337,392 372,409 404,393 369,376"></polygon><polygon class="h3" points="305,408 340,425 372,409 337,392"></polygon>
+<polygon points="60,285 340,425 531,330 251,190" fill="none" stroke="#46627a" stroke-width="1"></polygon>
+
+<!-- row bands (placement is illustrative) -->
+<polygon points="111,285 340,400 391,374 162,260" fill="none" stroke="#e4edf3" stroke-opacity="0.55" stroke-width="1.2" stroke-dasharray="5 4"></polygon>
+<polygon points="200,241 429,355 480,330 251,215" fill="none" stroke="#e4edf3" stroke-opacity="0.55" stroke-width="1.2" stroke-dasharray="5 4"></polygon>
+
+<!-- devices -->
+<g class="tw-pin is-warn is-sel"><line x1="219" y1="237" x2="219" y2="302"></line><circle class="tw-beacon" cx="219" cy="237" r="16"><animate attributeName="r" values="10;26" dur="1.6s" repeatCount="indefinite"></animate><animate attributeName="opacity" values="0.9;0" dur="1.6s" repeatCount="indefinite"></animate></circle><rect class="p" x="211" y="229" width="16" height="16" rx="3"></rect></g>
+<g class="tw-pin is-ok"><line x1="372" y1="224" x2="372" y2="289"></line><rect class="p" x="365" y="217" width="14" height="14" rx="3"></rect></g>
+<g><polygon points="211,302 219,306 227,302 219,298" fill="#8f7a45" stroke="#ffc23d" stroke-width="1"></polygon><polygon points="211,302 219,306 219,318 211,314" fill="#6d5c33" stroke="#ffc23d" stroke-width="1"></polygon><polygon points="219,306 227,302 227,314 219,318" fill="#54462a" stroke="#ffc23d" stroke-width="1"></polygon></g>
+<g><polygon points="364,289 372,293 379,289 372,285" fill="#3e6d62" stroke="#3df0ae" stroke-width="1"></polygon><polygon points="364,289 372,293 372,305 364,301" fill="#2f5249" stroke="#3df0ae" stroke-width="1"></polygon><polygon points="372,293 379,289 379,301 372,305" fill="#243f38" stroke="#3df0ae" stroke-width="1"></polygon></g>
+
+<!-- catalogue assets of this building (OCC seed); not simulated in V1 -->
+<g class="tw-ghostbox"><polygon points="154,288 166,294 166,312 154,305"></polygon><polygon points="166,294 173,291 173,308 166,312"></polygon><polygon points="154,288 166,294 173,291 160,285"></polygon></g><g class="tw-ghostbox"><polygon points="246,334 266,343 266,361 246,351"></polygon><polygon points="266,343 271,341 271,358 266,361"></polygon><polygon points="246,334 266,343 271,341 252,331"></polygon></g><g class="tw-ghostbox"><polygon points="447,304 459,310 459,327 447,321"></polygon><polygon points="459,310 464,307 464,324 459,327"></polygon><polygon points="447,304 459,310 464,307 453,301"></polygon></g><g class="tw-ghostbox"><polygon points="397,329 408,335 408,352 397,347"></polygon><polygon points="408,335 414,332 414,349 408,352"></polygon><polygon points="397,329 408,335 414,332 402,327"></polygon></g><g class="tw-ghostbox"><polygon points="287,295 295,300 295,312 287,307"></polygon><polygon points="295,300 304,295 304,307 295,312"></polygon><polygon points="287,295 295,300 304,295 295,291"></polygon></g><g class="tw-ghostbox"><polygon points="232,75 257,88 257,130 232,118"></polygon><polygon points="257,88 283,75 283,118 257,130"></polygon><polygon points="232,75 257,88 283,75 257,62"></polygon></g><g class="tw-ghostbox"><polygon points="315,116 340,129 340,172 315,159"></polygon><polygon points="340,129 365,116 365,159 340,172"></polygon><polygon points="315,116 340,129 365,116 340,104"></polygon></g>
+<!-- near walls, drawn last and nearly clear -->
+<polygon points="60,165 340,305 340,425 60,285" fill="rgba(42,70,88,0.10)" stroke="#6b8aa3" stroke-width="1.2"></polygon>
+<polygon points="340,305 531,210 531,330 340,425" fill="rgba(42,70,88,0.08)" stroke="#6b8aa3" stroke-width="1.2"></polygon>
+<polygon points="60,165 340,305 531,210 251,70" fill="none" stroke="#6b8aa3" stroke-width="1.2" stroke-dasharray="6 5"></polygon>
+</svg>
+
+<div class="tw-l is-warn is-sel" style="left:37.1%;top:43.5%;transform:translate(-50%,-100%)"><b><svg class="ic ic-s" aria-hidden="true"><use href="#i-rack"></use></svg>dc-env-01</b><span>Row A · 29.3 °C</span><em class="sev" data-sev="high"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>High · #7</em></div>
+<div class="tw-l" style="left:62.9%;top:40%;transform:translate(-50%,-100%)"><b><svg class="ic ic-s" aria-hidden="true"><use href="#i-rack"></use></svg>dc-env-02</b><span>Row B · 22.4 °C</span></div>
+<div class="tw-l is-ghost" style="left:27.6%;top:57.9%;transform:translate(-50%,-100%)"><b>UPS-01</b></div>
+<div class="tw-l is-ghost" style="left:43.7%;top:69.9%;transform:translate(-50%,-100%)"><b>BAT-01</b></div>
+<div class="tw-l is-ghost" style="left:77.1%;top:61.9%;transform:translate(-50%,-100%)"><b>CRAC-01</b></div>
+<div class="tw-l is-ghost" style="left:68.6%;top:68.2%;transform:translate(-50%,-100%)"><b>CRAC-02</b></div>
+<div class="tw-l is-ghost" style="left:50.0%;top:59.4%;transform:translate(-50%,-100%)"><b>ICS-DC</b></div>
+<div class="tw-l is-ghost" style="left:43.5%;top:4.2%;transform:translate(-50%,-100%)"><b>CT-01</b></div>
+<div class="tw-l is-ghost" style="left:57.5%;top:14.6%;transform:translate(-50%,-100%)"><b>CT-02</b></div>
+<div class="tw-l is-logical" style="left:49.9%;top:8%;transform:translate(-50%,0)"><b>Pipeline</b><span>logical</span></div>
+<div class="tw-l" style="left:15%;top:67%;background:rgba(16,33,45,0.85)"><b>Row A</b></div>
+<div class="tw-l" style="left:34%;top:52%;background:rgba(16,33,45,0.85)"><b>Row B</b></div>
+
+<div class="tw-ctl" style="left:12px;top:12px"><div class="row" style="gap:8px"><span class="pill is-ok"><span class="dot"></span>Live</span><span class="chip is-warn">server-room-overheat · 41 s in</span></div>
+<div class="tw-card" style="width:178px;padding:10px 12px"><div class="lbl" style="margin-bottom:6px">Layers</div><div class="col" style="gap:7px;font-size:14px"><div class="row"><span class="switch is-on" role="img" aria-label="On"></span>Devices</div><div class="row"><span class="switch is-on" role="img" aria-label="On"></span>Data flow</div><div class="row"><span class="switch is-on" role="img" aria-label="On"></span>Heat</div><div class="row"><span class="switch is-on" role="img" aria-label="On"></span>Catalogue · 8</div></div></div></div>
+<div class="tw-ctl" style="right:12px;bottom:12px"><div class="topo-tools" style="position:static"><button class="icon-btn sm" type="button" aria-label="Rotate left"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rotl"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Rotate right"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rotr"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Zoom in"><svg class="ic ic-s" aria-hidden="true"><use href="#i-plus"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Zoom out"><svg class="ic ic-s" aria-hidden="true"><use href="#i-minus"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Reset camera"><svg class="ic ic-s" aria-hidden="true"><use href="#i-focus"></use></svg></button></div></div>
+<div class="tw-card" style="position:absolute;left:12px;bottom:12px;max-width:330px;padding:10px 12px;z-index:2">
+<div class="row" style="gap:10px"><span class="lbl">Indoor temperature</span><span class="tw-heat"><i style="background:var(--heat-0)"></i><i style="background:var(--heat-1)"></i><i style="background:var(--heat-2)"></i><i style="background:var(--heat-3)"></i><i style="background:var(--heat-4)"></i><i style="background:var(--heat-5)"></i></span></div>
+<div class="row" style="justify-content:space-between;font-size:12px;color:var(--text-tertiary);margin-top:2px"><span>21 °C</span><span>30 °C</span></div>
+<p style="font-size:12px;color:var(--text-secondary);line-height:1.35;margin-top:6px">Floor tint is interpolated between two sensors, not measured. Walls are see-through; the rest of the campus is faded.</p>
+</div>
+</section>
+
+<aside class="col" style="gap:16px" aria-label="Selection">
+<section class="card is-selected">
+<div class="card-h"><span class="itile is-accent"><svg class="ic" aria-hidden="true"><use href="#i-server"></use></svg></span><div class="sp"><h3 class="card-t">dc-env-01</h3><div class="faint" style="font-size:13px">Data center — row A · BLD-DC</div></div><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Anomaly</span></div>
+<div class="card-b" style="padding-top:8px">
+<div class="row" style="align-items:baseline;gap:8px"><span class="m-val is-breach" style="font-size:30px">29.3<small>°C</small></span><span class="faint" style="font-size:13px">raise 27 · clear 25.5 · 3 of 3</span></div>
+<div class="chart" style="background:var(--surface-0);border-radius:var(--radius-2);padding:6px 6px 2px;margin:8px 0">
+<svg class="cx" viewBox="0 0 310 200" role="img" aria-label="temperature_c of dc-env-01: a step above the raise line; the alert is open from the third reading"><defs><linearGradient id="gam" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#47d7ff" stop-opacity="0.34"></stop><stop offset="1" stop-color="#47d7ff" stop-opacity="0"></stop></linearGradient><pattern id="hatchm" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#5a7488" stroke-opacity="0.35" stroke-width="2"></line></pattern></defs><rect x="50" y="10" width="242" height="59.4" fill="#ff8f3a" fill-opacity="0.06"></rect><line class="gl" x1="50" x2="292" y1="158.6" y2="158.6"></line><text class="v" x="42" y="162.6" text-anchor="end">21</text><line class="gl" x1="50" x2="292" y1="114.0" y2="114.0"></line><text class="v" x="42" y="118.0" text-anchor="end">24</text><line class="gl" x1="50" x2="292" y1="69.4" y2="69.4"></line><text class="v" x="42" y="73.4" text-anchor="end">27</text><line class="gl" x1="50" x2="292" y1="24.9" y2="24.9"></line><text class="v" x="42" y="28.9" text-anchor="end">30</text><line class="gl major" x1="50.0" x2="50.0" y1="10" y2="166"></line><text x="50.0" y="184" text-anchor="start">−2 min</text><line class="gl major" x1="171.0" x2="171.0" y1="10" y2="166"></line><text x="171.0" y="184" text-anchor="middle">−1 min</text><line class="gl major" x1="292.0" x2="292.0" y1="10" y2="166"></line><text x="292.0" y="184" text-anchor="end">now</text><line class="raise" x1="50" x2="292" y1="69.4" y2="69.4"></line><text class="raise-l" x="56" y="64.4">raise 27</text><line class="clear" x1="50" x2="292" y1="91.7" y2="91.7"></line><text class="clear-l" x="56" y="105.7">clear 25.5</text><polygon points="50.0,166 50.0,136.3 54.1,136.3 58.2,131.8 62.3,136.3 66.4,136.3 70.5,134.8 74.6,139.3 78.7,136.3 82.8,134.8 86.9,133.3 91.0,139.3 95.1,137.8 99.2,139.3 103.3,133.3 107.4,134.8 111.5,140.7 115.6,131.8 119.7,131.8 123.8,134.8 127.9,134.8 132.0,139.3 136.1,140.7 140.2,136.3 144.3,140.7 148.4,139.3 152.5,139.3 156.6,140.7 160.7,136.3 164.8,136.3 168.9,133.3 173.1,136.3 177.2,134.8 181.3,136.3 185.4,134.8 189.5,136.3 193.6,137.8 197.7,131.8 201.8,131.8 205.9,133.3 210.0,134.8 214.1,137.8 218.2,139.3 222.3,137.8 226.4,140.7 230.5,133.3 234.6,137.8 238.7,133.3 242.8,137.8 246.9,131.8 251.0,38.2 255.1,35.3 259.2,33.8 263.3,38.2 267.4,35.3 271.5,36.7 275.6,33.8 279.7,36.7 283.8,36.7 287.9,35.3 292.0,35.3 292.0,166" fill="url(#gam)"></polygon><polyline class="ser" points="50.0,136.3 54.1,136.3 58.2,131.8 62.3,136.3 66.4,136.3 70.5,134.8 74.6,139.3 78.7,136.3 82.8,134.8 86.9,133.3 91.0,139.3 95.1,137.8 99.2,139.3 103.3,133.3 107.4,134.8 111.5,140.7 115.6,131.8 119.7,131.8 123.8,134.8 127.9,134.8 132.0,139.3 136.1,140.7 140.2,136.3 144.3,140.7 148.4,139.3 152.5,139.3 156.6,140.7 160.7,136.3 164.8,136.3 168.9,133.3 173.1,136.3 177.2,134.8 181.3,136.3 185.4,134.8 189.5,136.3 193.6,137.8 197.7,131.8 201.8,131.8 205.9,133.3 210.0,134.8 214.1,137.8 218.2,139.3 222.3,137.8 226.4,140.7 230.5,133.3 234.6,137.8 238.7,133.3 242.8,137.8 246.9,131.8 251.0,38.2 255.1,35.3 259.2,33.8 263.3,38.2 267.4,35.3 271.5,36.7 275.6,33.8 279.7,36.7 283.8,36.7 287.9,35.3 292.0,35.3"></polyline><polyline class="ser warn" points="246.9,131.8 251.0,38.2 255.1,35.3 259.2,33.8 263.3,38.2 267.4,35.3 271.5,36.7 275.6,33.8 279.7,36.7 283.8,36.7 287.9,35.3 292.0,35.3"></polyline><rect x="259.2" y="10" width="32.8" height="156" fill="#ff8f3a" fill-opacity="0.10"></rect><line x1="259.2" x2="259.2" y1="24" y2="166" stroke="#ff8f3a" stroke-width="2" style="filter:url(#neon)"></line><circle cx="259.2" cy="16" r="11" fill="#ff8f3a" style="filter:url(#neon)"></circle><use href="#i-bell" x="252.2" y="9" width="14" height="14" fill="none" stroke="#08131d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></use><circle cx="251.0" cy="38.2" r="4.5" fill="#10212d" stroke="#ff8f3a" stroke-width="2"></circle><circle cx="255.1" cy="35.3" r="4.5" fill="#10212d" stroke="#ff8f3a" stroke-width="2"></circle><circle cx="259.2" cy="33.8" r="4.5" fill="#ff8f3a" stroke="#ff8f3a" stroke-width="2"></circle><circle cx="292.0" cy="35.3" r="9" fill="#ffc23d" fill-opacity="0.25"></circle><circle cx="292.0" cy="35.3" r="4" fill="#e3f9ff" stroke="#ffc23d" stroke-width="2"></circle><rect x="234.0" y="32.0" width="46" height="22" rx="6" fill="#284256" stroke="#ffc23d"></rect><text class="hi" x="257.0" y="47.0" text-anchor="middle">29.3</text></svg>
+</div>
+<div class="kv"><span>Humidity</span><b>45.1 %</b></div>
+<div class="kv"><span>Topic</span><b class="mono" style="font-size:12px">campus/BLD-DC/dc-env-01/telemetry</b></div>
+<div class="kv"><span>Placement</span><b>illustrative · <span class="mono" style="font-size:12px">twin-layout.json</span></b></div>
+</div>
+</section>
+<section class="card">
+<div class="card-h"><h3 class="card-t sp">Inject here</h3></div>
+<div class="card-b col" style="gap:10px">
+<div class="fk"><span class="chip is-accent">Breach</span><span class="chip">Silent</span><span class="chip">Drop</span><span class="chip">Delay</span><span class="chip">Malformed</span></div>
+<div class="row" style="gap:8px"><button class="btn primary" type="button" style="flex:1"><svg class="ic ic-s" aria-hidden="true"><use href="#i-zap"></use></svg>Inject now</button><button class="btn outline" type="button">Open in lab<svg class="ic ic-s" aria-hidden="true"><use href="#i-ext"></use></svg></button></div>
+</div>
+</section>
+<section class="card">
+<div class="card-h"><h3 class="card-t sp">Also in this building</h3><span class="chip">Catalogue · not simulated</span></div>
+<div class="card-b" style="padding-top:8px">
+<div class="kv"><span class="mono">CT-01, CT-02</span><b>Cooling towers, roof</b></div>
+<div class="kv"><span class="mono">UPS-01, BAT-01</span><b>UPS and battery</b></div>
+<div class="kv"><span class="mono">CRAC-01, CRAC-02</span><b>Precision cooling</b></div>
+<div class="kv"><span class="mono">ICS-DC</span><b>Indoor climate sensor</b></div>
+<div class="kv"><span class="mono">GEN-01</span><b>Generator, 3 m east</b></div>
+<p class="faint" style="font-size:13px;margin-top:6px">8 assets of the command center's catalogue stand here. Studio draws them but does not play them until V2-T05.</p>
+</div>
+</section>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

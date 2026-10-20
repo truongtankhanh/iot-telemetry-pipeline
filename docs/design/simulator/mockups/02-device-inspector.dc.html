@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Device inspector</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}
+.mpanel{background:var(--surface-0);border:1px solid var(--border-subtle);border-radius:var(--radius-3);padding:14px 16px}</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></symbol>
+<symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect><rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></symbol>
+<symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></symbol>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-rack" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M8 6h.01"></path><path d="M8 12h.01"></path><path d="M8 18h.01"></path></symbol>
+<symbol id="i-wind" viewBox="0 0 24 24"><path d="M12.8 19.6A2 2 0 1 0 14 16H2"></path><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"></path><path d="M9.8 4.4A2 2 0 1 1 11 8H2"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+<filter id="neon" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+<symbol id="i-thermo" viewBox="0 0 24 24"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path></symbol>
+<symbol id="i-droplets" viewBox="0 0 24 24"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item is-active" type="button" aria-label="Device fleet" title="Device fleet" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main" style="min-height:1240px">
+<div class="page-h">
+<div>
+<h2 class="page-t">Device fleet</h2>
+<p class="page-d">Six devices from <span class="mono">devices.json</span>, each publishing every 2 s on its own topic.</p>
+</div>
+</div>
+
+<!-- The grid stays as in frame 01; the sheet overlays it and the grid never resizes. -->
+<div class="fleet" aria-hidden="true">
+<article class="card dev is-anomaly is-selected" style="height:230px"><div class="dev-h"><span class="dg sq is-accent"><svg class="ic" aria-hidden="true"><use href="#i-rack"></use></svg></span><div class="sp"><div class="dev-name">Data center — row A</div><div class="dev-id">dc-env-01 · BLD-DC</div></div></div></article>
+<article class="card dev" style="height:230px"><div class="dev-h"><span class="dg sq"><svg class="ic" aria-hidden="true"><use href="#i-rack"></use></svg></span><div class="sp"><div class="dev-name">Data center — row B</div><div class="dev-id">dc-env-02 · BLD-DC</div></div></div></article>
+<article class="card dev" style="height:230px"><div class="dev-h"><span class="dg ci"><svg class="ic" aria-hidden="true"><use href="#i-wind"></use></svg></span><div class="sp"><div class="dev-name">Library reading room</div><div class="dev-id">lib-air-01 · BLD-LIB</div></div></div></article>
+<article class="card dev" style="height:230px"><div class="dev-h"><span class="dg ci"><svg class="ic" aria-hidden="true"><use href="#i-wind"></use></svg></span><div class="sp"><div class="dev-name">Lecture Hall A</div><div class="dev-id">lha-air-01 · BLD-LHA</div></div></div></article>
+<article class="card dev" style="height:230px"><div class="dev-h"><span class="dg ci"><svg class="ic" aria-hidden="true"><use href="#i-wind"></use></svg></span><div class="sp"><div class="dev-name">Student Center hall</div><div class="dev-id">stu-air-01 · BLD-STU</div></div></div></article>
+<article class="card dev" style="height:230px"><div class="dev-h"><span class="dg hx"><svg class="ic" aria-hidden="true"><use href="#i-zap"></use></svg></span><div class="sp"><div class="dev-name">Innovation Hub main feed</div><div class="dev-id">hub-power-01 · BLD-HUB</div></div></div></article>
+</div>
+
+<div class="scrim" aria-hidden="true"></div>
+
+<aside class="sheet" aria-label="Device inspector: dc-env-01" style="width:680px">
+<div class="sheet-h">
+<span class="dg sq is-accent"><svg class="ic" aria-hidden="true"><use href="#i-rack"></use></svg></span>
+<div class="sp"><div class="card-t">Data center — row A</div><div class="dev-id">dc-env-01 · BLD-DC · server_room</div></div>
+<span class="state running"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Running</span>
+<button class="icon-btn" type="button" aria-label="Close inspector"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
+</div>
+<div class="sheet-b" style="overflow-y:auto;gap:18px">
+
+<div class="col" style="gap:8px">
+<span class="lbl">Topic</span>
+<div class="input mono"><span>campus/BLD-DC/dc-env-01/telemetry</span><button class="icon-btn sm" type="button" style="margin-left:auto" aria-label="Copy topic"><svg class="ic ic-s" aria-hidden="true"><use href="#i-copy"></use></svg></button></div>
+</div>
+
+<div class="col" style="gap:10px">
+<div class="row"><span class="lbl sp">Publish</span><div class="seg" role="group" aria-label="Mode"><button class="is-on" type="button">Simulated</button><button type="button">Hold value</button></div></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px"><div class="field"><label>Interval</label><div class="input"><span class="num">2000</span><span class="unit">ms</span></div></div><div class="field"><label>Jitter</label><div class="input"><span class="num">0</span><span class="unit">ms</span></div></div><div class="field"><label>QoS</label><div class="input"><span class="num">1</span><span class="unit">PUBACK</span></div></div></div>
+</div>
+
+<section class="mpanel" aria-label="temperature_c">
+<div class="row" style="flex-wrap:wrap;gap:8px"><span class="mi" style="font-size:15px"><svg class="ic" aria-hidden="true"><use href="#i-thermo"></use></svg><b class="mono" style="color:var(--text-primary)">temperature_c</b></span><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-flask"></use></svg>Anomaly 29.2 °C until 80 s</span><span class="sp"></span><span class="m-val is-breach" style="font-size:32px">29.3<small>°C</small></span></div>
+<div class="faint" style="font-size:13px;margin:2px 0 8px">raise 27 · clear 25.5 · opens after 3 readings in a row · now 2.3 °C above raise</div>
+<svg class="cx" viewBox="0 0 620 190" role="img" aria-label="temperature_c of dc-env-01, last 2 minutes: a step above the raise line; the alert is open from the third reading"><defs><linearGradient id="gat1" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#47d7ff" stop-opacity="0.34"></stop><stop offset="1" stop-color="#47d7ff" stop-opacity="0"></stop></linearGradient><pattern id="hatcht1" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#5a7488" stroke-opacity="0.35" stroke-width="2"></line></pattern></defs><rect x="50" y="10" width="552" height="55.6" fill="#ff8f3a" fill-opacity="0.06"></rect><line class="gl" x1="50" x2="602" y1="149.0" y2="149.0"></line><text class="v" x="42" y="153.0" text-anchor="end">21</text><line class="gl" x1="50" x2="602" y1="107.3" y2="107.3"></line><text class="v" x="42" y="111.3" text-anchor="end">24</text><line class="gl" x1="50" x2="602" y1="65.6" y2="65.6"></line><text class="v" x="42" y="69.6" text-anchor="end">27</text><line class="gl" x1="50" x2="602" y1="23.9" y2="23.9"></line><text class="v" x="42" y="27.9" text-anchor="end">30</text><line class="gl major" x1="50.0" x2="50.0" y1="10" y2="156"></line><text x="50.0" y="174" text-anchor="start">−2 min</text><line class="gl major" x1="326.0" x2="326.0" y1="10" y2="156"></line><text x="326.0" y="174" text-anchor="middle">−1 min</text><line class="gl major" x1="602.0" x2="602.0" y1="10" y2="156"></line><text x="602.0" y="174" text-anchor="end">now</text><line class="raise" x1="50" x2="602" y1="65.6" y2="65.6"></line><text class="raise-l" x="56" y="60.6">raise 27</text><line class="clear" x1="50" x2="602" y1="86.5" y2="86.5"></line><text class="clear-l" x="56" y="100.5">clear 25.5</text><polygon points="50.0,156 50.0,128.2 59.4,128.2 68.7,124.0 78.1,128.2 87.4,128.2 96.8,126.8 106.1,131.0 115.5,128.2 124.8,126.8 134.2,125.4 143.6,131.0 152.9,129.6 162.3,131.0 171.6,125.4 181.0,126.8 190.3,132.4 199.7,124.0 209.1,124.0 218.4,126.8 227.8,126.8 237.1,131.0 246.5,132.4 255.8,128.2 265.2,132.4 274.5,131.0 283.9,131.0 293.3,132.4 302.6,128.2 312.0,128.2 321.3,125.4 330.7,128.2 340.0,126.8 349.4,128.2 358.7,126.8 368.1,128.2 377.5,129.6 386.8,124.0 396.2,124.0 405.5,125.4 414.9,126.8 424.2,129.6 433.6,131.0 442.9,129.6 452.3,132.4 461.7,125.4 471.0,129.6 480.4,125.4 489.7,129.6 499.1,124.0 508.4,36.4 517.8,33.6 527.2,32.2 536.5,36.4 545.9,33.6 555.2,35.0 564.6,32.2 573.9,35.0 583.3,35.0 592.6,33.6 602.0,33.6 602.0,156" fill="url(#gat1)"></polygon><polyline class="ser" points="50.0,128.2 59.4,128.2 68.7,124.0 78.1,128.2 87.4,128.2 96.8,126.8 106.1,131.0 115.5,128.2 124.8,126.8 134.2,125.4 143.6,131.0 152.9,129.6 162.3,131.0 171.6,125.4 181.0,126.8 190.3,132.4 199.7,124.0 209.1,124.0 218.4,126.8 227.8,126.8 237.1,131.0 246.5,132.4 255.8,128.2 265.2,132.4 274.5,131.0 283.9,131.0 293.3,132.4 302.6,128.2 312.0,128.2 321.3,125.4 330.7,128.2 340.0,126.8 349.4,128.2 358.7,126.8 368.1,128.2 377.5,129.6 386.8,124.0 396.2,124.0 405.5,125.4 414.9,126.8 424.2,129.6 433.6,131.0 442.9,129.6 452.3,132.4 461.7,125.4 471.0,129.6 480.4,125.4 489.7,129.6 499.1,124.0 508.4,36.4 517.8,33.6 527.2,32.2 536.5,36.4 545.9,33.6 555.2,35.0 564.6,32.2 573.9,35.0 583.3,35.0 592.6,33.6 602.0,33.6"></polyline><polyline class="ser warn" points="499.1,124.0 508.4,36.4 517.8,33.6 527.2,32.2 536.5,36.4 545.9,33.6 555.2,35.0 564.6,32.2 573.9,35.0 583.3,35.0 592.6,33.6 602.0,33.6"></polyline><rect x="527.2" y="10" width="74.8" height="146" fill="#ff8f3a" fill-opacity="0.10"></rect><line x1="527.2" x2="527.2" y1="24" y2="156" stroke="#ff8f3a" stroke-width="2" style="filter:url(#neon)"></line><circle cx="527.2" cy="16" r="11" fill="#ff8f3a" style="filter:url(#neon)"></circle><use href="#i-bell" x="520.2" y="9" width="14" height="14" fill="none" stroke="#08131d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></use><circle cx="508.4" cy="36.4" r="4.5" fill="#10212d" stroke="#ff8f3a" stroke-width="2"></circle><circle cx="517.8" cy="33.6" r="4.5" fill="#10212d" stroke="#ff8f3a" stroke-width="2"></circle><circle cx="527.2" cy="32.2" r="4.5" fill="#ff8f3a" stroke="#ff8f3a" stroke-width="2"></circle><circle cx="602.0" cy="33.6" r="9" fill="#ffc23d" fill-opacity="0.25"></circle><circle cx="602.0" cy="33.6" r="4" fill="#e3f9ff" stroke="#ffc23d" stroke-width="2"></circle><rect x="544.0" y="32.0" width="46" height="22" rx="6" fill="#284256" stroke="#ffc23d"></rect><text class="hi" x="567.0" y="47.0" text-anchor="middle">29.3</text></svg>
+<svg class="cx" viewBox="0 0 620 78" role="img" aria-label="29.3 °C on a scale from 20 to 32; clear below 25.5, raise above 27"><defs><pattern id="hza" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="rgba(255, 194, 61,0.18)"></rect><line x1="0" y1="0" x2="0" y2="6" stroke="#ffc23d" stroke-opacity="0.65" stroke-width="2"></line></pattern></defs><rect x="14" y="36" width="271.3" height="12" rx="6" fill="#3df0ae" fill-opacity="0.38"></rect><rect x="285.3" y="36" width="74.0" height="12" fill="url(#hza)"></rect><rect x="359.3" y="36" width="246.7" height="12" rx="6" fill="#ff8f3a" fill-opacity="0.5"></rect><line x1="137.3" x2="137.3" y1="30" y2="54" stroke="#e4edf3" stroke-opacity="0.7" stroke-width="2" stroke-dasharray="2 2"></line><text x="285.3" y="70" text-anchor="middle" style="fill:#3df0ae;font-size:12px">clear 25.5</text><text x="359.3" y="70" text-anchor="middle" style="fill:#ff8f3a;font-size:12px">raise 27</text><text x="14" y="70" style="font-size:12px">20</text><text x="606" y="70" text-anchor="end" style="font-size:12px">32</text><text x="137.3" y="26" text-anchor="middle" style="font-size:12px">baseline 22.5</text><circle cx="472.8" cy="42" r="11" fill="#ffc23d" fill-opacity="0.25"></circle><circle cx="472.8" cy="42" r="6" fill="#e3f9ff" stroke="#ffc23d" stroke-width="3" style="filter:url(#neon)"></circle><rect x="448.0" y="2" width="49.6" height="22" rx="6" fill="#284256" stroke="#ffc23d"></rect><text class="hi" x="472.8" y="17" text-anchor="middle" style="font-size:13px">29.3 °C</text></svg>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px"><div class="field"><label>Baseline</label><div class="input"><span class="num">22.5</span><span class="unit">°C</span></div></div><div class="field"><label>Noise ±</label><div class="input"><span class="num">0.3</span><span class="unit">°C</span></div></div><div class="field"><label>Daily swing</label><div class="input"><span class="num">0</span><span class="unit">°C</span></div></div></div>
+</section>
+
+<section class="mpanel" aria-label="humidity_pct">
+<div class="row" style="flex-wrap:wrap;gap:8px"><span class="mi" style="font-size:15px"><svg class="ic" aria-hidden="true"><use href="#i-droplets"></use></svg><b class="mono" style="color:var(--text-primary)">humidity_pct</b></span><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Normal</span><span class="sp"></span><span class="m-val" style="font-size:32px">45.1<small>%</small></span></div>
+<div class="faint" style="font-size:13px;margin:2px 0 8px">raise 60 · clear 55 · opens after 3 readings in a row · headroom 14.9 %</div>
+<svg class="cx" viewBox="0 0 620 150" role="img" aria-label="humidity_pct of dc-env-01, last 2 minutes: steady near 45, far under the raise line"><defs><linearGradient id="gat2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#47d7ff" stop-opacity="0.34"></stop><stop offset="1" stop-color="#47d7ff" stop-opacity="0"></stop></linearGradient><pattern id="hatcht2" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#5a7488" stroke-opacity="0.35" stroke-width="2"></line></pattern></defs><rect x="50" y="10" width="552" height="24.5" fill="#ff8f3a" fill-opacity="0.06"></rect><line class="gl" x1="50" x2="602" y1="116.0" y2="116.0"></line><text class="v" x="42" y="120.0" text-anchor="end">40</text><line class="gl" x1="50" x2="602" y1="75.2" y2="75.2"></line><text class="v" x="42" y="79.2" text-anchor="end">50</text><line class="gl" x1="50" x2="602" y1="34.5" y2="34.5"></line><text class="v" x="42" y="38.5" text-anchor="end">60</text><line class="gl major" x1="50.0" x2="50.0" y1="10" y2="116"></line><text x="50.0" y="134" text-anchor="start">−2 min</text><line class="gl major" x1="326.0" x2="326.0" y1="10" y2="116"></line><text x="326.0" y="134" text-anchor="middle">−1 min</text><line class="gl major" x1="602.0" x2="602.0" y1="10" y2="116"></line><text x="602.0" y="134" text-anchor="end">now</text><line class="raise" x1="50" x2="602" y1="34.5" y2="34.5"></line><text class="raise-l" x="56" y="29.5">raise 60</text><line class="clear" x1="50" x2="602" y1="54.8" y2="54.8"></line><text class="clear-l" x="56" y="68.8">clear 55</text><polygon points="50.0,116 50.0,96.8 59.4,94.4 68.7,94.4 78.1,95.2 87.4,96.4 96.8,93.6 106.1,93.6 115.5,95.2 124.8,95.2 134.2,96.4 143.6,97.7 152.9,96.0 162.3,94.8 171.6,97.2 181.0,93.6 190.3,96.4 199.7,96.4 209.1,97.2 218.4,92.8 227.8,94.0 237.1,93.2 246.5,94.8 255.8,97.7 265.2,96.0 274.5,95.2 283.9,97.2 293.3,93.2 302.6,96.0 312.0,96.8 321.3,93.6 330.7,97.2 340.0,93.2 349.4,95.6 358.7,94.8 368.1,96.0 377.5,95.2 386.8,96.8 396.2,97.7 405.5,93.6 414.9,96.4 424.2,94.0 433.6,96.4 442.9,92.8 452.3,93.2 461.7,94.0 471.0,94.0 480.4,94.8 489.7,94.0 499.1,97.2 508.4,95.2 517.8,93.6 527.2,96.8 536.5,93.2 545.9,93.2 555.2,95.6 564.6,96.0 573.9,95.6 583.3,95.6 592.6,92.8 602.0,95.6 602.0,116" fill="url(#gat2)"></polygon><polyline class="ser" points="50.0,96.8 59.4,94.4 68.7,94.4 78.1,95.2 87.4,96.4 96.8,93.6 106.1,93.6 115.5,95.2 124.8,95.2 134.2,96.4 143.6,97.7 152.9,96.0 162.3,94.8 171.6,97.2 181.0,93.6 190.3,96.4 199.7,96.4 209.1,97.2 218.4,92.8 227.8,94.0 237.1,93.2 246.5,94.8 255.8,97.7 265.2,96.0 274.5,95.2 283.9,97.2 293.3,93.2 302.6,96.0 312.0,96.8 321.3,93.6 330.7,97.2 340.0,93.2 349.4,95.6 358.7,94.8 368.1,96.0 377.5,95.2 386.8,96.8 396.2,97.7 405.5,93.6 414.9,96.4 424.2,94.0 433.6,96.4 442.9,92.8 452.3,93.2 461.7,94.0 471.0,94.0 480.4,94.8 489.7,94.0 499.1,97.2 508.4,95.2 517.8,93.6 527.2,96.8 536.5,93.2 545.9,93.2 555.2,95.6 564.6,96.0 573.9,95.6 583.3,95.6 592.6,92.8 602.0,95.6"></polyline><circle cx="602.0" cy="95.6" r="9" fill="#47d7ff" fill-opacity="0.25"></circle><circle cx="602.0" cy="95.6" r="4" fill="#e3f9ff" stroke="#47d7ff" stroke-width="2"></circle><rect x="544.0" y="84.6" width="46" height="22" rx="6" fill="#284256" stroke="#47d7ff"></rect><text class="hi" x="567.0" y="99.6" text-anchor="middle">45.0</text></svg>
+<svg class="cx" viewBox="0 0 620 78" role="img" aria-label="45.1 % on a scale from 40 to 70; clear below 55, raise above 60"><defs><pattern id="hzb" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="rgba(255, 194, 61,0.18)"></rect><line x1="0" y1="0" x2="0" y2="6" stroke="#ffc23d" stroke-opacity="0.65" stroke-width="2"></line></pattern></defs><rect x="14" y="36" width="296.0" height="12" rx="6" fill="#3df0ae" fill-opacity="0.38"></rect><rect x="310.0" y="36" width="98.7" height="12" fill="url(#hzb)"></rect><rect x="408.7" y="36" width="197.3" height="12" rx="6" fill="#ff8f3a" fill-opacity="0.5"></rect><line x1="112.7" x2="112.7" y1="30" y2="54" stroke="#e4edf3" stroke-opacity="0.7" stroke-width="2" stroke-dasharray="2 2"></line><text x="310.0" y="70" text-anchor="middle" style="fill:#3df0ae;font-size:12px">clear 55</text><text x="408.7" y="70" text-anchor="middle" style="fill:#ff8f3a;font-size:12px">raise 60</text><text x="14" y="70" style="font-size:12px">40</text><text x="606" y="70" text-anchor="end" style="font-size:12px">70</text><circle cx="114.6" cy="42" r="11" fill="#47d7ff" fill-opacity="0.25"></circle><circle cx="114.6" cy="42" r="6" fill="#e3f9ff" stroke="#47d7ff" stroke-width="3" style="filter:url(#neon)"></circle><rect x="31.0" y="2" width="167.2" height="22" rx="6" fill="#284256" stroke="#47d7ff"></rect><text class="hi" x="114.6" y="17" text-anchor="middle" style="font-size:13px">45.1 · baseline 45 %</text></svg>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px"><div class="field"><label>Baseline</label><div class="input"><span class="num">45.0</span><span class="unit">%</span></div></div><div class="field"><label>Noise ±</label><div class="input"><span class="num">1.5</span><span class="unit">%</span></div></div><div class="field"><label>Daily swing</label><div class="input"><span class="num">0</span><span class="unit">%</span></div></div></div>
+</section>
+
+<div class="col" style="gap:8px">
+<span class="lbl">Last payload · seq 1,284</span>
+<div class="code-wrap"><button class="icon-btn sm copy" type="button" aria-label="Copy payload" style="top:6px;right:6px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-copy"></use></svg></button><pre class="code"><span class="k">"seq"</span>: <span class="n">1284</span>,
+<span class="k">"ts"</span>: <span class="s">"2026-10-19T02:14:31.012Z"</span>,
+<span class="k">"metrics"</span>: { <span class="k">"temperature_c"</span>: <span class="n">29.3</span>, <span class="k">"humidity_pct"</span>: <span class="n">45.1</span> }</pre></div>
+</div>
+</div>
+<div class="sheet-f">
+<button class="btn danger" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-stop"></use></svg>Go silent</button>
+<button class="btn" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rotate"></use></svg>Reset seq</button>
+<span class="sp"></span>
+<button class="btn ghost" type="button">Reset to baseline</button>
+<button class="btn primary" type="button">Apply</button>
+</div>
+</aside>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

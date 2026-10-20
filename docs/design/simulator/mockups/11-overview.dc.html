@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overview</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:16px;align-items:start}
+@media (max-width:1100px){.cols{grid-template-columns:1fr}}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect><rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></symbol>
+<symbol id="i-wind" viewBox="0 0 24 24"><path d="M12.8 19.6A2 2 0 1 0 14 16H2"></path><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"></path><path d="M9.8 4.4A2 2 0 1 1 11 8H2"></path></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-radio" viewBox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19.1"></path></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"></path><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M7 21h10"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></symbol>
+<symbol id="i-step" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" x2="19" y1="5" y2="19"></line></symbol>
+<symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<filter id="neon" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+<filter id="neon-soft" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+<symbol id="i-rack" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M8 6h.01"></path><path d="M8 12h.01"></path><path d="M8 18h.01"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+<symbol id="i-building" viewBox="0 0 24 24"><rect width="16" height="20" x="4" y="2" rx="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></symbol>
+<symbol id="i-chevron-r" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item is-active" type="button" aria-label="Overview" title="Overview" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h">
+<div>
+<h2 class="page-t">Overview</h2>
+<p class="page-d">Campus simulation environment. What is running, what it caused, and what to do next.</p>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:10px">
+<span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-flask"></use></svg>server-room-overheat · 41 s in</span>
+<span class="pill is-ok"><span class="dot"></span>Simulation running</span>
+</div>
+</div>
+
+<div class="kpis k6">
+<div class="card kpi"><span class="lbl">Devices online</span><span class="val">4<small>of 6</small></span><div class="avail" role="img" aria-label="4 running, 1 paused, 1 stopped"><i style="width:66.7%;background:var(--success)"></i><i style="width:16.7%;background:var(--warning)"></i><i style="width:16.6%;background:var(--text-tertiary)"></i></div><span class="sub">66.7% availability · 1 paused, 1 stopped</span></div>
+<div class="card kpi" style="border-color:rgba(255, 143, 58,0.45)"><span class="lbl">Active alerts</span><span class="val">1</span><span class="sub"><span class="sev" data-sev="high" style="height:22px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>1 high</span> &nbsp;0 critical</span></div>
+<div class="card kpi"><span class="lbl">Message rate</span><span class="val">2.0<small>msg/s</small></span><span class="sub">120 per minute · 0 sequence gaps</span></div>
+<div class="card kpi"><span class="lbl">Ingest lag</span><span class="val">0.04<small>s</small></span><span class="sub">12 readings buffered</span></div>
+<div class="card kpi"><span class="lbl">Alert delivery</span><span class="val">1<small>of 1</small></span><span class="sub">delivered · 0 pending · 0 failed</span></div>
+<div class="card kpi"><span class="lbl">Not reporting</span><span class="val">2</span><span class="sub"><span class="mono">stu-air-01</span> paused · <span class="mono">hub-power-01</span> silent</span></div>
+</div>
+
+<div class="cols">
+<section class="card" aria-label="Live topology">
+<div class="card-h"><h3 class="card-t sp">Live topology</h3><div class="seg" role="group" aria-label="View"><button class="is-on" type="button">Topology</button><button type="button">Twin</button></div><span class="pill is-ok"><span class="dot"></span>Live</span><button class="btn outline sm" type="button" title="Opens the Topology page with this grouping, filter and selection">Open in Topology<svg class="ic ic-s" aria-hidden="true"><use href="#i-topology"></use></svg></button></div>
+<div class="card-b" style="padding:10px 12px 14px">
+<div class="scale-bar">
+<div class="seg" role="group" aria-label="Grouping"><button class="is-on" type="button">Grouped by zone</button><button type="button">All devices</button></div>
+<button class="chip is-warn" type="button" style="height:28px;border:0">Problems only <b style="margin-left:2px">3</b></button>
+<div class="input" style="width:240px;height:28px"><svg class="ic ic-s" aria-hidden="true" style="color:var(--text-tertiary)"><use href="#i-search"></use></svg><span class="faint">Find a device or zone</span></div>
+<span class="sp"></span>
+<span class="faint" style="font-size:13px">6 devices · 5 zones · groups automatically above 12 devices</span>
+</div>
+<div class="topo" style="border-radius:var(--radius-2)">
+<svg viewBox="0 0 848 326" role="img" aria-label="Compact topology grouped by zone. The Data Center is expanded and shows two devices, one in anomaly; the other four zones are collapsed. Rules and the alert have fired.">
+<g class="tel is-warn"><path class="te-halo" d="M170,82 C187,82 187,161 204,161"></path><path class="te-core" d="M170,82 C187,82 187,161 204,161"></path><path class="te-flow" d="M170,82 C187,82 187,161 204,161"></path></g>
+<g class="tel"><path class="te-halo" d="M170,118 C187,118 187,161 204,161"></path><path class="te-core" d="M170,118 C187,118 187,161 204,161"></path><path class="te-flow" d="M170,118 C187,118 187,161 204,161"></path></g>
+<g class="tel"><path class="te-halo" d="M180,171 C192,171 192,161 204,161"></path><path class="te-core" d="M180,171 C192,171 192,161 204,161"></path><path class="te-flow" d="M180,171 C192,171 192,161 204,161"></path></g>
+<g class="tel"><path class="te-halo" d="M180,215 C192,215 192,161 204,161"></path><path class="te-core" d="M180,215 C192,215 192,161 204,161"></path><path class="te-flow" d="M180,215 C192,215 192,161 204,161"></path></g>
+<g class="tel is-off"><path class="te-halo" d="M180,259 C192,259 192,161 204,161"></path><path class="te-core" d="M180,259 C192,259 192,161 204,161"></path><path class="te-flow" d="M180,259 C192,259 192,161 204,161"></path></g>
+<g class="tel is-off"><path class="te-halo" d="M180,303 C192,303 192,161 204,161"></path><path class="te-core" d="M180,303 C192,303 192,161 204,161"></path><path class="te-flow" d="M180,303 C192,303 192,161 204,161"></path></g>
+<g class="tel"><path class="te-halo" d="M308,161 L336,161"></path><path class="te-core" d="M308,161 L336,161"></path><path class="te-flow" d="M308,161 L336,161"></path></g>
+<g class="tel"><path class="te-halo" d="M440,161 L468,161"></path><path class="te-core" d="M440,161 L468,161"></path><path class="te-flow" d="M440,161 L468,161"></path></g>
+<g class="tel"><path class="te-halo" d="M388,197 L388,232"></path><path class="te-core" d="M388,197 L388,232"></path><path class="te-flow" d="M388,197 L388,232"></path></g>
+<g class="tel is-warn"><path class="te-halo" d="M572,161 L600,161"></path><path class="te-core" d="M572,161 L600,161"></path><path class="te-flow" d="M572,161 L600,161"></path></g>
+<g class="tel is-ok"><path class="te-halo" d="M704,161 L732,161"></path><path class="te-core" d="M704,161 L732,161"></path><path class="te-flow" d="M704,161 L732,161"></path></g>
+<circle class="fd warn" r="3"><animateMotion dur="2s" begin="0s" repeatCount="indefinite" path="M170,82 C187,82 187,161 204,161"></animateMotion></circle>
+<circle class="fd" r="3"><animateMotion dur="2s" begin="0.4s" repeatCount="indefinite" path="M170,118 C187,118 187,161 204,161"></animateMotion></circle>
+<circle class="fd" r="3"><animateMotion dur="2s" begin="0.8s" repeatCount="indefinite" path="M180,161 L204,161"></animateMotion></circle>
+<circle class="fd" r="3"><animateMotion dur="2s" begin="1.2s" repeatCount="indefinite" path="M180,215 C192,215 192,161 204,161"></animateMotion></circle>
+<circle class="fd" r="3"><animateMotion dur="2s" begin="0s" repeatCount="indefinite" path="M308,161 L336,161"></animateMotion></circle>
+<circle class="fd warn" r="3"><animateMotion dur="2s" begin="0.5s" repeatCount="indefinite" path="M572,161 L600,161"></animateMotion></circle>
+<g class="tn is-warn"><rect class="b" x="8" y="8" width="172" height="132" rx="10"></rect><use class="ico" href="#i-building" x="18" y="17" width="16" height="16"></use><text class="t" x="40" y="30" style="font-size:14px">Data Center</text><text class="s" x="18" y="48">BLD-DC · 2 devices</text><circle cx="150" cy="24" r="9" fill="#ffc23d"></circle><text x="150" y="28" text-anchor="middle" style="font-size:12px;font-weight:700;fill:#08131d">1</text><text x="164" y="29" style="font-size:13px;fill:#91a5b4">▾</text></g>
+<g class="tn is-warn"><rect class="b" x="16" y="66" width="156" height="32" rx="8"></rect><rect class="kind" x="21" y="71" width="22" height="22" rx="6"></rect><use class="ico" href="#i-rack" x="25" y="75" width="14" height="14"></use><text class="t" x="50" y="80" style="font-size:13px">dc-env-01</text><text class="s" x="50" y="94">29.3 °C</text></g>
+<g class="tn is-ok"><rect class="b" x="16" y="102" width="156" height="32" rx="8"></rect><rect class="kind" x="21" y="107" width="22" height="22" rx="6"></rect><use class="ico" href="#i-rack" x="25" y="111" width="14" height="14"></use><text class="t" x="50" y="116" style="font-size:13px">dc-env-02</text><text class="s" x="50" y="130">22.4 °C</text></g>
+<g class="tn is-ok"><rect class="b" x="8" y="152" width="172" height="38" rx="9"></rect><use class="ico" href="#i-building" x="18" y="163" width="16" height="16"></use><text class="t" x="40" y="168" style="font-size:13px">Library</text><text class="s" x="40" y="182" style="font-size:11.5px">1 device · 702 ppm</text><text x="164" y="176" style="font-size:13px;fill:#91a5b4">▸</text></g>
+<g class="tn is-ok"><rect class="b" x="8" y="196" width="172" height="38" rx="9"></rect><use class="ico" href="#i-building" x="18" y="207" width="16" height="16"></use><text class="t" x="40" y="212" style="font-size:13px">Lecture Hall A</text><text class="s" x="40" y="226" style="font-size:11.5px">1 device · 688 ppm</text><text x="164" y="220" style="font-size:13px;fill:#91a5b4">▸</text></g>
+<g class="tn is-stale"><rect class="b" x="8" y="240" width="172" height="38" rx="9"></rect><use class="ico" href="#i-building" x="18" y="251" width="16" height="16"></use><text class="t" x="40" y="256" style="font-size:13px">Student Center</text><text class="s" x="40" y="270" style="font-size:11.5px">1 device · paused</text><text x="164" y="264" style="font-size:13px;fill:#91a5b4">▸</text></g>
+<g class="tn is-stale"><rect class="b" x="8" y="284" width="172" height="38" rx="9"></rect><use class="ico" href="#i-building" x="18" y="295" width="16" height="16"></use><text class="t" x="40" y="300" style="font-size:13px">Innovation Hub</text><text class="s" x="40" y="314" style="font-size:11.5px">1 device · silent</text><text x="164" y="308" style="font-size:13px;fill:#91a5b4">▸</text></g>
+<g class="tn is-ok"><rect class="b" x="204" y="125" width="104" height="72" rx="10"></rect><use class="ico" href="#i-server" x="212" y="135" width="16" height="16"></use><text class="t" x="234" y="148">Broker</text><text class="s" x="212" y="170">Mosquitto</text><text class="s" x="212" y="188">4 ms</text></g>
+<g class="tn is-ok"><rect class="b" x="336" y="125" width="104" height="72" rx="10"></rect><use class="ico" href="#i-radio" x="344" y="135" width="16" height="16"></use><text class="t" x="366" y="148">Ingest</text><text class="s" x="344" y="170">lag 0.04 s</text><text class="s" x="344" y="188">0 gaps</text></g>
+<g class="tn is-warn"><rect class="b" x="468" y="125" width="104" height="72" rx="10"></rect><use class="ico" href="#i-scale" x="476" y="135" width="16" height="16"></use><text class="t" x="498" y="148">Rules</text><text class="s" x="476" y="170">1 fired</text><text class="s" x="476" y="188">3 of 3</text></g>
+<g class="tn is-warn"><rect class="b" x="600" y="125" width="104" height="72" rx="10"></rect><use class="ico" href="#i-bell" x="608" y="135" width="16" height="16"></use><text class="t" x="630" y="148">Alert</text><text class="s" x="608" y="170">#7 high</text><text class="s" x="608" y="188">outbox ✓</text></g>
+<g class="tn is-ok"><rect class="b" x="732" y="125" width="104" height="72" rx="10"></rect><use class="ico" href="#i-shield" x="740" y="135" width="16" height="16"></use><text class="t" x="762" y="148">OCC</text><text class="s" x="740" y="170">incident</text><text class="s" x="740" y="188">open</text></g>
+<g class="tn is-ok"><rect class="b" x="336" y="232" width="104" height="52" rx="10"></rect><use class="ico" href="#i-db" x="344" y="242" width="16" height="16"></use><text class="t" x="366" y="255">Database</text><text class="s" x="344" y="274">stored</text></g>
+</svg>
+<p class="faint" style="font-size:13px;margin-top:10px">Click a zone to expand it; line width follows the devices behind it. Above 60 devices a zone shows counts and its worst state, never one node per device; use the search or <b>Problems only</b> to reach one.</p></div>
+</div>
+</section>
+
+<div class="col" style="gap:16px">
+<section class="card" aria-label="Alerts">
+<div class="card-h"><h3 class="card-t sp">Alerts</h3><button class="btn ghost sm" type="button">View all</button></div>
+<div class="card-b" style="padding:10px 0 0">
+<div class="feed-i is-open">
+<div class="row"><span class="sev" data-sev="high"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>High</span><span class="chip is-warn">Open</span><span class="sp"></span><span class="faint mono" style="font-size:13px">09:14:15</span></div>
+<div class="card-t">Server room temperature high</div>
+<div class="muted" style="font-size:14px"><span class="mono">dc-env-01</span> · 29.3 °C · incident <span class="mono">c3a1…</span> open</div>
+</div>
+<div class="feed-i">
+<div class="row"><span class="sev" data-sev="medium"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Medium</span><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Cleared</span><span class="sp"></span><span class="faint mono" style="font-size:13px">09:08:36</span></div>
+<div class="card-t">Poor air quality (CO₂)</div>
+<div class="muted" style="font-size:14px"><span class="mono">lha-air-01</span> · back to 988 ppm</div>
+</div>
+</div>
+</section>
+
+<section class="card" aria-label="Simulation controls">
+<div class="card-h"><h3 class="card-t sp">Simulation controls</h3><span class="chip is-warn">Running</span></div>
+<div class="card-b col" style="gap:12px">
+<div class="field"><label>Scenario</label><div class="input mono"><span>server-room-overheat</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div></div>
+<div class="phase" role="group" aria-label="Scenario progress: normal, anomaly, recovery">
+<div class="phase-bar">
+<i class="p-norm" style="width:22.2%"></i><i class="p-anom" style="width:23.3%"></i><i class="p-anom rest" style="width:43.3%"></i><i class="p-rec" style="width:11.2%"></i>
+<span class="p-flag warn" style="left:26.7%" title="Alert opened at 24 s"></span><span class="p-flag todo" style="left:88.9%" title="Alert clears at 80 s"></span><span class="p-head" style="left:45.6%" data-t="41 s"></span>
+</div>
+<div class="phase-lbl"><span style="left:0"><b>Normal</b>0–20 s</span><span style="left:32%"><b>Anomaly · 29.2 °C</b>20–80 s</span><span style="right:0;text-align:right"><b>Recovery</b>80–90 s</span></div>
+<div class="phase-sum"><span><i style="background:var(--sev-high)"></i>Alert opened <b>24 s</b> ✓</span><span><i style="border:2px solid var(--success)"></i>Alert clears <b>80 s</b>, in <b>39 s</b></span></div>
+</div>
+<div class="row wrap" style="gap:8px">
+<button class="btn" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-pause"></use></svg>Pause</button>
+<button class="btn" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-step"></use></svg>Step +2 s</button>
+<button class="btn ghost" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rotate"></use></svg>Reset</button>
+</div>
+<p class="faint" style="font-size:13px">Step moves simulated time forward by one publish interval and sends that tick. Reset clears anomalies and returns devices to baseline.</p>
+</div>
+</section>
+</div>
+</div>
+
+<section class="card" aria-label="Event timeline">
+<div class="card-h" style="flex-wrap:wrap;gap:10px"><h3 class="card-t">Event timeline</h3><span class="chip">75 events · last hour</span><span class="sp"></span>
+<div class="seg" role="group" aria-label="Range"><button type="button">5m</button><button type="button">30m</button><button class="is-on" type="button">1h</button><button type="button">3h</button><button type="button">12h</button><button type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-calendar"></use></svg>Custom</button></div>
+<div class="seg" role="group" aria-label="Time display"><button class="is-on" type="button">Local</button><button type="button">UTC</button></div>
+<button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-download"></use></svg>Export</button></div>
+<div class="card-b" style="padding:6px 16px 4px">
+<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:6px">
+<div class="input" style="flex:1;min-width:320px;height:34px"><svg class="ic ic-s" aria-hidden="true" style="color:var(--text-tertiary)"><use href="#i-filter"></use></svg><span class="faint">Filter events, for example </span><span class="mono" style="font-size:13px">source:Rule device:dc-env-01</span></div>
+<div class="input" style="width:160px;height:34px"><span>All sources</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<div class="pages"><button class="pg" type="button" disabled aria-label="Previous page">‹</button><button class="pg is-on" type="button" aria-current="page">1</button><button class="pg" type="button">2</button><button class="pg" type="button">3</button><button class="pg" type="button">4</button><button class="pg" type="button">5</button><span class="gap-l">…</span><button class="pg" type="button">8</button><button class="pg" type="button" aria-label="Next page">›</button></div><button class="icon-btn" type="button" aria-label="Table preferences"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg></button></div>
+<svg class="ev-hist" viewBox="0 0 1200 84" role="img" aria-label="Events per minute from 08:15 to 09:15; the whole hour is selected. Busiest minute: 6 events."><line x1="34" x2="1184" y1="62" y2="62" stroke="rgba(166,184,197,.25)"></line><text x="6" y="14">6</text><text x="6" y="62">0</text><rect x="342.2" y="52.7" width="16.2" height="9.3" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="380.5" y="6.0" width="16.2" height="56.0" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="399.7" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="457.2" y="43.3" width="16.2" height="18.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="476.3" y="24.7" width="16.2" height="37.3" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="495.5" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="572.2" y="52.7" width="16.2" height="9.3" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="591.3" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="610.5" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="744.7" y="6.0" width="16.2" height="56.0" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="763.8" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="898.0" y="52.7" width="16.2" height="9.3" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="917.2" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="936.3" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="1013.0" y="6.0" width="16.2" height="56.0" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="1051.3" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="1128.0" y="52.7" width="16.2" height="9.3" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="1147.2" y="43.3" width="16.2" height="18.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="1166.3" y="15.3" width="16.2" height="46.7" rx="2" fill="#47d7ff" fill-opacity="0.9"></rect><rect x="34" y="4" width="1150" height="60" rx="6" fill="#959bff" fill-opacity="0.08" stroke="#959bff" stroke-width="1.5"></rect><rect x="30" y="16" width="8" height="36" rx="4" fill="#e4edf3" stroke="#959bff" stroke-width="2"></rect><rect x="1180" y="16" width="8" height="36" rx="4" fill="#e4edf3" stroke="#959bff" stroke-width="2"></rect><text x="34.0" y="80" text-anchor="start">08:15</text><text x="321.5" y="80" text-anchor="middle">08:30</text><text x="609.0" y="80" text-anchor="middle">08:45</text><text x="896.5" y="80" text-anchor="middle">09:00</text><text x="1184.0" y="80" text-anchor="end">09:15</text></svg>
+<p class="faint" style="font-size:13px;margin:0 0 6px">Drag the handles to narrow the range; the table and its pages follow. Events are kept for the session (the last 5,000).</p></div>
+<div class="ev-head" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><span></span><span>Time</span><span>Source</span><span>Message</span></div>
+<div class="ev is-new" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Collapse event" aria-expanded="true" style="width:24px;height:24px"><svg class="ic ic-s" style="transform:rotate(90deg);color:var(--text-primary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:14:16</span><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-inbox"></use></svg>Outbox</span><span>Event <b class="mono">opened</b> delivered</span></div><div class="ev-x"><div><span class="lbl">Source</span><span>Command Center</span></div><div><span class="lbl">Alert</span><span class="mono">#7</span></div><div><span class="lbl">Rule</span><span class="mono">server-room-hot</span></div><div><span class="lbl">Device</span><span class="mono">dc-env-01</span></div><div><span class="lbl">Incident</span><span class="mono">c3a1…</span></div><div><span class="lbl">Seen by Studio</span><span class="mono">09:14:16</span></div></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:14:16</span><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-shield"></use></svg>Command Center</span><span>Incident created for alert #7</span></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:14:15</span><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-scale"></use></svg>Rule</span><span><b class="mono">server-room-hot</b> raised</span></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:14:15</span><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg>Alert</span><span>#7 opened · high</span></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:14:11</span><span class="chip "><svg class="ic ic-s" aria-hidden="true"><use href="#i-flask"></use></svg>Scenario</span><span>Anomaly started: <b class="mono">dc-env-01</b> → 29.2 °C</span></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:13:51</span><span class="chip "><svg class="ic ic-s" aria-hidden="true"><use href="#i-flask"></use></svg>Scenario</span><span><b class="mono">server-room-overheat</b> started</span></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:13:50</span><span class="chip "><svg class="ic ic-s" aria-hidden="true"><use href="#i-fleet"></use></svg>Fleet</span><span><b class="mono">stu-air-01</b> paused</span></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:12:08</span><span class="chip "><svg class="ic ic-s" aria-hidden="true"><use href="#i-fleet"></use></svg>Fleet</span><span><b class="mono">hub-power-01</b> stopped</span></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:08:37</span><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-inbox"></use></svg>Outbox</span><span>Event <b class="mono">cleared</b> delivered</span></div>
+<div class="ev" style="grid-template-columns:24px 92px 160px minmax(0,1fr)"><button class="icon-btn sm" type="button" aria-label="Expand event" aria-expanded="false" style="width:24px;height:24px"><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-chevron-r"></use></svg></button><span class="tm">09:08:37</span><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-shield"></use></svg>Command Center</span><span>Incident for alert #6 resolved</span></div>
+<div class="pager"><span>Rows per page</span><div class="input" style="width:78px;height:30px"><span class="num">10</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div><span class="range" aria-live="polite">Events <b>1–10</b> of <b>75</b>, newest first</span><span class="faint" style="font-size:12px">Page and range are in the URL, so a reload keeps the place.</span><span class="sp"></span>
+<div class="pages"><button class="pg" type="button" disabled aria-label="First page">«</button><button class="pg" type="button" disabled aria-label="Previous page">‹</button><button class="pg is-on" type="button" aria-current="page">1</button><button class="pg" type="button">2</button><button class="pg" type="button">3</button><span class="gap-l">…</span><button class="pg" type="button">8</button><button class="pg" type="button" aria-label="Next page">›</button><button class="pg" type="button" aria-label="Last page">»</button></div></div>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1200}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

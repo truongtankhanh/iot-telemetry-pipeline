@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Benchmark</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cols{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1100px){.cols{grid-template-columns:1fr}}
+.prog-row{display:flex;flex-direction:column;gap:8px}
+.prog-row .row{align-items:baseline}
+.bigv{font-family:var(--font-ui);font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></symbol>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+<filter id="neon" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Database <small class="mono">:5433</small></span>
+</div>
+<div class="hdr-end">
+<span class="pill is-warn"><span class="dot"></span>Benchmark running</span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:32:50</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item is-active" type="button" aria-label="Analytics" title="Analytics" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h">
+<div>
+<h2 class="page-t">Analytics</h2>
+<p class="page-d">Benchmark run. Publishes as fast as the broker accepts, then waits until every reading is in PostgreSQL. Method and past results: <span class="mono">docs/benchmarks.md</span>.</p>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:12px">
+<span class="chip">Sample data</span>
+<button class="btn danger" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-stop"></use></svg>Stop run</button>
+</div>
+</div>
+
+<div class="banner is-warn"><svg class="ic" aria-hidden="true"><use href="#i-alert"></use></svg><span><b>Heavy run.</b> This uses most of this machine’s CPU and memory while it lasts. Normal publishing is paused and the fleet controls are locked.</span></div>
+
+<div class="cols">
+<aside class="card" aria-label="Run settings">
+<div class="card-h"><h3 class="card-t sp">Run settings</h3><span class="chip"><svg class="ic ic-s" aria-hidden="true"><use href="#i-lock"></use></svg>Locked</span></div>
+<div class="card-b col" style="gap:14px">
+<div class="field"><label>Messages</label><div class="input"><span class="num">100,000</span></div></div>
+<div class="field"><label>Devices</label><div class="input"><span class="num">6</span><span class="unit">from devices.json</span></div></div>
+<div class="field"><label>QoS</label><div class="seg" role="group" aria-label="QoS" style="align-self:flex-start"><button type="button">0</button><button class="is-on" type="button">1</button></div></div>
+<div class="row"><span class="switch is-on" role="img" aria-label="On"></span><span>Wait until stored in PostgreSQL</span></div>
+<hr class="hr">
+<div class="col" style="gap:8px">
+<span class="lbl">Checks before start</span>
+<div class="row"><svg class="ic ic-s" style="color:var(--success)" aria-hidden="true"><use href="#i-check"></use></svg><span class="muted">Ingest ready</span></div>
+<div class="row"><svg class="ic ic-s" style="color:var(--success)" aria-hidden="true"><use href="#i-check"></use></svg><span class="muted">Database reachable</span></div>
+<div class="row"><svg class="ic ic-s" style="color:var(--success)" aria-hidden="true"><use href="#i-check"></use></svg><span class="muted">Fleet paused</span></div>
+</div>
+</div>
+</aside>
+
+<div class="col" style="gap:16px">
+<section class="card" aria-label="Progress">
+<div class="card-b col" style="gap:20px;padding:20px">
+<div class="prog-row">
+<div class="row"><span class="lbl sp">Published</span><span class="bigv">62,400</span><span class="faint">/ 100,000</span></div>
+<div class="progress"><i style="width:62.4%"></i></div>
+</div>
+<div class="prog-row">
+<div class="row"><span class="lbl sp">Stored in PostgreSQL</span><span class="bigv">61,980</span><span class="faint">/ 100,000</span></div>
+<div class="progress"><i style="width:61.98%;background:var(--series-2)"></i></div>
+<span class="faint" style="font-size:14px">420 readings still in flight or buffered</span>
+</div>
+</div>
+</section>
+
+<div class="kpis">
+<div class="card kpi"><span class="lbl">Publish rate</span><span class="val">5,820<small>msg/s</small></span><span class="sub">elapsed 10.7 s</span></div>
+<div class="card kpi"><span class="lbl">Stored rate</span><span class="val">5,780<small>msg/s</small></span><span class="sub">end to end</span></div>
+<div class="card kpi"><span class="lbl">Ingest lag</span><span class="val">0.31<small>s</small></span><span class="sub mono" style="font-size:13px">telemetry_ingest_lag_seconds</span></div>
+<div class="card kpi"><span class="lbl">Flush time p95</span><span class="val">18<small>ms</small></span><span class="sub mono" style="font-size:13px">telemetry_flush_duration_seconds</span></div>
+</div>
+
+<section class="card chart" aria-label="Throughput">
+<div class="card-h"><h3 class="card-t sp">Throughput</h3><div class="legend"><span><i></i>published</span><span><i style="border-top-color:var(--series-2);border-top-style:dashed"></i>stored in PostgreSQL</span></div><span class="chip">Sample data</span></div>
+<div class="card-b" style="padding-top:10px"><svg class="cx" viewBox="0 0 1000 300" role="img" aria-label="Chart over 18 seconds"><defs><linearGradient id="at0" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#47d7ff" stop-opacity="0.35"></stop><stop offset="1" stop-color="#47d7ff" stop-opacity="0"></stop></linearGradient><linearGradient id="at1" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#b7bbff" stop-opacity="0.35"></stop><stop offset="1" stop-color="#b7bbff" stop-opacity="0"></stop></linearGradient></defs><rect x="56.0" y="18" width="76.7" height="248" fill="#959bff" fill-opacity="0.05"></rect><text x="94.3" y="14" text-anchor="middle" style="font-size:12px;letter-spacing:0.05em;text-transform:uppercase">ramp-up</text><rect x="132.7" y="18" width="802.4" height="248" fill="#959bff" fill-opacity="0.0"></rect><text x="533.9" y="14" text-anchor="middle" style="font-size:12px;letter-spacing:0.05em;text-transform:uppercase">steady state</text><line class="gl" x1="56" x2="976" y1="266.0" y2="266.0"></line><text class="v" x="48" y="270.0" text-anchor="end">0</text><line class="gl" x1="56" x2="976" y1="204.0" y2="204.0"></line><text class="v" x="48" y="208.0" text-anchor="end">2,000</text><line class="gl" x1="56" x2="976" y1="142.0" y2="142.0"></line><text class="v" x="48" y="146.0" text-anchor="end">4,000</text><line class="gl" x1="56" x2="976" y1="80.0" y2="80.0"></line><text class="v" x="48" y="84.0" text-anchor="end">6,000</text><line class="gl" x1="56" x2="976" y1="18.0" y2="18.0"></line><text class="v" x="48" y="22.0" text-anchor="end">8,000</text><line class="gl major" x1="56.0" x2="56.0" y1="18" y2="266"></line><text x="56.0" y="284" text-anchor="middle">0</text><line class="gl major" x1="209.3" x2="209.3" y1="18" y2="266"></line><text x="209.3" y="284" text-anchor="middle">3</text><line class="gl major" x1="362.7" x2="362.7" y1="18" y2="266"></line><text x="362.7" y="284" text-anchor="middle">6</text><line class="gl major" x1="516.0" x2="516.0" y1="18" y2="266"></line><text x="516.0" y="284" text-anchor="middle">9</text><line class="gl major" x1="669.3" x2="669.3" y1="18" y2="266"></line><text x="669.3" y="284" text-anchor="middle">12</text><line class="gl major" x1="822.7" x2="822.7" y1="18" y2="266"></line><text x="822.7" y="284" text-anchor="middle">15</text><line class="gl major" x1="976.0" x2="976.0" y1="18" y2="266"></line><text x="976.0" y="284" text-anchor="middle">18 s</text><text x="56" y="298" style="font-size:12px">elapsed</text><text x="12" y="14" style="font-size:12px">msg/s</text><line x1="56" x2="976" y1="89.3" y2="89.3" stroke="#a6b8c5" stroke-dasharray="2 5" stroke-opacity="0.6"></line><text x="976" y="84.3" text-anchor="end" style="font-size:12px">average 5700</text><polygon points="56.0,266 56.0,266.0 68.8,202.7 81.6,157.6 94.3,135.1 107.1,115.2 119.9,105.6 132.7,101.0 145.4,93.6 158.2,94.1 171.0,89.7 183.8,91.0 196.6,90.2 209.3,87.5 222.1,84.5 234.9,89.1 247.7,88.3 260.4,85.5 273.2,83.2 286.0,85.7 298.8,86.9 311.6,83.0 324.3,89.3 337.1,83.8 349.9,87.6 362.7,88.6 375.4,88.8 388.2,87.5 401.0,84.0 413.8,88.4 426.6,85.6 439.3,85.2 452.1,87.1 464.9,85.9 477.7,89.2 490.4,89.2 503.2,88.2 516.0,85.0 528.8,86.7 541.6,87.5 554.3,85.6 567.1,86.5 579.9,87.6 592.7,84.2 602.9,85.6 602.9,266" fill="url(#at0)"></polygon><polyline fill="none" stroke="#47d7ff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" style="filter:url(#neon)" points="56.0,266.0 68.8,202.7 81.6,157.6 94.3,135.1 107.1,115.2 119.9,105.6 132.7,101.0 145.4,93.6 158.2,94.1 171.0,89.7 183.8,91.0 196.6,90.2 209.3,87.5 222.1,84.5 234.9,89.1 247.7,88.3 260.4,85.5 273.2,83.2 286.0,85.7 298.8,86.9 311.6,83.0 324.3,89.3 337.1,83.8 349.9,87.6 362.7,88.6 375.4,88.8 388.2,87.5 401.0,84.0 413.8,88.4 426.6,85.6 439.3,85.2 452.1,87.1 464.9,85.9 477.7,89.2 490.4,89.2 503.2,88.2 516.0,85.0 528.8,86.7 541.6,87.5 554.3,85.6 567.1,86.5 579.9,87.6 592.7,84.2 602.9,85.6"></polyline><circle cx="602.9" cy="85.6" r="8" fill="#47d7ff" fill-opacity="0.25"></circle><circle cx="602.9" cy="85.6" r="3.8" fill="#e3f9ff" stroke="#47d7ff" stroke-width="2"></circle><rect x="479.9" y="60.6" width="113" height="22" rx="6" fill="#284256" stroke="#47d7ff"></rect><text class="hi" x="536.4" y="75.6" text-anchor="middle">5,820 msg/s</text><polyline fill="none" stroke="#b7bbff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 4" points="56.0,266.0 68.8,266.0 81.6,253.3 94.3,195.3 107.1,158.7 119.9,132.2 132.7,117.0 145.4,109.2 158.2,97.9 171.0,98.7 183.8,93.8 196.6,89.7 209.3,92.2 222.1,89.2 234.9,91.4 247.7,87.1 260.4,86.3 273.2,87.3 286.0,85.3 298.8,88.7 311.6,86.3 324.3,86.9 337.1,87.0 349.9,87.8 362.7,85.4 375.4,84.7 388.2,87.6 401.0,86.4 413.8,90.2 426.6,86.2 439.3,86.5 452.1,84.4 464.9,85.5 477.7,88.8 490.4,88.2 503.2,86.4 516.0,90.4 528.8,87.7 541.6,89.5 554.3,89.8 567.1,90.2 579.9,85.8 592.7,89.7 602.9,86.8"></polyline><circle cx="602.9" cy="86.8" r="8" fill="#b7bbff" fill-opacity="0.25"></circle><circle cx="602.9" cy="86.8" r="3.8" fill="#e3f9ff" stroke="#b7bbff" stroke-width="2"></circle><rect x="533.9" y="89.8" width="59" height="22" rx="6" fill="#284256" stroke="#b7bbff"></rect><text class="hi" x="563.4" y="104.8" text-anchor="middle">5,780</text></svg>
+<div class="row" style="justify-content:space-between;font-size:13px;color:var(--text-secondary);margin-top:6px"><span>The gap between the lines is what is still in flight: <b style="color:var(--text-primary)">420 readings</b>.</span><span>Projected finish <b style="color:var(--text-primary)">≈ 17 s</b> at the current rate</span></div></div>
+</section>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+<section class="card chart" aria-label="Ingest lag"><div class="card-h"><h3 class="card-t sp">Ingest lag</h3><span class="mono faint" style="font-size:12px">telemetry_ingest_lag_seconds</span></div><div class="card-b" style="padding-top:8px"><svg class="cx" viewBox="0 0 470 200" role="img" aria-label="Chart over 18 seconds"><defs><linearGradient id="al0" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#47d7ff" stop-opacity="0.35"></stop><stop offset="1" stop-color="#47d7ff" stop-opacity="0"></stop></linearGradient></defs><line class="gl" x1="56" x2="446" y1="166.0" y2="166.0"></line><text class="v" x="48" y="170.0" text-anchor="end">0</text><line class="gl" x1="56" x2="446" y1="116.7" y2="116.7"></line><text class="v" x="48" y="120.7" text-anchor="end">0.2</text><line class="gl" x1="56" x2="446" y1="67.3" y2="67.3"></line><text class="v" x="48" y="71.3" text-anchor="end">0.4</text><line class="gl" x1="56" x2="446" y1="18.0" y2="18.0"></line><text class="v" x="48" y="22.0" text-anchor="end">0.6</text><line class="gl major" x1="56.0" x2="56.0" y1="18" y2="166"></line><text x="56.0" y="184" text-anchor="middle">0</text><line class="gl major" x1="186.0" x2="186.0" y1="18" y2="166"></line><text x="186.0" y="184" text-anchor="middle">6</text><line class="gl major" x1="316.0" x2="316.0" y1="18" y2="166"></line><text x="316.0" y="184" text-anchor="middle">12</text><line class="gl major" x1="446.0" x2="446.0" y1="18" y2="166"></line><text x="446.0" y="184" text-anchor="middle">18 s</text><text x="56" y="198" style="font-size:12px">elapsed</text><text x="12" y="14" style="font-size:12px">seconds</text><polygon points="56.0,166 56.0,162.3 61.4,151.2 66.8,155.9 72.2,146.8 77.7,141.3 83.1,133.2 88.5,130.5 93.9,126.5 99.3,130.5 104.8,126.0 110.2,124.1 115.6,115.2 121.0,112.0 126.4,119.6 131.8,117.4 137.2,114.9 142.7,113.2 148.1,108.8 153.5,106.1 158.9,108.8 164.3,110.7 169.8,104.3 175.2,104.1 180.6,100.6 186.0,95.0 191.4,97.4 196.8,98.7 202.2,96.7 207.7,95.5 213.1,102.4 218.5,91.5 223.9,92.5 229.3,90.8 234.8,91.3 240.2,95.9 245.6,95.5 251.0,98.7 256.4,91.8 261.8,98.7 267.2,98.2 272.7,96.2 278.1,96.7 283.5,94.2 287.8,89.5 287.8,166" fill="url(#al0)"></polygon><polyline fill="none" stroke="#47d7ff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" style="filter:url(#neon)" points="56.0,162.3 61.4,151.2 66.8,155.9 72.2,146.8 77.7,141.3 83.1,133.2 88.5,130.5 93.9,126.5 99.3,130.5 104.8,126.0 110.2,124.1 115.6,115.2 121.0,112.0 126.4,119.6 131.8,117.4 137.2,114.9 142.7,113.2 148.1,108.8 153.5,106.1 158.9,108.8 164.3,110.7 169.8,104.3 175.2,104.1 180.6,100.6 186.0,95.0 191.4,97.4 196.8,98.7 202.2,96.7 207.7,95.5 213.1,102.4 218.5,91.5 223.9,92.5 229.3,90.8 234.8,91.3 240.2,95.9 245.6,95.5 251.0,98.7 256.4,91.8 261.8,98.7 267.2,98.2 272.7,96.2 278.1,96.7 283.5,94.2 287.8,89.5"></polyline><circle cx="287.8" cy="89.5" r="8" fill="#47d7ff" fill-opacity="0.25"></circle><circle cx="287.8" cy="89.5" r="3.8" fill="#e3f9ff" stroke="#47d7ff" stroke-width="2"></circle><rect x="209.8" y="64.5" width="68" height="22" rx="6" fill="#284256" stroke="#47d7ff"></rect><text class="hi" x="243.8" y="79.5" text-anchor="middle">0.31 s</text></svg></div></section>
+<section class="card chart" aria-label="Flush time"><div class="card-h"><h3 class="card-t sp">Flush time p95</h3><span class="mono faint" style="font-size:12px">telemetry_flush_duration_seconds</span></div><div class="card-b" style="padding-top:8px"><svg class="cx" viewBox="0 0 470 200" role="img" aria-label="Chart over 18 seconds"><defs><linearGradient id="af0" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#47d7ff" stop-opacity="0.35"></stop><stop offset="1" stop-color="#47d7ff" stop-opacity="0"></stop></linearGradient></defs><line class="gl" x1="56" x2="446" y1="166.0" y2="166.0"></line><text class="v" x="48" y="170.0" text-anchor="end">0</text><line class="gl" x1="56" x2="446" y1="116.7" y2="116.7"></line><text class="v" x="48" y="120.7" text-anchor="end">10</text><line class="gl" x1="56" x2="446" y1="67.3" y2="67.3"></line><text class="v" x="48" y="71.3" text-anchor="end">20</text><line class="gl" x1="56" x2="446" y1="18.0" y2="18.0"></line><text class="v" x="48" y="22.0" text-anchor="end">30</text><line class="gl major" x1="56.0" x2="56.0" y1="18" y2="166"></line><text x="56.0" y="184" text-anchor="middle">0</text><line class="gl major" x1="186.0" x2="186.0" y1="18" y2="166"></line><text x="186.0" y="184" text-anchor="middle">6</text><line class="gl major" x1="316.0" x2="316.0" y1="18" y2="166"></line><text x="316.0" y="184" text-anchor="middle">12</text><line class="gl major" x1="446.0" x2="446.0" y1="18" y2="166"></line><text x="446.0" y="184" text-anchor="middle">18 s</text><text x="56" y="198" style="font-size:12px">elapsed</text><text x="12" y="14" style="font-size:12px">ms</text><polygon points="56.0,166 56.0,124.6 61.4,117.7 66.8,114.2 72.2,106.3 77.7,108.8 83.1,92.5 88.5,94.0 93.9,99.4 99.3,95.5 104.8,92.5 110.2,90.5 115.6,93.0 121.0,80.7 126.4,77.2 131.8,84.6 137.2,83.6 142.7,89.0 148.1,88.1 153.5,83.6 158.9,84.6 164.3,75.2 169.8,85.6 175.2,87.1 180.6,72.3 186.0,78.7 191.4,84.6 196.8,78.2 202.2,86.1 207.7,78.2 213.1,70.8 218.5,72.3 223.9,74.7 229.3,81.6 234.8,80.2 240.2,83.1 245.6,73.3 251.0,77.2 256.4,73.3 261.8,80.2 267.2,81.6 272.7,72.8 278.1,69.8 283.5,71.8 287.8,77.2 287.8,166" fill="url(#af0)"></polygon><polyline fill="none" stroke="#47d7ff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" style="filter:url(#neon)" points="56.0,124.6 61.4,117.7 66.8,114.2 72.2,106.3 77.7,108.8 83.1,92.5 88.5,94.0 93.9,99.4 99.3,95.5 104.8,92.5 110.2,90.5 115.6,93.0 121.0,80.7 126.4,77.2 131.8,84.6 137.2,83.6 142.7,89.0 148.1,88.1 153.5,83.6 158.9,84.6 164.3,75.2 169.8,85.6 175.2,87.1 180.6,72.3 186.0,78.7 191.4,84.6 196.8,78.2 202.2,86.1 207.7,78.2 213.1,70.8 218.5,72.3 223.9,74.7 229.3,81.6 234.8,80.2 240.2,83.1 245.6,73.3 251.0,77.2 256.4,73.3 261.8,80.2 267.2,81.6 272.7,72.8 278.1,69.8 283.5,71.8 287.8,77.2"></polyline><circle cx="287.8" cy="77.2" r="8" fill="#47d7ff" fill-opacity="0.25"></circle><circle cx="287.8" cy="77.2" r="3.8" fill="#e3f9ff" stroke="#47d7ff" stroke-width="2"></circle><rect x="218.8" y="52.2" width="59" height="22" rx="6" fill="#284256" stroke="#47d7ff"></rect><text class="hi" x="248.3" y="67.2" text-anchor="middle">18 ms</text></svg></div></section>
+<section class="card chart" aria-label="Buffered readings"><div class="card-h"><h3 class="card-t sp">Buffered readings</h3><span class="mono faint" style="font-size:12px">telemetry_buffered_readings</span></div><div class="card-b" style="padding-top:8px"><svg class="cx" viewBox="0 0 470 200" role="img" aria-label="Chart over 18 seconds"><defs><linearGradient id="ab0" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#47d7ff" stop-opacity="0.35"></stop><stop offset="1" stop-color="#47d7ff" stop-opacity="0"></stop></linearGradient></defs><line class="gl" x1="56" x2="446" y1="166.0" y2="166.0"></line><text class="v" x="48" y="170.0" text-anchor="end">0</text><line class="gl" x1="56" x2="446" y1="129.0" y2="129.0"></line><text class="v" x="48" y="133.0" text-anchor="end">250</text><line class="gl" x1="56" x2="446" y1="92.0" y2="92.0"></line><text class="v" x="48" y="96.0" text-anchor="end">500</text><line class="gl" x1="56" x2="446" y1="55.0" y2="55.0"></line><text class="v" x="48" y="59.0" text-anchor="end">750</text><line class="gl" x1="56" x2="446" y1="18.0" y2="18.0"></line><text class="v" x="48" y="22.0" text-anchor="end">1,000</text><line class="gl major" x1="56.0" x2="56.0" y1="18" y2="166"></line><text x="56.0" y="184" text-anchor="middle">0</text><line class="gl major" x1="186.0" x2="186.0" y1="18" y2="166"></line><text x="186.0" y="184" text-anchor="middle">6</text><line class="gl major" x1="316.0" x2="316.0" y1="18" y2="166"></line><text x="316.0" y="184" text-anchor="middle">12</text><line class="gl major" x1="446.0" x2="446.0" y1="18" y2="166"></line><text x="446.0" y="184" text-anchor="middle">18 s</text><text x="56" y="198" style="font-size:12px">elapsed</text><text x="12" y="14" style="font-size:12px">readings</text><polygon points="56.0,166 56.0,160.4 61.4,149.7 66.8,149.1 72.2,136.1 77.7,132.6 83.1,133.1 88.5,129.0 93.9,121.0 99.3,118.6 104.8,108.7 110.2,102.2 115.6,109.8 121.0,99.8 126.4,97.9 131.8,97.8 137.2,107.5 142.7,109.6 148.1,109.0 153.5,109.3 158.9,108.9 164.3,101.2 169.8,96.0 175.2,97.0 180.6,103.2 186.0,100.1 191.4,97.3 196.8,110.1 202.2,99.7 207.7,95.3 213.1,97.5 218.5,98.1 223.9,102.8 229.3,108.1 234.8,97.3 240.2,105.3 245.6,97.0 251.0,94.1 256.4,104.3 261.8,104.1 267.2,94.5 272.7,98.4 278.1,108.3 283.5,109.0 287.8,103.8 287.8,166" fill="url(#ab0)"></polygon><polyline fill="none" stroke="#47d7ff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" style="filter:url(#neon)" points="56.0,160.4 61.4,149.7 66.8,149.1 72.2,136.1 77.7,132.6 83.1,133.1 88.5,129.0 93.9,121.0 99.3,118.6 104.8,108.7 110.2,102.2 115.6,109.8 121.0,99.8 126.4,97.9 131.8,97.8 137.2,107.5 142.7,109.6 148.1,109.0 153.5,109.3 158.9,108.9 164.3,101.2 169.8,96.0 175.2,97.0 180.6,103.2 186.0,100.1 191.4,97.3 196.8,110.1 202.2,99.7 207.7,95.3 213.1,97.5 218.5,98.1 223.9,102.8 229.3,108.1 234.8,97.3 240.2,105.3 245.6,97.0 251.0,94.1 256.4,104.3 261.8,104.1 267.2,94.5 272.7,98.4 278.1,108.3 283.5,109.0 287.8,103.8"></polyline><circle cx="287.8" cy="103.8" r="8" fill="#47d7ff" fill-opacity="0.25"></circle><circle cx="287.8" cy="103.8" r="3.8" fill="#e3f9ff" stroke="#47d7ff" stroke-width="2"></circle><rect x="236.8" y="78.8" width="41" height="22" rx="6" fill="#284256" stroke="#47d7ff"></rect><text class="hi" x="257.3" y="93.8" text-anchor="middle">420</text></svg></div></section>
+</div>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

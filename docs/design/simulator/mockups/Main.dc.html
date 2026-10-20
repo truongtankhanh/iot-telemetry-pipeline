@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foundations</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+@media (max-width:1100px){.g3{grid-template-columns:1fr}}
+.sw{display:flex;flex-direction:column;gap:4px}
+.sw .swatch{height:52px}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect></symbol>
+<symbol id="i-step" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" x2="19" y1="5" y2="19"></line></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></symbol>
+<symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect><rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+<filter id="neon" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+<filter id="neon-soft" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+<symbol id="i-rack" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M8 6h.01"></path><path d="M8 12h.01"></path><path d="M8 18h.01"></path></symbol>
+<symbol id="i-wind" viewBox="0 0 24 24"><path d="M12.8 19.6A2 2 0 1 0 14 16H2"></path><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"></path><path d="M9.8 4.4A2 2 0 1 1 11 8H2"></path></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-thermo" viewBox="0 0 24 24"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path></symbol>
+<symbol id="i-droplets" viewBox="0 0 24 24"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h">
+<div>
+<h2 class="page-t">Foundations <span class="chip" style="vertical-align:middle;margin-left:6px">Internal · /foundations</span></h2>
+<p class="page-d">The electric neon language of Studio: tokens, status, device identity, data lines, controls, motion and wide-screen rules every page reuses. Neon is the style of the whole product (an IoT console), kept legible by four rules: the glow sits outside borders and never behind text, only numerals of 24 px and up may glow, every animation stops under reduced motion, and a screen carries at most 24 glowing lines and 12 pulsing nodes. Not the landing page: Studio opens on Overview. Token names equal the command center’s; the values are Studio’s own and lead its later refresh.</p>
+</div>
+</div>
+
+<div class="g3">
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Surfaces and text</h3></div>
+<div class="card-b col" style="gap:14px">
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+<div class="sw"><div class="swatch" style="background:#08131d;box-shadow:inset 0 0 0 1px rgba(71,215,255,0.22),0 0 12px rgba(71,215,255,0.08)"></div><span class="mono">surface-0</span><span class="faint" style="font-size:13px">canvas, inputs</span></div><div class="sw"><div class="swatch" style="background:#10212d;box-shadow:inset 0 0 0 1px rgba(71,215,255,0.22),0 0 12px rgba(71,215,255,0.08)"></div><span class="mono">surface-1</span><span class="faint" style="font-size:13px">panels, rail</span></div><div class="sw"><div class="swatch" style="background:#1b3345;box-shadow:inset 0 0 0 1px rgba(71,215,255,0.22),0 0 12px rgba(71,215,255,0.08)"></div><span class="mono">surface-2</span><span class="faint" style="font-size:13px">elevated, selected</span></div><div class="sw"><div class="swatch" style="background:#284256;box-shadow:inset 0 0 0 1px rgba(71,215,255,0.22),0 0 12px rgba(71,215,255,0.08)"></div><span class="mono">surface-3</span><span class="faint" style="font-size:13px">menus, toasts</span></div>
+</div>
+<table class="tbl" style="font-size:13px">
+<thead><tr><th>Text on</th><th>s0</th><th>s1</th><th>s2</th><th>s3</th></tr></thead>
+<tbody>
+<tr><td style="color:var(--text-primary)">primary</td><td class="num">15.8</td><td class="num">13.9</td><td class="num">11.5</td><td class="num">9.8</td></tr>
+<tr><td style="color:var(--text-secondary)">secondary</td><td class="num">9.2</td><td class="num">8.1</td><td class="num">6.7</td><td class="num">5.7</td></tr>
+<tr><td style="color:var(--text-tertiary)">tertiary</td><td class="num">7.4</td><td class="num">6.5</td><td class="num">5.4</td><td class="num" style="color:var(--warning)">4.1</td></tr>
+</tbody></table>
+<span class="t-label">Text beside a glow</span>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+<span class="fx-box" style="box-shadow:var(--neon-ok);background:rgba(61,240,174,0.12)"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg>Healthy · 29.3 °C</span>
+<span class="fx-box" style="box-shadow:var(--neon-warn);background:rgba(255,194,61,0.12)"><svg class="ic" aria-hidden="true"><use href="#i-alert"></use></svg>Anomaly · 31.8 °C</span>
+<span class="fx-box" style="box-shadow:var(--neon-bad);background:rgba(255,98,128,0.12)"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg>Down · no data</span>
+<span class="fx-box" style="box-shadow:var(--neon-accent);background:rgba(149,155,255,0.14)"><svg class="ic" aria-hidden="true"><use href="#i-play"></use></svg>Selected · dc-env-01</span>
+</div>
+<p class="faint" style="font-size:13px">WCAG contrast ratios (computed 2026-10-20). Text on a 12 % neon tint over surface-1 stays at 10.4 to 12.2:1 (primary) and 4.6 to 8.4:1 (the neon colour itself). The glow is a <span class="mono">box-shadow</span> or <span class="mono">drop-shadow</span> outside the border; nothing glows behind text, so the ratios above hold. Tertiary text stays off surface-3. Depth also comes from a 1 px cyan top highlight and <span class="mono">border-subtle</span>.</p>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Colour roles</h3></div>
+<div class="card-b col" style="gap:14px">
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px"><div class="sw"><div class="swatch" style="background:#959bff;box-shadow:0 0 0 1px rgba(149,155,255,0.6),0 0 18px rgba(149,155,255,0.55)"></div><span class="mono" style="font-size:12px">accent</span><span class="faint" style="font-size:12px">#959BFF</span><span class="faint num" style="font-size:12px">6.6:1 on s1</span></div><div class="sw"><div class="swatch" style="background:#3df0ae;box-shadow:0 0 0 1px rgba(61,240,174,0.6),0 0 18px rgba(61,240,174,0.55)"></div><span class="mono" style="font-size:12px">success</span><span class="faint" style="font-size:12px">#3DF0AE</span><span class="faint num" style="font-size:12px">11.2:1 on s1</span></div><div class="sw"><div class="swatch" style="background:#ffc23d;box-shadow:0 0 0 1px rgba(255,194,61,0.6),0 0 18px rgba(255,194,61,0.55)"></div><span class="mono" style="font-size:12px">warning</span><span class="faint" style="font-size:12px">#FFC23D</span><span class="faint num" style="font-size:12px">10.2:1 on s1</span></div><div class="sw"><div class="swatch" style="background:#ff6280;box-shadow:0 0 0 1px rgba(255,98,128,0.6),0 0 18px rgba(255,98,128,0.55)"></div><span class="mono" style="font-size:12px">danger</span><span class="faint" style="font-size:12px">#FF6280</span><span class="faint num" style="font-size:12px">5.7:1 on s1</span></div><div class="sw"><div class="swatch" style="background:#44d2ff;box-shadow:0 0 0 1px rgba(68,210,255,0.6),0 0 18px rgba(68,210,255,0.55)"></div><span class="mono" style="font-size:12px">info</span><span class="faint" style="font-size:12px">#44D2FF</span><span class="faint num" style="font-size:12px">9.3:1 on s1</span></div></div>
+<div class="row wrap" style="gap:8px">
+<span class="sev" data-sev="critical"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Critical</span>
+<span class="sev" data-sev="high"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>High</span>
+<span class="sev" data-sev="medium"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Medium</span>
+<span class="sev" data-sev="low"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Low</span>
+<span class="chip is-accent">Accent</span><span class="chip is-ok">Healthy</span><span class="chip is-warn">Anomaly</span><span class="chip is-bad">Down</span>
+</div>
+<svg viewBox="0 0 560 54" role="img" aria-label="Neon recipe: a wide halo, a glow and a bright core" style="display:block;width:100%;height:auto"><defs><filter id="rf" filterUnits="userSpaceOnUse" x="0" y="0" width="560" height="54"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter><filter id="rg" filterUnits="userSpaceOnUse" x="0" y="0" width="560" height="54"><feGaussianBlur stdDeviation="2" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs>
+<line x1="8" x2="260" y1="27" y2="27" stroke="#47d7ff" stroke-width="10" stroke-opacity="0.28" filter="url(#rf)"></line><line x1="8" x2="260" y1="27" y2="27" stroke="#47d7ff" stroke-width="4" stroke-opacity="0.6" filter="url(#rg)"></line><line x1="8" x2="260" y1="27" y2="27" stroke="#d8f6ff" stroke-width="1.8"></line>
+<text x="290" y="16" style="font-size:12.5px;fill:#a6b8c5;font-family:var(--font-ui)">halo · 10 px · 25 %</text><text x="290" y="31" style="font-size:12.5px;fill:#a6b8c5;font-family:var(--font-ui)">glow · 4 px · 60 %</text><text x="290" y="46" style="font-size:12.5px;fill:#a6b8c5;font-family:var(--font-ui)">core · 1.8 px · near white</text></svg>
+<p class="faint" style="font-size:13px">Electric tones: saturated hues that stay readable as text (4.6:1 or more on surface-2) and glow without turning white. Electric cyan <span class="mono">#47D7ff</span> (<span class="mono">--flow</span>) is energy moving and belongs to data lines and focus; indigo accent means “you can act on this” or “this is selected”, never a fault; neon green is healthy or delivered; amber is anomaly; one hot red serves critical alerts and failed components, told apart by icon and label. Alert severity <span class="mono">high</span> keeps an orange (<span class="mono">#FF8F3A</span>) of its own so it is not mistaken for amber.</p>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Status language</h3></div>
+<div class="card-b col" style="gap:10px">
+<div class="topo" style="border-radius:var(--radius-2)">
+<svg viewBox="0 0 330 250" role="img" aria-label="Five node states: healthy, anomaly, paused or silent, down, and selected">
+<g class="tn is-ok"><rect class="b" x="10" y="8" width="310" height="38" rx="9"></rect><use class="ico" href="#i-server" x="20" y="18" width="18" height="18"></use><text class="t" x="46" y="32">Healthy</text><text class="s" x="310" y="32" text-anchor="end">green edge · slow breathing</text></g>
+<g class="tn is-warn"><rect class="b" x="10" y="54" width="310" height="38" rx="9"></rect><use class="ico" href="#i-server" x="20" y="64" width="18" height="18"></use><text class="t" x="46" y="78">Anomaly or degraded</text><text class="s" x="310" y="78" text-anchor="end">amber · fast pulse</text></g>
+<g class="tn is-stale"><rect class="b" x="10" y="100" width="310" height="38" rx="9"></rect><use class="ico" href="#i-server" x="20" y="110" width="18" height="18"></use><text class="t" x="46" y="124">Paused or silent</text><text class="s" x="310" y="124" text-anchor="end">grey · dashed · dark</text></g>
+<g class="tn is-bad"><rect class="b" x="10" y="146" width="310" height="38" rx="9"></rect><use class="ico" href="#i-x" x="20" y="156" width="18" height="18"></use><text class="t" x="46" y="170">Down</text><text class="s" x="310" y="170" text-anchor="end">red · marching dashes · flicker</text></g>
+<g class="tn is-selected"><rect class="halo" x="7" y="189" width="316" height="44" rx="12"></rect><rect class="b" x="10" y="192" width="310" height="38" rx="9"></rect><use class="ico" href="#i-server" x="20" y="202" width="18" height="18"></use><text class="t" x="46" y="216">Selected</text><text class="s" x="310" y="216" text-anchor="end">indigo · 2 px · breathing halo</text></g>
+</svg>
+</div>
+<p class="faint" style="font-size:13px">The edge light is the state, in motion: healthy breathes (3.2 s), an anomaly pulses faster (1.3 s) so it is the first thing the eye finds, down stutters like a failing arc and its dashes march, paused and silent stay dark. A state is still always border style, icon and a word, never colour or light alone. At most 12 nodes animate at once; the rest hold their glow still.</p>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Type</h3></div>
+<div class="card-b col" style="gap:10px">
+<div class="row" style="align-items:baseline;gap:14px"><span class="t-neon" style="font-size:32px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums">29.3 °C</span><span class="t-neon-warn" style="font-size:32px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums">1450 ppm</span><span class="t-neon-ok" style="font-size:32px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums">0 gaps</span></div>
+<span class="faint" style="font-size:13px">Geist 600 · metrics, glow cyan, amber or green by state</span>
+<div class="row" style="align-items:baseline"><span class="t-title" style="font-size:24px;font-weight:600">Page title</span><span class="faint">24 · 600 · indigo to ice gradient</span></div>
+<div class="row" style="align-items:baseline"><span class="t-label">Alert delivery</span><span class="faint">13 · 500 · tracked, cyan</span></div>
+<div class="row" style="align-items:baseline"><span style="font-size:16px;font-weight:600">Card title</span><span class="faint">16 · 600 · no glow</span></div>
+<div class="row" style="align-items:baseline"><span style="font-size:14px">Body text. The smallest text is 13 px.</span><span class="faint">14 · 400 · no glow</span></div>
+<div class="row" style="align-items:baseline"><span class="mono" style="color:#bfeaff">campus/BLD-DC/dc-env-01/telemetry</span></div>
+<span class="faint" style="font-size:13px">JetBrains Mono for ids, topics, payloads, logs and rule names, in pale cyan. Numbers are tabular, so a live value never moves its neighbours. Only numerals of 24 px and up glow (<span class="mono">.t-neon</span>); smaller text keeps a solid colour so it stays sharp.</span>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Controls</h3></div>
+<div class="card-b col" style="gap:14px">
+<div class="row wrap">
+<button class="btn primary" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Run</button>
+<button class="btn" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-pause"></use></svg>Pause</button>
+<button class="btn" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-step"></use></svg>Step</button>
+<button class="btn outline" type="button">Save as…</button>
+<button class="btn danger" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-stop"></use></svg>Stop</button>
+<button class="btn ghost" type="button">Cancel</button>
+<button class="btn" type="button" disabled>Disabled</button>
+</div>
+<div class="row wrap" style="gap:16px">
+<div class="seg" role="group" aria-label="Shape"><button class="is-on" type="button">Step</button><button type="button">Ramp</button><button type="button">Spike</button></div>
+<div class="row"><span class="switch is-on" role="img" aria-label="On"></span><span>Follow</span></div>
+<div class="row"><span class="switch" role="img" aria-label="Off"></span><span class="muted">Jitter</span></div>
+<div class="row" style="gap:6px"><span class="cb is-on" role="checkbox" aria-checked="true"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg></span><span class="cb" role="checkbox" aria-checked="false"></span></div>
+</div>
+<div class="row" style="gap:12px">
+<div class="field" style="width:130px"><label>Interval</label><div class="input"><span class="num">2000</span><span class="unit">ms</span></div></div>
+<div class="field" style="width:150px"><label>Focused</label><div class="input is-focus"><span class="num">29.2</span><span class="unit">°C</span></div></div>
+<div class="field sp"><label>Value · raise 27</label><div class="slider"><span class="trk"></span><span class="fill" style="width:62%"></span><span class="mark" style="left:70%;background:var(--sev-high)"></span><span class="thumb" style="left:62%"></span></div></div>
+</div>
+<div class="progress"><i style="width:58%"></i></div>
+<div class="row wrap" style="gap:8px"><span class="kbd">Space</span><span class="muted">next</span><span class="kbd">⌘ K</span><span class="muted">search</span><span class="kbd">G</span><span class="muted">go to…</span></div>
+<span class="t-label">States</span>
+<div style="display:grid;grid-template-columns:64px repeat(5,minmax(0,1fr));gap:8px;align-items:center;font-size:12.5px;color:var(--text-tertiary)">
+<span></span><span>Default</span><span>Hover</span><span>Pressed</span><span>Focus</span><span>Disabled</span>
+<span>Primary</span><button class="btn primary sm" type="button">Run</button><button class="btn primary sm is-hover" type="button">Run</button><button class="btn primary sm is-pressed" type="button">Run</button><button class="btn primary sm is-focus" type="button">Run</button><button class="btn primary sm" type="button" disabled>Run</button>
+<span>Secondary</span><button class="btn sm" type="button">Pause</button><button class="btn sm is-hover" type="button">Pause</button><button class="btn sm is-pressed" type="button">Pause</button><button class="btn sm is-focus" type="button">Pause</button><button class="btn sm" type="button" disabled>Pause</button>
+<span>Outline</span><button class="btn outline sm" type="button">Save</button><button class="btn outline sm is-hover" type="button">Save</button><button class="btn outline sm is-pressed" type="button">Save</button><button class="btn outline sm is-focus" type="button">Save</button><button class="btn outline sm" type="button" disabled>Save</button>
+<span>Danger</span><button class="btn danger sm" type="button">Stop</button><button class="btn danger sm is-hover" type="button">Stop</button><button class="btn danger sm is-pressed" type="button">Stop</button><button class="btn danger sm is-focus" type="button">Stop</button><button class="btn danger sm" type="button" disabled>Stop</button>
+<span>Ghost</span><button class="btn ghost sm" type="button">Cancel</button><button class="btn ghost sm is-hover" type="button">Cancel</button><button class="btn ghost sm is-pressed" type="button">Cancel</button><button class="btn ghost sm is-focus" type="button">Cancel</button><button class="btn ghost sm" type="button" disabled>Cancel</button>
+</div>
+<div class="row wrap" style="gap:16px;align-items:center">
+<div class="seg" role="group" aria-label="Segment hover"><button class="is-on" type="button">Step</button><button class="is-hover" type="button">Ramp (hover)</button><button type="button">Spike</button></div>
+<div class="row"><span class="switch is-hover" role="img" aria-label="Off, hover"></span><span class="muted">Hover</span></div>
+<div class="row"><span class="switch is-on is-hover" role="img" aria-label="On, hover"></span><span class="muted">Hover</span></div>
+<div class="row"><span class="cb is-hover" role="checkbox" aria-checked="false"></span><span class="muted">Hover</span></div>
+<div class="field" style="width:120px"><div class="input is-hover"><span class="num">2000</span><span class="unit">ms</span></div></div>
+<div class="row" style="gap:6px"><button class="pg is-hover" type="button">3</button><button class="icon-btn is-hover" type="button" aria-label="Settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg></button></div>
+</div>
+<p class="faint" style="font-size:13px">Controls light up when they can act: the primary action and the selected option carry an indigo edge light, hover and focus switch the edge to cyan, danger is red, and a disabled control has no light at all. Every control that acts shows <span class="mono">cursor: pointer</span> and answers a hover within 120 ms; a pressed control drops 1 px and dims its glow; a disabled one shows <span class="mono">not-allowed</span> and never glows; text fields keep the text cursor. Sliders and progress fill from indigo to cyan like a charging line.</p>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Motion</h3></div>
+<div class="card-b" style="padding-top:8px">
+<table class="tbl" style="font-size:13px">
+<thead><tr><th>Event</th><th>Effect</th><th>Timing</th><th>Live</th></tr></thead>
+<tbody>
+<tr><td>Message on a line</td><td>A dot and a spark travel along the direction of data</td><td class="num">2.2 s</td><td><span class="fx-spark"></span></td></tr>
+<tr><td>Healthy node</td><td>Edge light breathes</td><td class="num">3.2 s</td><td><span class="fx-box fx-ok">Healthy</span></td></tr>
+<tr><td>Anomaly</td><td>Amber edge pulses</td><td class="num">1.3 s</td><td><span class="fx-box fx-warn">Anomaly</span></td></tr>
+<tr><td>Down</td><td>Red edge stutters, dashes march</td><td class="num">2.4 s</td><td><span class="fx-box fx-bad">Down</span></td></tr>
+<tr><td>Selected</td><td>Indigo halo breathes</td><td class="num">2.4 s</td><td><span class="fx-box fx-sel">Selected</span></td></tr>
+<tr><td>Fault injected</td><td>Node changes state and holds it</td><td class="num">200 ms</td><td class="faint">once</td></tr>
+<tr><td>Link lost</td><td>Line turns dashed; dots stop; the light goes out</td><td class="num">200 ms</td><td class="faint">once</td></tr>
+<tr><td>Rule raised</td><td>Rules node flashes; a row is added to the timeline</td><td class="num">400 ms</td><td class="faint">once</td></tr>
+<tr><td>Pause</td><td>All motion stops; state and camera stay</td><td class="num">0</td><td class="faint">held</td></tr>
+</tbody></table>
+<p class="faint" style="font-size:13px;margin-top:8px">Motion follows the engine’s state, never a loop of its own: a node breathes only while it is in that state. With <span class="mono">prefers-reduced-motion</span> the dots, sparks, breathing and flicker are not drawn; the glow stays, still. Caps: 4 dots per line, 24 on screen, 24 glowing lines, 12 animated nodes.</p>
+</div>
+</section>
+
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Device identity</h3></div>
+<div class="card-b col" style="gap:12px">
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+<div class="col" style="align-items:center;gap:8px"><div class="row" style="gap:8px"><span class="dg sq is-ok"><svg class="ic" aria-hidden="true"><use href="#i-rack"></use></svg></span><span class="dg sq is-warn"><svg class="ic" aria-hidden="true"><use href="#i-rack"></use></svg></span><span class="dg sq is-bad"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></span></div><b>Server room</b><span class="faint" style="font-size:13px;text-align:center">rounded square · rack</span></div><div class="col" style="align-items:center;gap:8px"><div class="row" style="gap:8px"><span class="dg ci is-ok"><svg class="ic" aria-hidden="true"><use href="#i-wind"></use></svg></span><span class="dg ci is-warn"><svg class="ic" aria-hidden="true"><use href="#i-wind"></use></svg></span><span class="dg ci is-bad"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></span></div><b>Indoor air</b><span class="faint" style="font-size:13px;text-align:center">circle · air flow</span></div><div class="col" style="align-items:center;gap:8px"><div class="row" style="gap:8px"><span class="dg hx is-ok"><svg class="ic" aria-hidden="true"><use href="#i-zap"></use></svg></span><span class="dg hx is-warn"><svg class="ic" aria-hidden="true"><use href="#i-zap"></use></svg></span><span class="dg hx is-bad"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></span></div><b>Power meter</b><span class="faint" style="font-size:13px;text-align:center">hexagon · bolt</span></div>
+</div>
+<div class="row wrap" style="gap:12px;font-size:14px"><span class="mi" style="color:#bfeaff"><svg class="ic" aria-hidden="true"><use href="#i-thermo"></use></svg>temperature_c</span><span class="mi" style="color:#bfeaff"><svg class="ic" aria-hidden="true"><use href="#i-droplets"></use></svg>humidity_pct</span><span class="mi" style="color:#bfeaff"><svg class="ic" aria-hidden="true"><use href="#i-cloud"></use></svg>co2_ppm</span><span class="mi" style="color:#bfeaff"><svg class="ic" aria-hidden="true"><use href="#i-zap"></use></svg>power_kw</span></div>
+<p class="faint" style="font-size:13px">Three kinds, three shapes, one glyph each, so a device is recognisable in a graph, on a card and in 3D without reading its name. The shape is the kind and the edge light is the state (healthy, anomaly, down, left to right). A short code (<span class="dcode" style="margin:0">DC·1</span> <span class="dcode" style="margin:0">LIB</span> <span class="dcode" style="margin:0">HUB</span>) comes from the zone code and an index. Colour and light are never identity; they are status.</p>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Data lines</h3></div>
+<div class="card-b col" style="gap:10px">
+<div class="topo" style="border-radius:var(--radius-2)">
+<svg viewBox="0 0 330 250" role="img" aria-label="Five line states: flowing, anomaly, delivered, no flow and down">
+<g class="tel"><path class="te-halo" d="M16,28 C120,28 200,28 314,28"></path><path class="te-core" d="M16,28 C120,28 200,28 314,28"></path><path class="te-flow" d="M16,28 C120,28 200,28 314,28"></path></g>
+<g class="tel is-warn"><path class="te-halo" d="M16,78 C120,78 200,78 314,78"></path><path class="te-core" d="M16,78 C120,78 200,78 314,78"></path><path class="te-flow" d="M16,78 C120,78 200,78 314,78"></path></g>
+<g class="tel is-ok"><path class="te-halo" d="M16,128 C120,128 200,128 314,128"></path><path class="te-core" d="M16,128 C120,128 200,128 314,128"></path><path class="te-flow" d="M16,128 C120,128 200,128 314,128"></path></g>
+<g class="tel is-off"><path class="te-halo" d="M16,178 L314,178"></path><path class="te-core" d="M16,178 L314,178"></path><path class="te-flow" d="M16,178 L314,178"></path></g>
+<g class="tel is-bad"><path class="te-halo" d="M16,226 L314,226"></path><path class="te-core" d="M16,226 L314,226"></path><path class="te-flow" d="M16,226 L314,226"></path></g>
+<circle class="fd" r="3.5"><animateMotion dur="2.2s" repeatCount="indefinite" path="M16,28 L314,28"></animateMotion></circle>
+<circle class="fd warn" r="3.5"><animateMotion dur="2.2s" repeatCount="indefinite" path="M16,78 L314,78"></animateMotion></circle>
+<circle class="fd ok" r="3.5"><animateMotion dur="2.2s" repeatCount="indefinite" path="M16,128 L314,128"></animateMotion></circle>
+<text class="el" x="16" y="16">Flowing: electric cyan, moving pulse</text>
+<text class="el" x="16" y="66">Anomaly: amber</text>
+<text class="el" x="16" y="116">Delivered: green</text>
+<text class="el" x="16" y="166">No flow: dim dashed wire, no light</text>
+<text class="el" x="16" y="214">Down: red dashed, no light</text>
+</svg>
+</div>
+<p class="faint" style="font-size:13px">Light means energy is moving. A line that carries nothing is dark, so the glow can be trusted. Data lines are where the electric style began and stay the brightest thing on a page. The same three layers (halo, glow, core) now also edge nodes, controls and charts, at lower strength, so a line still reads as the one carrying energy. Capped at 24 glowing lines on screen; reduced motion keeps the glow and stops the pulse.</p>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Wide screens</h3></div>
+<div class="card-b" style="padding-top:8px">
+<svg viewBox="0 0 330 96" role="img" aria-label="Three screen sizes: labelled navigation, icon rail, and the whole UI scaled for a wall" style="display:block;width:100%;height:auto"><g transform="translate(6,6)"><rect x="0" y="0" width="84" height="52" rx="6" fill="#08131d" stroke="#47d7ff" stroke-width="1.6" style="filter:drop-shadow(0 0 5px rgba(71,215,255,0.8))"></rect><rect x="4" y="4" width="24" height="44" rx="3" fill="#47d7ff" fill-opacity="0.22" stroke="#47d7ff" stroke-opacity="0.6"></rect><rect x="32" y="4" width="48" height="20" rx="3" fill="#959bff" fill-opacity="0.25" stroke="#959bff" stroke-opacity="0.7"></rect><rect x="32" y="28" width="48" height="20" rx="3" fill="#47d7ff" fill-opacity="0.1" stroke="#47d7ff" stroke-opacity="0.35"></rect><text x="42.0" y="70" text-anchor="middle" style="font-size:12px;fill:#a6b8c5;font-family:var(--font-ui)">under 1600</text></g><g transform="translate(108,6)"><rect x="0" y="0" width="108" height="64" rx="6" fill="#08131d" stroke="#47d7ff" stroke-width="1.6" style="filter:drop-shadow(0 0 5px rgba(71,215,255,0.8))"></rect><rect x="4" y="4" width="10" height="56" rx="3" fill="#47d7ff" fill-opacity="0.22" stroke="#47d7ff" stroke-opacity="0.6"></rect><rect x="18" y="4" width="86" height="24" rx="3" fill="#959bff" fill-opacity="0.25" stroke="#959bff" stroke-opacity="0.7"></rect><rect x="18" y="32" width="86" height="28" rx="3" fill="#47d7ff" fill-opacity="0.1" stroke="#47d7ff" stroke-opacity="0.35"></rect><text x="54.0" y="82" text-anchor="middle" style="font-size:12px;fill:#a6b8c5;font-family:var(--font-ui)">1600 and up</text></g><g transform="translate(232,6)"><rect x="0" y="0" width="92" height="56" rx="6" fill="#08131d" stroke="#47d7ff" stroke-width="1.6" style="filter:drop-shadow(0 0 5px rgba(71,215,255,0.8))"></rect><rect x="4" y="4" width="10" height="48" rx="3" fill="#47d7ff" fill-opacity="0.22" stroke="#47d7ff" stroke-opacity="0.6"></rect><rect x="18" y="4" width="70" height="21" rx="3" fill="#959bff" fill-opacity="0.25" stroke="#959bff" stroke-opacity="0.7"></rect><rect x="18" y="29" width="70" height="23" rx="3" fill="#47d7ff" fill-opacity="0.1" stroke="#47d7ff" stroke-opacity="0.35"></rect><text x="46.0" y="74" text-anchor="middle" style="font-size:12px;fill:#a6b8c5;font-family:var(--font-ui)">2560 · 3200</text></g></svg>
+<table class="tbl" style="font-size:13px">
+<thead><tr><th>Width</th><th>Layout</th></tr></thead>
+<tbody>
+<tr><td class="num t-label" style="font-size:13px">&lt; 1600 px</td><td>Labelled navigation, 28 px margin</td></tr>
+<tr><td class="num t-label" style="font-size:13px">≥ 1600 px</td><td>Icon rail (labels on hover or pinned), 40 px margin, larger figures</td></tr>
+<tr><td class="num t-label" style="font-size:13px">≥ 2560 px</td><td>Whole UI scaled ×1.25</td></tr>
+<tr><td class="num t-label" style="font-size:13px">≥ 3200 px</td><td>Whole UI scaled ×1.5, for a wall</td></tr>
+</tbody></table>
+<p class="faint" style="font-size:13px;margin-top:8px">Stage pages (Overview, Topology, Twin, Lab) give the picture all the width the side panels leave: panels are fixed at 340 to 460 px, the stage takes the rest. Nothing is capped at a maximum content width. The glow is drawn in CSS pixels, so it scales with the whole UI (×1.25, ×1.5) and keeps its proportion on a wall; at 3200 px the halo of a data line is 15 px.</p>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Tables</h3></div>
+<div class="card-b" style="padding-top:8px">
+<table class="tbl is-click" style="font-size:13px">
+<thead><tr><th>Device</th><th>State</th><th>Reading</th><th>Seen</th><th></th></tr></thead>
+<tbody>
+<tr class=""><td><div class="row" style="gap:10px"><span class="dg sq is-ok" style="width:28px;height:28px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rack"></use></svg></span><b class="mono" style="color:var(--text-primary)">dc-env-02</b></div></td><td><span class="chip is-ok">Healthy</span></td><td class="num">22.4 °C</td><td class="num faint">2 s ago</td><td style="text-align:right"><button class="btn ghost sm row-act" type="button">Open<svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron"></use></svg></button></td></tr>
+<tr class="is-hover"><td><div class="row" style="gap:10px"><span class="dg sq is-warn" style="width:28px;height:28px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rack"></use></svg></span><b class="mono" style="color:var(--text-primary)">dc-env-01</b></div></td><td><span class="chip is-warn">Anomaly</span></td><td class="num">29.3 °C</td><td class="num faint">1 s ago</td><td style="text-align:right"><button class="btn ghost sm row-act" type="button">Open<svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron"></use></svg></button></td></tr>
+<tr class="is-selected"><td><div class="row" style="gap:10px"><span class="dg ci is-ok" style="width:28px;height:28px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-wind"></use></svg></span><b class="mono" style="color:var(--text-primary)">lha-air-01</b></div></td><td><span class="chip is-ok">Healthy</span></td><td class="num">688 ppm</td><td class="num faint">2 s ago</td><td style="text-align:right"><button class="btn ghost sm row-act" type="button">Open<svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron"></use></svg></button></td></tr>
+<tr class=""><td><div class="row" style="gap:10px"><span class="dg hx is-bad" style="width:28px;height:28px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-zap"></use></svg></span><b class="mono" style="color:var(--text-primary)">hub-power-01</b></div></td><td><span class="chip is-bad">Down</span></td><td class="num">—</td><td class="num faint">4 min ago</td><td style="text-align:right"><button class="btn ghost sm row-act" type="button">Open<svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron"></use></svg></button></td></tr>
+</tbody></table>
+<p class="faint" style="font-size:13px;margin-top:8px">Hover (second row): the row takes a cyan wash, a 2 px cyan bar on its left edge, primary text and a quiet action on the right (also shown on keyboard focus). Selected (third row) keeps the indigo tint and an indigo bar, and does not change on hover. A row that opens something shows <span class="mono">cursor: pointer</span> (<span class="mono">.tbl.is-click</span>); a read-only table still lights up but keeps the arrow. Hover never changes a row's height, so nothing jumps.</p>
+</div>
+</section>
+
+<section class="card">
+<div class="card-h"><h3 class="card-t">Pagination</h3></div>
+<div class="card-b col" style="gap:10px;padding-bottom:0">
+<table class="tbl" style="font-size:13px">
+<thead><tr><th>Table</th><th>Paging</th></tr></thead>
+<tbody>
+<tr><td>Event stream</td><td>Numbered, 10 / 25 / 50 / 100 rows, 200 messages kept in memory</td></tr>
+<tr><td>Overview timeline</td><td>Numbered, 10 / 25 / 50 / 100 rows, 5,000 events kept for the session</td></tr>
+<tr><td>Alerts</td><td>Cursor (Newer, Older): the API returns <span class="mono">X-Next-Cursor</span>, no total</td></tr>
+<tr><td>Fleet (above 12 devices)</td><td>Numbered, 10 / 25 / 50 rows; server-side above 60 devices</td></tr>
+<tr><td>Scenarios</td><td>Numbered, 6 / 12 / 24 cards per page</td></tr>
+</tbody></table>
+</div>
+<div class="pager" style="margin-top:8px">
+<span>Rows per page</span><div class="input" style="width:78px;height:30px"><span class="num">25</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<span class="range">Rows <b>26–50</b> of <b>312</b></span>
+<span class="sp"></span>
+<div class="pages"><button class="pg" type="button" aria-label="Previous page">‹</button><button class="pg" type="button">1</button><button class="pg is-on" type="button" aria-current="page">2</button><button class="pg" type="button">3</button><span class="gap-l">…</span><button class="pg" type="button">13</button><button class="pg" type="button" aria-label="Next page">›</button></div>
+</div>
+<div class="pager">
+<span>First page</span><span class="range">Rows <b>1–25</b> of <b>312</b></span><span class="sp"></span>
+<div class="pages"><button class="pg" type="button" disabled aria-label="Previous page">‹</button><button class="pg is-on" type="button" aria-current="page">1</button><button class="pg" type="button">2</button><button class="pg" type="button">3</button><span class="gap-l">…</span><button class="pg" type="button">13</button><button class="pg" type="button" aria-label="Next page">›</button></div>
+</div>
+<div class="card-b" style="padding-top:8px"><p class="faint" style="font-size:13px">The current page is lit in indigo, a page under the pointer picks up a cyan edge, a disabled end has no light. A table longer than 25 rows is paged; audit tables are never infinite scroll. Page and size live in the URL (<span class="mono">?page=2&amp;size=25</span>) so a reload keeps the place. The range is announced politely when it changes; a live table follows only on page 1. Selection survives a page change.</p></div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

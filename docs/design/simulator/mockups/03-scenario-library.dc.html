@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scenario library</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.scn{display:flex;flex-direction:column}
+.scn-b{padding:14px 16px 0;display:flex;flex-direction:column;gap:12px;flex:1}
+.mini{position:relative;height:6px;border-radius:3px;background:var(--surface-3)}
+.mini i{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+.mini-ax{display:flex;justify-content:space-between;font-size:13px;color:var(--text-tertiary);margin-top:4px}
+.exp{display:flex;gap:8px;font-size:14px;color:var(--text-secondary);line-height:1.35}
+.exp .ic{margin-top:2px;color:var(--text-tertiary)}
+.scn-f{display:flex;align-items:center;gap:8px;padding:12px 16px 14px;margin-top:14px;border-top:1px solid var(--border-subtle)}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M12 5v14"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></symbol>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+<filter id="neon" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item is-active" type="button" aria-label="Simulation lab" title="Simulation lab" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="seg" role="group" aria-label="Simulation lab" style="align-self:flex-start"><button class="" type="button">Workspace</button><button class="is-on" type="button">Scenarios</button><button class="" type="button">Timeline</button><button class="" type="button">Faults</button></div>
+<div class="page-h">
+<div>
+<h2 class="page-t">Scenarios</h2>
+<p class="page-d" style="max-width:1000px">A scenario is a script of anomalies. Studio reads <span class="mono">rules.json</span> and tells you which alerts it should raise, and when, before you run it. Dashed lines are the rule's raise and clear thresholds; the dot on the top edge is the alert, the green dot is the clear.</p>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:12px">
+<button class="btn outline" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-upload"></use></svg>Import JSON</button>
+<button class="btn primary" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-plus"></use></svg>New scenario</button>
+</div>
+</div>
+
+<div class="tabs" role="tablist" aria-label="Scenario source">
+<button class="tab is-active" role="tab" aria-selected="true" type="button">All <span class="cnt">38</span></button>
+<button class="tab" role="tab" aria-selected="false" type="button">Built-in <span class="cnt">2</span></button>
+<button class="tab" role="tab" aria-selected="false" type="button">Custom <span class="cnt">36</span></button>
+</div>
+
+<div class="row" style="gap:12px;flex-wrap:nowrap">
+<div class="input" style="width:320px"><svg class="ic ic-s" aria-hidden="true" style="color:var(--text-tertiary)"><use href="#i-search"></use></svg><span class="faint">Find a scenario by name, device or rule</span></div>
+<div class="input" style="width:210px"><span class="faint">Sort</span><span>Recently run</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<span class="sp"></span>
+<span class="faint" style="font-size:13px">Search, tab, sort, page and size are in the URL.</span>
+</div>
+
+<div class="fleet">
+
+<article class="card scn is-selected" style="border-color:rgba(255, 143, 58,0.5)">
+<div class="dev-h"><span class="itile" style="color:var(--sev-high)"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></span><div class="sp"><div class="dev-name">server-room-overheat</div><div class="dev-id">built-in · 1 anomaly · 80 s</div></div><span class="chip is-warn">Running · 41 s</span></div>
+<div class="scn-b">
+<p class="muted" style="font-size:14px">Row A runs hot for a minute, then recovers.</p>
+<svg class="cx" viewBox="0 0 330 112" role="img" aria-label="server-room-overheat: dc-env-01 temperature_c held at 29.2 from 20 s for 60 s; alert expected at 24 s, clears at 80 s; now at 41 s"><defs><linearGradient id="sg1" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffc23d" stop-opacity="0.34"></stop><stop offset="1" stop-color="#ffc23d" stop-opacity="0.02"></stop></linearGradient></defs><rect x="34" y="12" width="98.4" height="72" fill="#959bff" fill-opacity="0.07"></rect><line class="gl major" x1="34.0" x2="34.0" y1="12" y2="84"></line><text x="34.0" y="100" text-anchor="start">0</text><line class="gl major" x1="106.0" x2="106.0" y1="12" y2="84"></line><text x="106.0" y="100" text-anchor="middle">30</text><line class="gl major" x1="178.0" x2="178.0" y1="12" y2="84"></line><text x="178.0" y="100" text-anchor="middle">60</text><line class="gl major" x1="250.0" x2="250.0" y1="12" y2="84"></line><text x="250.0" y="100" text-anchor="middle">90</text><line class="gl major" x1="322.0" x2="322.0" y1="12" y2="84"></line><text x="322.0" y="100" text-anchor="end">120 s</text><line class="gl" x1="58.0" x2="58.0" y1="80" y2="84"></line><line class="gl" x1="82.0" x2="82.0" y1="80" y2="84"></line><line class="gl" x1="130.0" x2="130.0" y1="80" y2="84"></line><line class="gl" x1="154.0" x2="154.0" y1="80" y2="84"></line><line class="gl" x1="202.0" x2="202.0" y1="80" y2="84"></line><line class="gl" x1="226.0" x2="226.0" y1="80" y2="84"></line><line class="gl" x1="274.0" x2="274.0" y1="80" y2="84"></line><line class="gl" x1="298.0" x2="298.0" y1="80" y2="84"></line><line class="gl" x1="34" x2="322" y1="84" y2="84"></line><line class="raise" x1="34" x2="322" y1="47.8" y2="47.8"></line><text class="raise-l" x="322" y="43.8" text-anchor="end">raise 27</text><line class="clear" x1="34" x2="322" y1="55.6" y2="55.6"></line><polygon points="82.0,71.1 82.0,36.5 226.0,36.5 226.0,71.1" fill="url(#sg1)"></polygon><polyline class="ser" points="34,71.1 82.0,71.1 82.0,36.5 226.0,36.5 226.0,71.1 322,71.1"></polyline><text class="hi" x="154.0" y="30.5" text-anchor="middle" style="fill:#ffc23d">29.2 °C</text><line x1="91.6" x2="91.6" y1="12" y2="84" stroke="#ff8f3a" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="91.6" cy="12" r="4.5" fill="#ff8f3a"></circle><line x1="226.0" x2="226.0" y1="12" y2="84" stroke="#3df0ae" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="226.0" cy="12" r="4.5" fill="#3df0ae"></circle><text x="84.6" y="14" text-anchor="end" style="fill:#ff8f3a;font-size:11.5px">alert ≈ 24 s</text><text x="233.0" y="14" style="fill:#3df0ae;font-size:11.5px">clears ≈ 80 s</text><line x1="132.4" x2="132.4" y1="10" y2="84" stroke="#47d7ff" stroke-width="2" style="filter:url(#neon)"></line><rect x="108.4" y="87" width="48" height="18" rx="5" fill="#47d7ff"></rect><text x="132.4" y="100" text-anchor="middle" style="fill:#08131d;font-weight:600;font-size:12px">41 s</text></svg>
+<div class="row wrap" style="gap:6px"><span class="chip mono">dc-env-01</span><span class="chip mono">temperature_c → 29.2</span></div>
+<div class="exp"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg><span>Raises <b style="color:var(--text-primary)">Server room temperature high</b> (high) about 24 s; clears about 80 s.</span></div>
+</div>
+<div class="scn-f"><button class="btn danger sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-stop"></use></svg>Stop</button><button class="btn outline sm" type="button" aria-haspopup="menu">Follow<svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron"></use></svg></button></div>
+</article>
+
+<article class="card scn">
+<div class="dev-h"><span class="itile"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></span><div class="sp"><div class="dev-name">crowded-lecture</div><div class="dev-id">built-in · 1 anomaly · 110 s</div></div></div>
+<div class="scn-b">
+<p class="muted" style="font-size:14px">Lecture Hall A fills up and CO₂ climbs.</p>
+<svg class="cx" viewBox="0 0 330 112" role="img" aria-label="crowded-lecture: lha-air-01 co2_ppm held at 1450 from 20 s for 90 s; alert expected at 24 s, clears at 110 s"><defs><linearGradient id="sg2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffc23d" stop-opacity="0.34"></stop><stop offset="1" stop-color="#ffc23d" stop-opacity="0.02"></stop></linearGradient></defs><line class="gl major" x1="34.0" x2="34.0" y1="12" y2="84"></line><text x="34.0" y="100" text-anchor="start">0</text><line class="gl major" x1="106.0" x2="106.0" y1="12" y2="84"></line><text x="106.0" y="100" text-anchor="middle">30</text><line class="gl major" x1="178.0" x2="178.0" y1="12" y2="84"></line><text x="178.0" y="100" text-anchor="middle">60</text><line class="gl major" x1="250.0" x2="250.0" y1="12" y2="84"></line><text x="250.0" y="100" text-anchor="middle">90</text><line class="gl major" x1="322.0" x2="322.0" y1="12" y2="84"></line><text x="322.0" y="100" text-anchor="end">120 s</text><line class="gl" x1="58.0" x2="58.0" y1="80" y2="84"></line><line class="gl" x1="82.0" x2="82.0" y1="80" y2="84"></line><line class="gl" x1="130.0" x2="130.0" y1="80" y2="84"></line><line class="gl" x1="154.0" x2="154.0" y1="80" y2="84"></line><line class="gl" x1="202.0" x2="202.0" y1="80" y2="84"></line><line class="gl" x1="226.0" x2="226.0" y1="80" y2="84"></line><line class="gl" x1="274.0" x2="274.0" y1="80" y2="84"></line><line class="gl" x1="298.0" x2="298.0" y1="80" y2="84"></line><line class="gl" x1="34" x2="322" y1="84" y2="84"></line><line class="raise" x1="34" x2="322" y1="44.5" y2="44.5"></line><text class="raise-l" x="78" y="40.5" text-anchor="end">raise 1200</text><line class="clear" x1="34" x2="322" y1="55.8" y2="55.8"></line><polygon points="82.0,75.5 82.0,30.5 298.0,30.5 298.0,75.5" fill="url(#sg2)"></polygon><polyline class="ser" points="34,75.5 82.0,75.5 82.0,30.5 298.0,30.5 298.0,75.5 322,75.5"></polyline><text class="hi" x="150.0" y="24.5" text-anchor="middle" style="fill:#ffc23d">1450 ppm</text><line x1="91.6" x2="91.6" y1="12" y2="84" stroke="#ff8f3a" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="91.6" cy="12" r="4.5" fill="#ff8f3a"></circle><line x1="298.0" x2="298.0" y1="12" y2="84" stroke="#3df0ae" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="298.0" cy="12" r="4.5" fill="#3df0ae"></circle><text x="84.6" y="14" text-anchor="end" style="fill:#ff8f3a;font-size:11.5px">alert ≈ 24 s</text><text x="290.0" y="14" text-anchor="end" style="fill:#3df0ae;font-size:11.5px">clears ≈ 110 s</text></svg>
+<div class="row wrap" style="gap:6px"><span class="chip mono">lha-air-01</span><span class="chip mono">co2_ppm → 1450</span></div>
+<div class="exp"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg><span>Raises <b style="color:var(--text-primary)">Poor air quality (CO₂)</b> (medium) about 24 s; clears about 110 s.</span></div>
+</div>
+<div class="scn-f"><button class="btn primary sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Run</button><button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-copy"></use></svg>Duplicate</button></div>
+</article>
+
+<article class="card scn">
+<div class="dev-h"><span class="itile"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></span><div class="sp"><div class="dev-name">humidity-excursion</div><div class="dev-id">custom · 1 anomaly · 75 s</div></div></div>
+<div class="scn-b">
+<p class="muted" style="font-size:14px">Row B humidity drifts past the limit.</p>
+<svg class="cx" viewBox="0 0 330 112" role="img" aria-label="humidity-excursion: dc-env-02 humidity_pct held at 63 from 15 s for 60 s; alert expected at 20 s, clears at 76 s"><defs><linearGradient id="sg3" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffc23d" stop-opacity="0.34"></stop><stop offset="1" stop-color="#ffc23d" stop-opacity="0.02"></stop></linearGradient></defs><line class="gl major" x1="34.0" x2="34.0" y1="12" y2="84"></line><text x="34.0" y="100" text-anchor="start">0</text><line class="gl major" x1="106.0" x2="106.0" y1="12" y2="84"></line><text x="106.0" y="100" text-anchor="middle">30</text><line class="gl major" x1="178.0" x2="178.0" y1="12" y2="84"></line><text x="178.0" y="100" text-anchor="middle">60</text><line class="gl major" x1="250.0" x2="250.0" y1="12" y2="84"></line><text x="250.0" y="100" text-anchor="middle">90</text><line class="gl major" x1="322.0" x2="322.0" y1="12" y2="84"></line><text x="322.0" y="100" text-anchor="end">120 s</text><line class="gl" x1="58.0" x2="58.0" y1="80" y2="84"></line><line class="gl" x1="82.0" x2="82.0" y1="80" y2="84"></line><line class="gl" x1="130.0" x2="130.0" y1="80" y2="84"></line><line class="gl" x1="154.0" x2="154.0" y1="80" y2="84"></line><line class="gl" x1="202.0" x2="202.0" y1="80" y2="84"></line><line class="gl" x1="226.0" x2="226.0" y1="80" y2="84"></line><line class="gl" x1="274.0" x2="274.0" y1="80" y2="84"></line><line class="gl" x1="298.0" x2="298.0" y1="80" y2="84"></line><line class="gl" x1="34" x2="322" y1="84" y2="84"></line><line class="raise" x1="34" x2="322" y1="42.7" y2="42.7"></line><text class="raise-l" x="322" y="38.7" text-anchor="end">raise 60</text><line class="clear" x1="34" x2="322" y1="53.0" y2="53.0"></line><polygon points="70.0,73.7 70.0,36.5 214.0,36.5 214.0,73.7" fill="url(#sg3)"></polygon><polyline class="ser" points="34,73.7 70.0,73.7 70.0,36.5 214.0,36.5 214.0,73.7 322,73.7"></polyline><text class="hi" x="142.0" y="30.5" text-anchor="middle" style="fill:#ffc23d">63 %</text><line x1="82.0" x2="82.0" y1="12" y2="84" stroke="#ff8f3a" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="82.0" cy="12" r="4.5" fill="#ff8f3a"></circle><line x1="216.4" x2="216.4" y1="12" y2="84" stroke="#3df0ae" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="216.4" cy="12" r="4.5" fill="#3df0ae"></circle><text x="75.0" y="14" text-anchor="end" style="fill:#ff8f3a;font-size:11.5px">alert ≈ 20 s</text><text x="223.4" y="14" style="fill:#3df0ae;font-size:11.5px">clears ≈ 76 s</text></svg>
+<div class="row wrap" style="gap:6px"><span class="chip mono">dc-env-02</span><span class="chip mono">humidity_pct → 63</span></div>
+<div class="exp"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg><span>Raises <b style="color:var(--text-primary)">Server room humidity high</b> (medium) about 20 s; clears about 76 s.</span></div>
+</div>
+<div class="scn-f"><button class="btn primary sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Run</button><button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-edit"></use></svg>Edit</button><button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-copy"></use></svg>Duplicate</button></div>
+</article>
+
+<article class="card scn">
+<div class="dev-h"><span class="itile"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></span><div class="sp"><div class="dev-name">power-peak</div><div class="dev-id">custom · 1 anomaly · 55 s</div></div></div>
+<div class="scn-b">
+<p class="muted" style="font-size:14px">The Hub exceeds its contracted capacity.</p>
+<svg class="cx" viewBox="0 0 330 112" role="img" aria-label="power-peak: hub-power-01 power_kw held at 190 from 10 s for 45 s; alert expected at 12 s, clears at 56 s"><defs><linearGradient id="sg4" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffc23d" stop-opacity="0.34"></stop><stop offset="1" stop-color="#ffc23d" stop-opacity="0.02"></stop></linearGradient></defs><line class="gl major" x1="34.0" x2="34.0" y1="12" y2="84"></line><text x="34.0" y="100" text-anchor="start">0</text><line class="gl major" x1="106.0" x2="106.0" y1="12" y2="84"></line><text x="106.0" y="100" text-anchor="middle">30</text><line class="gl major" x1="178.0" x2="178.0" y1="12" y2="84"></line><text x="178.0" y="100" text-anchor="middle">60</text><line class="gl major" x1="250.0" x2="250.0" y1="12" y2="84"></line><text x="250.0" y="100" text-anchor="middle">90</text><line class="gl major" x1="322.0" x2="322.0" y1="12" y2="84"></line><text x="322.0" y="100" text-anchor="end">120 s</text><line class="gl" x1="58.0" x2="58.0" y1="80" y2="84"></line><line class="gl" x1="82.0" x2="82.0" y1="80" y2="84"></line><line class="gl" x1="130.0" x2="130.0" y1="80" y2="84"></line><line class="gl" x1="154.0" x2="154.0" y1="80" y2="84"></line><line class="gl" x1="202.0" x2="202.0" y1="80" y2="84"></line><line class="gl" x1="226.0" x2="226.0" y1="80" y2="84"></line><line class="gl" x1="274.0" x2="274.0" y1="80" y2="84"></line><line class="gl" x1="298.0" x2="298.0" y1="80" y2="84"></line><line class="gl" x1="34" x2="322" y1="84" y2="84"></line><line class="raise" x1="34" x2="322" y1="34.4" y2="34.4"></line><text class="raise-l" x="322" y="30.4" text-anchor="end">raise 180</text><line class="clear" x1="34" x2="322" y1="46.8" y2="46.8"></line><polygon points="58.0,71.6 58.0,28.2 166.0,28.2 166.0,71.6" fill="url(#sg4)"></polygon><polyline class="ser" points="34,71.6 58.0,71.6 58.0,28.2 166.0,28.2 166.0,71.6 322,71.6"></polyline><text class="hi" x="112.0" y="22.2" text-anchor="middle" style="fill:#ffc23d">190 kW</text><line x1="62.8" x2="62.8" y1="12" y2="84" stroke="#ff8f3a" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="62.8" cy="12" r="4.5" fill="#ff8f3a"></circle><line x1="168.4" x2="168.4" y1="12" y2="84" stroke="#3df0ae" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="168.4" cy="12" r="4.5" fill="#3df0ae"></circle><text x="55.8" y="14" text-anchor="end" style="fill:#ff8f3a;font-size:11.5px">alert ≈ 12 s</text><text x="175.4" y="14" style="fill:#3df0ae;font-size:11.5px">clears ≈ 56 s</text></svg>
+<div class="row wrap" style="gap:6px"><span class="chip mono">hub-power-01</span><span class="chip mono">power_kw → 190</span></div>
+<div class="exp"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg><span>Raises <b style="color:var(--text-primary)">Power draw above contracted capacity</b> (low) about 12 s; clears about 56 s.</span></div>
+<div class="banner is-warn" style="padding:8px 10px;font-size:14px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg><span><span class="mono">hub-power-01</span> is stopped; running this starts it.</span></div>
+</div>
+<div class="scn-f"><button class="btn primary sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Run</button><button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-edit"></use></svg>Edit</button><button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-copy"></use></svg>Duplicate</button></div>
+</article>
+
+<article class="card scn">
+<div class="dev-h"><span class="itile"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></span><div class="sp"><div class="dev-name">bad-afternoon</div><div class="dev-id">custom · 3 anomalies · 120 s</div></div></div>
+<div class="scn-b">
+<p class="muted" style="font-size:14px">Three things go wrong, one after another.</p>
+<svg class="cx" viewBox="0 0 330 114" role="img" aria-label="Three anomalies in sequence"><line class="gl major" x1="46.0" x2="46.0" y1="8" y2="90"></line><text x="46.0" y="106" text-anchor="start">0</text><line class="gl major" x1="115.0" x2="115.0" y1="8" y2="90"></line><text x="115.0" y="106" text-anchor="middle">30</text><line class="gl major" x1="184.0" x2="184.0" y1="8" y2="90"></line><text x="184.0" y="106" text-anchor="middle">60</text><line class="gl major" x1="253.0" x2="253.0" y1="8" y2="90"></line><text x="253.0" y="106" text-anchor="middle">90</text><line class="gl major" x1="322.0" x2="322.0" y1="8" y2="90"></line><text x="322.0" y="106" text-anchor="end">120 s</text><rect x="4" y="12" width="320" height="23" rx="5" fill="#ffffff" fill-opacity="0.025"></rect><polygon points="9,23.5 11.5,17.5 16.5,17.5 19,23.5 16.5,29.5 11.5,29.5" fill="#1b3345" stroke="#a6b8c5" stroke-width="1.2"></polygon><text class="v" x="26" y="27.5" style="font-size:11.5px">HUB</text><rect x="69.0" y="15" width="103.5" height="17" rx="4" fill="#959bff" fill-opacity="0.22" stroke="#959bff" stroke-opacity="0.7"></rect><text x="75.0" y="27.0" style="fill:#e4edf3;font-size:11.5px;font-weight:600">190 kW</text><circle cx="73.6" cy="33" r="3.2" fill="#44d2ff"></circle><circle cx="174.8" cy="33" r="3.2" fill="#3df0ae"></circle><line x1="73.6" x2="174.8" y1="33" y2="33" stroke="#44d2ff" stroke-width="1.6" stroke-opacity="0.8"></line><rect x="4" y="38" width="320" height="23" rx="5" fill="#ffffff" fill-opacity="0.0"></rect><rect x="8" y="43.5" width="12" height="12" rx="3" fill="#1b3345" stroke="#a6b8c5" stroke-width="1.2"></rect><text class="v" x="26" y="53.5" style="font-size:11.5px">DC·1</text><rect x="115.0" y="41" width="138.0" height="17" rx="4" fill="#959bff" fill-opacity="0.22" stroke="#959bff" stroke-opacity="0.7"></rect><text x="121.0" y="53.0" style="fill:#e4edf3;font-size:11.5px;font-weight:600">29.2 °C</text><circle cx="124.2" cy="59" r="3.2" fill="#ff8f3a"></circle><circle cx="253.0" cy="59" r="3.2" fill="#3df0ae"></circle><line x1="124.2" x2="253.0" y1="59" y2="59" stroke="#ff8f3a" stroke-width="1.6" stroke-opacity="0.8"></line><rect x="4" y="64" width="320" height="23" rx="5" fill="#ffffff" fill-opacity="0.025"></rect><circle cx="14" cy="75.5" r="6.5" fill="#1b3345" stroke="#a6b8c5" stroke-width="1.2"></circle><text class="v" x="26" y="79.5" style="font-size:11.5px">LHA</text><rect x="184.0" y="67" width="138.0" height="17" rx="4" fill="#959bff" fill-opacity="0.22" stroke="#959bff" stroke-opacity="0.7"></rect><text x="190.0" y="79.0" style="fill:#e4edf3;font-size:11.5px;font-weight:600">1450 ppm</text><circle cx="193.2" cy="85" r="3.2" fill="#ffe04d"></circle><line x1="193.2" x2="322" y1="85" y2="85" stroke="#ffe04d" stroke-width="1.6" stroke-opacity="0.8" stroke-dasharray="3 3"></line></svg>
+<div class="row wrap" style="gap:6px"><span class="chip mono">hub-power-01</span><span class="chip mono">dc-env-01</span><span class="chip mono">lha-air-01</span></div>
+<div class="exp"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg><span>Raises 3 alerts: low, high, medium.</span></div>
+</div>
+<div class="scn-f"><button class="btn primary sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Run</button><button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-edit"></use></svg>Edit</button><button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-copy"></use></svg>Duplicate</button></div>
+</article>
+
+<article class="card scn">
+<div class="dev-h"><span class="itile"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></span><div class="sp"><div class="dev-name">exam-week-crowd</div><div class="dev-id">custom · 1 anomaly · 110 s</div></div></div>
+<div class="scn-b">
+<p class="muted" style="font-size:14px">Lecture Hall A stays full through the afternoon.</p>
+<svg class="cx" viewBox="0 0 330 112" role="img" aria-label="exam-week-crowd: lha-air-01 co2_ppm held at 1450 from 20 s for 90 s; alert expected at 24 s, clears at 110 s"><defs><linearGradient id="sg2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffc23d" stop-opacity="0.34"></stop><stop offset="1" stop-color="#ffc23d" stop-opacity="0.02"></stop></linearGradient></defs><line class="gl major" x1="34.0" x2="34.0" y1="12" y2="84"></line><text x="34.0" y="100" text-anchor="start">0</text><line class="gl major" x1="106.0" x2="106.0" y1="12" y2="84"></line><text x="106.0" y="100" text-anchor="middle">30</text><line class="gl major" x1="178.0" x2="178.0" y1="12" y2="84"></line><text x="178.0" y="100" text-anchor="middle">60</text><line class="gl major" x1="250.0" x2="250.0" y1="12" y2="84"></line><text x="250.0" y="100" text-anchor="middle">90</text><line class="gl major" x1="322.0" x2="322.0" y1="12" y2="84"></line><text x="322.0" y="100" text-anchor="end">120 s</text><line class="gl" x1="58.0" x2="58.0" y1="80" y2="84"></line><line class="gl" x1="82.0" x2="82.0" y1="80" y2="84"></line><line class="gl" x1="130.0" x2="130.0" y1="80" y2="84"></line><line class="gl" x1="154.0" x2="154.0" y1="80" y2="84"></line><line class="gl" x1="202.0" x2="202.0" y1="80" y2="84"></line><line class="gl" x1="226.0" x2="226.0" y1="80" y2="84"></line><line class="gl" x1="274.0" x2="274.0" y1="80" y2="84"></line><line class="gl" x1="298.0" x2="298.0" y1="80" y2="84"></line><line class="gl" x1="34" x2="322" y1="84" y2="84"></line><line class="raise" x1="34" x2="322" y1="44.5" y2="44.5"></line><text class="raise-l" x="78" y="40.5" text-anchor="end">raise 1200</text><line class="clear" x1="34" x2="322" y1="55.8" y2="55.8"></line><polygon points="82.0,75.5 82.0,30.5 298.0,30.5 298.0,75.5" fill="url(#sg2)"></polygon><polyline class="ser" points="34,75.5 82.0,75.5 82.0,30.5 298.0,30.5 298.0,75.5 322,75.5"></polyline><text class="hi" x="150.0" y="24.5" text-anchor="middle" style="fill:#ffc23d">1450 ppm</text><line x1="91.6" x2="91.6" y1="12" y2="84" stroke="#ff8f3a" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="91.6" cy="12" r="4.5" fill="#ff8f3a"></circle><line x1="298.0" x2="298.0" y1="12" y2="84" stroke="#3df0ae" stroke-width="1.2" stroke-dasharray="2 3"></line><circle cx="298.0" cy="12" r="4.5" fill="#3df0ae"></circle><text x="84.6" y="14" text-anchor="end" style="fill:#ff8f3a;font-size:11.5px">alert ≈ 24 s</text><text x="290.0" y="14" text-anchor="end" style="fill:#3df0ae;font-size:11.5px">clears ≈ 110 s</text></svg>
+<div class="row wrap" style="gap:6px"><span class="chip mono">lha-air-01</span><span class="chip mono">co2_ppm → 1450</span></div>
+<div class="exp"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg><span>Raises <b style="color:var(--text-primary)">Poor air quality (CO₂)</b> (medium) about 24 s; clears about 110 s.</span></div>
+</div>
+<div class="scn-f"><button class="btn primary sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Run</button><button class="btn ghost sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-copy"></use></svg>Duplicate</button></div>
+</article>
+
+</div>
+<div class="pager" role="navigation" aria-label="Scenario pages" style="border:1px solid var(--border-subtle);border-radius:var(--radius-3);background:var(--surface-1)">
+<span>Cards per page</span><div class="input" style="width:78px;height:30px"><span class="num">6</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<span class="range" aria-live="polite">Scenarios <b>1–6</b> of <b>38</b>, recently run first</span>
+<span class="sp"></span>
+<div class="pages"><button class="pg" type="button" disabled aria-label="First page">«</button><button class="pg" type="button" disabled aria-label="Previous page">‹</button><button class="pg is-on" type="button" aria-current="page">1</button><button class="pg" type="button">2</button><button class="pg" type="button">3</button><span class="gap-l">…</span><button class="pg" type="button">7</button><button class="pg" type="button" aria-label="Next page">›</button><button class="pg" type="button" aria-label="Last page">»</button></div>
+</div>
+<p class="faint" style="font-size:13px">The 6 scenarios on this page are samples; Studio ships 2 built-in scenarios and keeps custom ones in the simulator's own folder. Above one page, New scenario is only in the header.</p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

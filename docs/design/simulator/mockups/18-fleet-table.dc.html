@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Device fleet at scale</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.tbl th{white-space:nowrap}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></symbol>
+<symbol id="i-fan" viewBox="0 0 24 24"><path d="M10.827 16.379a6.082 6.082 0 0 1-8.618-7.002l5.412 1.45a6.082 6.082 0 0 1 7.002-8.618l-1.45 5.412a6.082 6.082 0 0 1 8.618 7.002l-5.412-1.45a6.082 6.082 0 0 1-7.002 8.618l1.45-5.412Z"></path><path d="M12 12v.01"></path></symbol>
+<symbol id="i-move" viewBox="0 0 24 24"><polyline points="8 18 12 22 16 18"></polyline><polyline points="8 6 12 2 16 6"></polyline><line x1="12" x2="12" y1="2" y2="22"></line></symbol>
+<symbol id="i-barrier" viewBox="0 0 24 24"><path d="M3 19h18"></path><path d="M6 19V8"></path><rect x="6" y="5" width="15" height="4" rx="1"></rect></symbol>
+<symbol id="i-wind" viewBox="0 0 24 24"><path d="M12.8 19.6A2 2 0 1 0 14 16H2"></path><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"></path><path d="M9.8 4.4A2 2 0 1 1 11 8H2"></path></symbol>
+<symbol id="i-batt" viewBox="0 0 24 24"><path d="m11 7-3 5h4l-3 5"></path><path d="M14.856 6H16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.935"></path><path d="M22 14v-4"></path><path d="M5.14 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.935"></path></symbol>
+<symbol id="i-snow" viewBox="0 0 24 24"><line x1="2" x2="22" y1="12" y2="12"></line><line x1="12" x2="12" y1="2" y2="22"></line><path d="m20 16-4-4 4-4"></path><path d="m4 8 4 4-4 4"></path><path d="m16 4-4 4-4-4"></path><path d="m8 20 4-4 4 4"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>28 devices · 14 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item is-active" type="button" aria-label="Device fleet" title="Device fleet" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h">
+<div>
+<h2 class="page-t">Device fleet <span class="chip" style="vertical-align:middle;margin-left:6px">Catalogue preview · 31 devices · sample data</span></h2>
+<p class="page-d">What Fleet becomes when the simulator plays the command center's catalogue. Above 12 devices the cards give way to this table.</p>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:12px">
+<button class="btn" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-pause"></use></svg>Pause all</button>
+<button class="btn primary" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Start all</button>
+</div>
+</div>
+
+<div class="fleet-bar" role="toolbar" aria-label="Find and arrange devices">
+<div class="input" style="width:320px"><svg class="ic ic-s" aria-hidden="true" style="color:var(--text-tertiary)"><use href="#i-search"></use></svg><span class="faint">Find by id, name or zone</span></div>
+<div class="input" style="width:150px"><span>All zones</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<div class="input" style="width:170px"><span>All classes</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<div class="input" style="width:190px"><span class="faint">Sort</span><span>Problems first</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<div class="row"><span class="switch" role="img" aria-label="Off"></span><span class="muted">Group by zone</span></div>
+<span class="sp"></span>
+<button class="icon-btn" type="button" aria-label="Columns"><svg class="ic" aria-hidden="true"><use href="#i-sliders"></use></svg></button>
+<div class="seg" role="group" aria-label="View"><button type="button">Cards</button><button class="is-on" type="button">Table</button></div>
+</div>
+
+<div class="row" style="gap:6px;flex-wrap:wrap">
+<div class="seg" role="group" aria-label="State"><button class="is-on" type="button">All <span class="faint">31</span></button><button type="button">Running <span class="faint">27</span></button><button type="button">Anomaly <span class="faint">1</span></button><button type="button">Paused <span class="faint">1</span></button><button type="button">Stopped <span class="faint">1</span></button><button type="button">Silent <span class="faint">1</span></button></div>
+</div>
+
+<div class="bulk" role="status">
+<span class="cb is-on" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg></span><b>3 selected</b><span class="muted">on this page</span>
+<span class="sp"></span>
+<button class="btn sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-pause"></use></svg>Pause</button>
+<button class="btn sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Start</button>
+<button class="btn sm danger" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-stop"></use></svg>Stop</button>
+<button class="btn sm outline" type="button">Hold value…</button>
+<button class="btn sm ghost" type="button">Select all 31</button>
+<button class="btn sm ghost" type="button">Clear</button>
+</div>
+
+<section class="card" aria-label="Devices" style="overflow:hidden">
+<table class="tbl dtbl">
+<thead><tr><th style="width:44px"><span class="cb" role="checkbox" aria-checked="mixed" aria-label="Select this page"><svg class="ic" aria-hidden="true" style="color:var(--text-tertiary)"><use href="#i-check"></use></svg></span></th><th>Device</th><th>Class</th><th>Zone</th><th>State</th><th>Reading 1</th><th>Reading 2</th><th>Last 2 min</th><th>Last seen</th><th style="width:44px"></th></tr></thead>
+<tbody>
+<tr class="is-sel"><td><span class="cb is-on" role="checkbox" aria-checked="true" aria-label="Select CT-01"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg></span></td><td><div class="row" style="gap:10px"><span class="dg sq is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-fan"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">CT-01</b><span class="faint" style="font-size:13px">Cooling tower 1</span></div></div></td><td>Cooling tower</td><td><div class="col" style="gap:0"><span>Data Center</span><span class="faint mono" style="font-size:12px">BLD-DC</span></div></td><td><span class="st anom"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Anomaly</span></td><td><div class="col" style="gap:0"><span class="val warnv">1,436<small>rpm</small></span><span class="faint mono" style="font-size:12px">fanSpeedRpm</span></div></td><td><div class="col" style="gap:0"><span class="val">88.4<small>°C</small></span><span class="faint mono" style="font-size:12px">motorTempC</span></div></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#ffc23d" stroke-width="1.8" stroke-linejoin="round" points="0.0,20.1 4.8,20.3 9.6,18.7 14.3,21.0 19.1,19.2 23.9,19.9 28.7,19.9 33.5,19.0 38.3,21.1 43.0,20.7 47.8,18.7 52.6,20.3 57.4,18.6 62.2,19.9 67.0,21.1 71.7,21.3 76.5,20.9 81.3,6.3 86.1,3.8 90.9,4.2 95.7,4.8 100.4,4.4 105.2,4.7 110.0,5.3"></polyline></svg></td><td class="num">2 s ago</td><td><button class="icon-btn sm" type="button" aria-label="Actions for CT-01"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class="is-sel"><td><span class="cb is-on" role="checkbox" aria-checked="true" aria-label="Select LFT-A2"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg></span></td><td><div class="row" style="gap:10px"><span class="dg sq is-stale"><svg class="ic ic-s" aria-hidden="true"><use href="#i-move"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">LFT-A2</b><span class="faint" style="font-size:13px">Lift, Dormitory A</span></div></div></td><td>Lift</td><td><div class="col" style="gap:0"><span>Dormitory A</span><span class="faint mono" style="font-size:12px">BLD-DORA</span></div></td><td><span class="st pause"><svg class="ic ic-s" aria-hidden="true"><use href="#i-pause"></use></svg>Paused</span></td><td><div class="col" style="gap:0"><span class="val">3<small></small></span><span class="faint mono" style="font-size:12px">carFloor</span></div></td><td><div class="col" style="gap:0"><span class="val">yes<small></small></span><span class="faint mono" style="font-size:12px">inService</span></div></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#47d7ff" stroke-width="1.8" stroke-linejoin="round" points="0.0,14.5 4.8,16.4 9.6,15.1 14.3,16.6 19.1,16.1 23.9,16.9 28.7,15.0 33.5,12.0 38.3,16.2 43.0,16.8 47.8,16.4 52.6,14.4 57.4,15.3 62.2,12.3 67.0,16.0 71.7,14.4 76.5,12.7 81.3,11.4 86.1,16.1 90.9,16.9 95.7,11.5 100.4,15.8 105.2,13.5 110.0,11.9"></polyline></svg></td><td class="num">09:13:50</td><td><button class="icon-btn sm" type="button" aria-label="Actions for LFT-A2"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class="is-sel"><td><span class="cb is-on" role="checkbox" aria-checked="true" aria-label="Select BAR-02"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg></span></td><td><div class="row" style="gap:10px"><span class="dg sq is-stale"><svg class="ic ic-s" aria-hidden="true"><use href="#i-barrier"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">BAR-02</b><span class="faint" style="font-size:13px">Barrier arm, East Gate</span></div></div></td><td>Barrier arm</td><td><div class="col" style="gap:0"><span>East Gate</span><span class="faint mono" style="font-size:12px">GATE-EAST</span></div></td><td><span class="st stop"><svg class="ic ic-s" aria-hidden="true"><use href="#i-stop"></use></svg>Stopped</span></td><td><div class="col" style="gap:0"><span class="val">—<small></small></span><span class="faint mono" style="font-size:12px">armPosition</span></div></td><td><span class="faint">—</span></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><line x1="0" y1="14" x2="110" y2="14" stroke="#5a7488" stroke-dasharray="3 3"></line></svg></td><td class="num">09:12:08</td><td><button class="icon-btn sm" type="button" aria-label="Actions for BAR-02"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class=""><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Select AHU-C1"></span></td><td><div class="row" style="gap:10px"><span class="dg sq"><svg class="ic ic-s" aria-hidden="true"><use href="#i-wind"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">AHU-C1</b><span class="faint" style="font-size:13px">Air handler, Clinic</span></div></div></td><td>Air handler</td><td><div class="col" style="gap:0"><span>Health Clinic</span><span class="faint mono" style="font-size:12px">BLD-CLINIC</span></div></td><td><span class="st run"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Running</span></td><td><div class="col" style="gap:0"><span class="val">22.8<small>°C</small></span><span class="faint mono" style="font-size:12px">indoorTempC</span></div></td><td><div class="col" style="gap:0"><span class="val">14.6<small>°C</small></span><span class="faint mono" style="font-size:12px">supplyAirTempC</span></div></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#47d7ff" stroke-width="1.8" stroke-linejoin="round" points="0.0,12.8 4.8,15.6 9.6,16.2 14.3,11.3 19.1,14.7 23.9,11.3 28.7,15.3 33.5,13.0 38.3,16.3 43.0,16.9 47.8,14.0 52.6,17.0 57.4,12.9 62.2,11.5 67.0,14.6 71.7,11.2 76.5,12.2 81.3,13.4 86.1,14.7 90.9,11.9 95.7,11.3 100.4,16.2 105.2,12.9 110.0,16.8"></polyline></svg></td><td class="num">2 s ago</td><td><button class="icon-btn sm" type="button" aria-label="Actions for AHU-C1"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class=""><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Select AHU-H1"></span></td><td><div class="row" style="gap:10px"><span class="dg sq"><svg class="ic ic-s" aria-hidden="true"><use href="#i-wind"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">AHU-H1</b><span class="faint" style="font-size:13px">Air handler, Hub roof</span></div></div></td><td>Air handler</td><td><div class="col" style="gap:0"><span>Innovation Hub</span><span class="faint mono" style="font-size:12px">BLD-HUB</span></div></td><td><span class="st run"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Running</span></td><td><div class="col" style="gap:0"><span class="val">23.1<small>°C</small></span><span class="faint mono" style="font-size:12px">indoorTempC</span></div></td><td><div class="col" style="gap:0"><span class="val">14.9<small>°C</small></span><span class="faint mono" style="font-size:12px">supplyAirTempC</span></div></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#47d7ff" stroke-width="1.8" stroke-linejoin="round" points="0.0,16.4 4.8,13.3 9.6,13.8 14.3,14.1 19.1,14.9 23.9,14.6 28.7,14.4 33.5,14.7 38.3,16.6 43.0,14.0 47.8,13.6 52.6,15.3 57.4,12.4 62.2,12.8 67.0,16.9 71.7,14.1 76.5,14.3 81.3,11.1 86.1,13.5 90.9,14.5 95.7,11.1 100.4,14.7 105.2,14.8 110.0,11.4"></polyline></svg></td><td class="num">2 s ago</td><td><button class="icon-btn sm" type="button" aria-label="Actions for AHU-H1"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class=""><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Select AHU-L1"></span></td><td><div class="row" style="gap:10px"><span class="dg sq"><svg class="ic ic-s" aria-hidden="true"><use href="#i-wind"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">AHU-L1</b><span class="faint" style="font-size:13px">Air handler, Library</span></div></div></td><td>Air handler</td><td><div class="col" style="gap:0"><span>Library</span><span class="faint mono" style="font-size:12px">BLD-LIB</span></div></td><td><span class="st run"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Running</span></td><td><div class="col" style="gap:0"><span class="val">22.5<small>°C</small></span><span class="faint mono" style="font-size:12px">indoorTempC</span></div></td><td><div class="col" style="gap:0"><span class="val">14.4<small>°C</small></span><span class="faint mono" style="font-size:12px">supplyAirTempC</span></div></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#47d7ff" stroke-width="1.8" stroke-linejoin="round" points="0.0,14.8 4.8,13.8 9.6,15.1 14.3,13.1 19.1,15.2 23.9,15.4 28.7,11.1 33.5,11.4 38.3,15.1 43.0,16.8 47.8,12.5 52.6,13.7 57.4,14.6 62.2,12.9 67.0,13.2 71.7,12.9 76.5,13.2 81.3,14.6 86.1,12.8 90.9,13.3 95.7,15.6 100.4,11.2 105.2,14.4 110.0,15.4"></polyline></svg></td><td class="num">2 s ago</td><td><button class="icon-btn sm" type="button" aria-label="Actions for AHU-L1"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class=""><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Select BAR-01"></span></td><td><div class="row" style="gap:10px"><span class="dg sq"><svg class="ic ic-s" aria-hidden="true"><use href="#i-barrier"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">BAR-01</b><span class="faint" style="font-size:13px">Barrier arm, Main Gate</span></div></div></td><td>Barrier arm</td><td><div class="col" style="gap:0"><span>Main Gate</span><span class="faint mono" style="font-size:12px">GATE-MAIN</span></div></td><td><span class="st run"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Running</span></td><td><div class="col" style="gap:0"><span class="val">closed<small></small></span><span class="faint mono" style="font-size:12px">armPosition</span></div></td><td><span class="faint">—</span></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#47d7ff" stroke-width="1.8" stroke-linejoin="round" points="0.0,12.9 4.8,12.3 9.6,15.8 14.3,12.4 19.1,12.1 23.9,13.6 28.7,15.2 33.5,11.6 38.3,12.9 43.0,13.0 47.8,16.0 52.6,13.6 57.4,16.1 62.2,12.0 67.0,13.0 71.7,14.9 76.5,16.3 81.3,13.7 86.1,12.4 90.9,11.7 95.7,14.2 100.4,12.1 105.2,15.8 110.0,16.0"></polyline></svg></td><td class="num">2 s ago</td><td><button class="icon-btn sm" type="button" aria-label="Actions for BAR-01"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class=""><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Select BAT-01"></span></td><td><div class="row" style="gap:10px"><span class="dg sq"><svg class="ic ic-s" aria-hidden="true"><use href="#i-batt"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">BAT-01</b><span class="faint" style="font-size:13px">UPS battery bank</span></div></div></td><td>UPS battery bank</td><td><div class="col" style="gap:0"><span>Data Center</span><span class="faint mono" style="font-size:12px">BLD-DC</span></div></td><td><span class="st run"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Running</span></td><td><div class="col" style="gap:0"><span class="val">100<small>%</small></span><span class="faint mono" style="font-size:12px">chargePct</span></div></td><td><div class="col" style="gap:0"><span class="val">24.1<small>°C</small></span><span class="faint mono" style="font-size:12px">roomTempC</span></div></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#47d7ff" stroke-width="1.8" stroke-linejoin="round" points="0.0,12.1 4.8,12.7 9.6,15.8 14.3,14.9 19.1,15.8 23.9,13.1 28.7,11.8 33.5,12.8 38.3,15.8 43.0,12.6 47.8,13.1 52.6,13.5 57.4,13.5 62.2,13.5 67.0,16.5 71.7,11.9 76.5,11.0 81.3,16.7 86.1,16.3 90.9,16.9 95.7,13.6 100.4,16.7 105.2,16.6 110.0,12.3"></polyline></svg></td><td class="num">2 s ago</td><td><button class="icon-btn sm" type="button" aria-label="Actions for BAT-01"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class=""><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Select CH-01"></span></td><td><div class="row" style="gap:10px"><span class="dg sq"><svg class="ic ic-s" aria-hidden="true"><use href="#i-snow"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">CH-01</b><span class="faint" style="font-size:13px">Chiller 1</span></div></div></td><td>Chiller</td><td><div class="col" style="gap:0"><span>Utility Plant</span><span class="faint mono" style="font-size:12px">UTL-PLANT</span></div></td><td><span class="st run"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Running</span></td><td><div class="col" style="gap:0"><span class="val">6.8<small>°C</small></span><span class="faint mono" style="font-size:12px">chilledWaterSupplyTempC</span></div></td><td><div class="col" style="gap:0"><span class="val">yes<small></small></span><span class="faint mono" style="font-size:12px">running</span></div></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#47d7ff" stroke-width="1.8" stroke-linejoin="round" points="0.0,15.5 4.8,16.0 9.6,15.0 14.3,14.1 19.1,12.7 23.9,13.0 28.7,12.4 33.5,11.4 38.3,14.5 43.0,12.7 47.8,15.9 52.6,11.3 57.4,16.4 62.2,15.2 67.0,16.5 71.7,16.4 76.5,16.4 81.3,14.5 86.1,11.1 90.9,15.5 95.7,12.0 100.4,12.8 105.2,15.0 110.0,14.1"></polyline></svg></td><td class="num">2 s ago</td><td><button class="icon-btn sm" type="button" aria-label="Actions for CH-01"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+<tr class=""><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Select CRAC-01"></span></td><td><div class="row" style="gap:10px"><span class="dg sq"><svg class="ic ic-s" aria-hidden="true"><use href="#i-snow"></use></svg></span><div class="col" style="gap:0"><b class="mono" style="color:var(--text-primary)">CRAC-01</b><span class="faint" style="font-size:13px">Precision cooling 1</span></div></div></td><td>Precision cooling</td><td><div class="col" style="gap:0"><span>Data Center</span><span class="faint mono" style="font-size:12px">BLD-DC</span></div></td><td><span class="st run"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Running</span></td><td><div class="col" style="gap:0"><span class="val">14.2<small>°C</small></span><span class="faint mono" style="font-size:12px">supplyAirTempC</span></div></td><td><div class="col" style="gap:0"><span class="val">24.8<small>°C</small></span><span class="faint mono" style="font-size:12px">returnAirTempC</span></div></td><td><svg viewBox="0 0 110 28" width="110" height="28" aria-hidden="true"><polyline fill="none" stroke="#47d7ff" stroke-width="1.8" stroke-linejoin="round" points="0.0,13.5 4.8,16.6 9.6,14.7 14.3,13.0 19.1,12.5 23.9,16.2 28.7,13.9 33.5,15.7 38.3,13.1 43.0,12.2 47.8,14.2 52.6,15.9 57.4,12.0 62.2,15.8 67.0,16.5 71.7,15.8 76.5,15.9 81.3,11.0 86.1,14.8 90.9,16.2 95.7,11.3 100.4,12.6 105.2,12.6 110.0,14.2"></polyline></svg></td><td class="num">2 s ago</td><td><button class="icon-btn sm" type="button" aria-label="Actions for CRAC-01"><svg class="ic ic-s" aria-hidden="true"><use href="#i-more"></use></svg></button></td></tr>
+</tbody>
+</table>
+<div class="pager" role="navigation" aria-label="Device pages">
+<span>Rows per page</span><div class="input" style="width:78px;height:30px"><span class="num">10</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<span class="range" aria-live="polite">Devices <b>1–10</b> of <b>31</b>, problems first</span>
+<span class="faint" style="font-size:12px">Sort, filters, page and size are in the URL.</span>
+<span class="sp"></span>
+<div class="pages"><button class="pg" type="button" disabled aria-label="First page">«</button><button class="pg" type="button" disabled aria-label="Previous page">‹</button><button class="pg is-on" type="button" aria-current="page">1</button><button class="pg" type="button">2</button><button class="pg" type="button">3</button><button class="pg" type="button">4</button><button class="pg" type="button" aria-label="Next page">›</button><button class="pg" type="button" aria-label="Last page">»</button></div>
+</div>
+</section>
+<p class="faint" style="font-size:13px">Device names, classes and readings are the command center's catalogue (31 assets, 16 classes) with sample values. In V1 the simulator plays 6 devices and Fleet shows cards. Above 60 devices the same table pages on the server.</p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

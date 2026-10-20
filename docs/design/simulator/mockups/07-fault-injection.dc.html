@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fault injection</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);gap:16px;align-items:start}
+@media (max-width:1100px){.cols{grid-template-columns:1fr}}
+.fault{display:flex;gap:14px;padding:14px 16px;border-top:1px solid var(--border-subtle)}
+.fault:first-child{border-top:0}
+.fault.is-on{background:linear-gradient(90deg,rgba(255, 98, 128,0.07),transparent 65%)}
+.fault-b{display:flex;flex-direction:column;gap:10px;flex:1;min-width:0}
+.fault-t{font-family:var(--font-ui);font-size:16px;font-weight:600}
+.fault-d{font-size:14px;color:var(--text-secondary)}
+.cnt-row{display:flex;align-items:baseline;gap:8px;padding:10px 0;border-top:1px solid var(--border-subtle)}
+.cnt-row:first-child{border-top:0}
+.cnt-row .mono{font-size:13px}
+.delta{font-family:var(--font-ui);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;margin-left:auto}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></symbol>
+<symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></symbol>
+<symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></symbol>
+<symbol id="i-shuffle" viewBox="0 0 24 24"><path d="m18 14 4 4-4 4"></path><path d="m18 2 4 4-4 4"></path><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"></path><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"></path><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"></path></symbol>
+<symbol id="i-bug" viewBox="0 0 24 24"><path d="m8 2 1.88 1.88"></path><path d="M14.12 3.88 16 2"></path><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"></path><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"></path><path d="M12 20v-9"></path><path d="M6.53 9C4.6 8.8 3 7.1 3 5"></path><path d="M6 13H2"></path><path d="M3 21c0-2.1 1.7-3.9 3.8-4"></path><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"></path><path d="M22 13h-4"></path><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"></path></symbol>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-warn"><span class="dot"></span>Faults on <small>3 active</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:21:07</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item is-active" type="button" aria-label="Simulation lab" title="Simulation lab" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="seg" role="group" aria-label="Simulation lab" style="align-self:flex-start"><button class="" type="button">Workspace</button><button class="" type="button">Scenarios</button><button class="" type="button">Timeline</button><button class="is-on" type="button">Faults</button></div>
+<div class="page-h">
+<div>
+<h2 class="page-t">Faults <span class="chip" style="vertical-align:middle;margin-left:6px">Simulation lab</span></h2>
+<p class="page-d">Make the transport misbehave and watch the pipeline count it. Loss is bounded and measured, not hidden (ADR-0002).</p>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:12px">
+<button class="btn ghost" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rotate"></use></svg>Reset counters</button>
+<button class="btn danger" type="button">Clear all faults</button>
+</div>
+</div>
+
+<div class="banner is-warn"><svg class="ic" aria-hidden="true"><use href="#i-alert"></use></svg><span><b>3 faults are active</b> on 4 devices. Readings in the database and alerts may differ from what the devices intended until you clear them.</span></div>
+
+<div class="row wrap" style="gap:10px"><span class="lbl">Applies to</span><div class="seg" role="group" aria-label="Scope"><button type="button">All running</button><button class="is-on" type="button">Selected</button></div><span class="chip is-accent mono">dc-env-01</span><span class="chip is-accent mono">dc-env-02</span><span class="chip is-accent mono">lib-air-01</span><span class="chip is-accent mono">lha-air-01</span><button class="btn ghost sm" type="button">Change…</button></div>
+
+<div class="cols">
+<section class="card" aria-label="Faults">
+<div class="fault is-on">
+<span class="itile" style="color:var(--danger)"><svg class="ic" aria-hidden="true"><use href="#i-drop"></use></svg></span>
+<div class="fault-b">
+<div class="row"><div class="sp"><div class="fault-t">Drop messages</div><div class="fault-d">The device counts the message but never sends it, so <span class="mono">seq</span> skips.</div></div><span class="switch is-on" role="img" aria-label="On"></span></div>
+<div class="row" style="gap:12px"><div class="slider sp"><span class="trk"></span><span class="fill" style="width:25%"></span><span class="thumb" style="left:25%"></span></div><div class="input" style="width:92px"><span class="num">5</span><span class="unit">%</span></div></div>
+</div>
+</div>
+<div class="fault is-on">
+<span class="itile" style="color:var(--danger)"><svg class="ic" aria-hidden="true"><use href="#i-copy"></use></svg></span>
+<div class="fault-b">
+<div class="row"><div class="sp"><div class="fault-t">Duplicate messages</div><div class="fault-d">The same payload is sent twice. Ingest stores it once.</div></div><span class="switch is-on" role="img" aria-label="On"></span></div>
+<div class="row" style="gap:12px"><div class="slider sp"><span class="trk"></span><span class="fill" style="width:10%"></span><span class="thumb" style="left:10%"></span></div><div class="input" style="width:92px"><span class="num">2</span><span class="unit">%</span></div></div>
+</div>
+</div>
+<div class="fault is-on">
+<span class="itile" style="color:var(--danger)"><svg class="ic" aria-hidden="true"><use href="#i-bug"></use></svg></span>
+<div class="fault-b">
+<div class="row"><div class="sp"><div class="fault-t">Malformed payloads</div><div class="fault-d">A share of messages break the contract. Pick how; ingest rejects them and counts the reason.</div></div><span class="switch is-on" role="img" aria-label="On"></span></div>
+<div class="row wrap" style="gap:6px"><span class="chip is-accent mono">range</span><span class="chip mono">json</span><span class="chip mono">shape</span><span class="chip mono">seq</span><span class="chip mono">ts</span><span class="chip mono">metric</span><span class="chip mono">value</span><span class="chip mono">size</span><span class="chip mono">topic</span></div>
+<div class="row" style="gap:12px"><div class="slider sp"><span class="trk"></span><span class="fill" style="width:15%"></span><span class="thumb" style="left:15%"></span></div><div class="input" style="width:92px"><span class="num">3</span><span class="unit">%</span></div></div>
+</div>
+</div>
+<div class="fault">
+<span class="itile"><svg class="ic" aria-hidden="true"><use href="#i-clock"></use></svg></span>
+<div class="fault-b">
+<div class="row"><div class="sp"><div class="fault-t">Delay and jitter</div><div class="fault-d">Hold each message back before publishing, so ingest lag and the timestamp age grow.</div></div><span class="switch" role="img" aria-label="Off"></span></div>
+</div>
+</div>
+<div class="fault">
+<span class="itile"><svg class="ic" aria-hidden="true"><use href="#i-shuffle"></use></svg></span>
+<div class="fault-b">
+<div class="row"><div class="sp"><div class="fault-t">Out-of-order delivery</div><div class="fault-d">Swap neighbouring messages inside a small window.</div></div><span class="switch" role="img" aria-label="Off"></span></div>
+</div>
+</div>
+<div class="fault">
+<span class="itile"><svg class="ic" aria-hidden="true"><use href="#i-send"></use></svg></span>
+<div class="fault-b">
+<div class="row"><div class="sp"><div class="fault-t">Burst</div><div class="fault-d">Publish a batch as fast as the broker accepts it. Not a benchmark: use Analytics for numbers.</div></div><button class="btn outline sm" type="button">Send 1,000</button></div>
+</div>
+</div>
+</section>
+
+<aside class="card" aria-label="Effect on the pipeline">
+<div class="card-h"><h3 class="card-t sp">Effect on the pipeline</h3><span class="chip">Sample data</span></div>
+<div class="card-b col" style="gap:10px">
+<p class="faint" style="font-size:14px">Counters read from ingest <span class="mono">/metrics</span>, shown as the change since the faults were switched on (4 min 12 s ago).</p>
+<div>
+<div class="cnt-row"><div class="col" style="gap:2px"><span class="mono">telemetry_sequence_gaps_total</span><span class="faint" style="font-size:13px">from Drop messages</span></div><span class="delta">+25</span></div>
+<div class="cnt-row"><div class="col" style="gap:2px"><span class="mono">telemetry_rejections_total{reason="range"}</span><span class="faint" style="font-size:13px">from Malformed payloads</span></div><span class="delta">+14</span></div>
+<div class="cnt-row"><div class="col" style="gap:2px"><span class="mono">telemetry_messages_total</span><span class="faint" style="font-size:13px">including duplicates</span></div><span class="delta">+504</span></div>
+<div class="cnt-row"><div class="col" style="gap:2px"><span class="mono">telemetry_readings_total</span><span class="faint" style="font-size:13px">stored once each</span></div><span class="delta">+463</span></div>
+</div>
+<div class="banner is-info" style="font-size:14px"><svg class="ic" aria-hidden="true"><use href="#i-info"></use></svg><span>Dropped messages show up as gaps, not as silent loss. Duplicates raise messages but not readings.</span></div>
+</div>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
