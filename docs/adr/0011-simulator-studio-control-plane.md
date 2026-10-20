@@ -310,3 +310,46 @@ What was decided on the way:
 - **The incident link goes to the console, not to an incident.** Which page of the command center shows an incident is
   its own route and Studio does not know it; with `OCC_CONSOLE_URL` set (an http or https URL; any other scheme is dropped)
   the alert card links to the console and names the incident by its id. SIM-07 settles the link.
+
+## Amendment, 2026-10-20: Alerts as built (SIM-07)
+
+The Alerts (the list, the detail and the delivery trail) is in `apps/simulator-ui` (`src/pages/alerts/`, with its logic in
+`src/lib/alert*.ts` and `cursorPaging.ts`), and, unlike the Topology, it needed the simulator: the ticket was built in two
+halves. What was decided on the way:
+
+- **A route in the simulator, because the browser cannot reach ingest.** The Content-Security-Policy is
+  `default-src 'self'; connect-src 'self'` and no CORS header is sent, both on purpose; Studio only talks to the simulator that
+  serves it, and the alerts it already had were the newest 100 that the poller reads once a second. `GET /api/alerts?status=&limit=&before=`
+  (`apps/simulator/src/control-routes.ts`) asks ingest for one page and answers with it: ingest's array and its `X-Next-Cursor`
+  header, copied unchanged. The alternatives were to build a cursor from the 100 Studio holds (against the acceptance criterion
+  that a cursor is never built) and to widen the policy (against the decisions above). `IngestPoller.alertsPage` reads the page
+  with its own timeout (3 s; the poll's 800 ms is for a request a second) and changes no feed. Ingest's `400` is relayed as `400`
+  and anything else that is not a page as `502`; `StateView`, the poll and the stream are untouched. The query is checked before
+  ingest is asked; `before` is passed URL-encoded and otherwise unread.
+- **Each alert carries what only Studio knows.** The elements are ingest's alert plus `preexisting` and `observed` (as in the
+  state view; empty for an alert Studio never tracked) and `cause`. The server adds them so that older pages have their observed
+  times when Studio saw them, and so that the rule for a cause is one tested place.
+- **A cause is claimed only on evidence.** `POST /api/scenarios/:name/run` now records the anomalies it added (id, device, metric,
+  `startAt` with the offset, duration) in its `scenario-run` observation, because the engine forgets them on a reset. An alert has
+  `cause: { scenario, startedAt }` when such a run added an anomaly on its device and metric and the alert opened from the
+  anomaly's start until 30 s after its end (`CAUSE_SLACK_S`, `alert-cause.ts`); the newest run wins. It is a match by device,
+  metric and time, not a proof: a fault added by hand on the same metric inside a run's window would be taken for the run's. The CLI's
+  `--scenario` leaves no run, so its alerts have no cause; an engine on the simulated clock never claims one, since its time is not
+  wall time. The 30 s is a judgement, not a measurement.
+- **The cursor stays in memory.** Paging is one way (older); Studio keeps the cursors it was given in a stack and _Newer_ pops it.
+  The address holds the status, severity, size and open alert, not the cursor, so a reload opens the newest alerts and a stale
+  cursor can never be shared. There is no "Page n" and no total; the line says "Showing 5 alerts · newest first".
+- **The severity filter hides rows; it does not search.** Ingest has no severity parameter, so the filter applies to the loaded page and
+  the list says how many rows it hides. No further pages are fetched to fill a page.
+- **A page is a snapshot; the store's fresher facts are laid over it only when ahead.** A delivery or a clear is heard a second after it
+  happens, and a page fetched since may be fresher than the store, so `overlayLive` takes the store's copy of a row only when it saw
+  more happen (observed times are only ever filled in). The newest page asks again when the store hears of a new alert or a status
+  or delivery change; older pages are never refetched by the page.
+- **Times say whose clock they are.** `openedAt` and `clearedAt` are ingest's; the delivery and the incident are when Studio first
+  saw them, to within its 1 s poll; the first breaching reading is a reading Studio recorded (it keeps two minutes, so for an older
+  alert the step is left out, with a note). `deliveryStatus` is the state of the _latest_ outbox event: for a cleared alert it is the
+  clearing's, and the opening's delivery is known only from what Studio saw or from the incident id.
+- **The incident link goes to the console root,** as in SIM-06. Which page of the command center shows an incident is its own route
+  and was not checked here; a deep link needs that route. The id is shown beside the link with a copy button.
+- **Small shared pieces moved or were added:** `DeliveryChip` and `severityOf` left the Topology's `AlertsCard`; `SelectField`
+  and `CursorPager` are new in `ui/`; `CopyButton` can carry visible words. No dependency was added.

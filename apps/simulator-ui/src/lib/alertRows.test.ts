@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { ObservedAlert, PagedAlert } from '../api/types';
-import { filterBySeverity, filterNote, ingestFields, overlayLive, severityOf } from './alertRows';
+import {
+  filterBySeverity,
+  filterNote,
+  formatOpened,
+  ingestFields,
+  overlayLive,
+  severityOf,
+} from './alertRows';
+import { formatClockTime } from './time';
 
 const T = (second: number) => `2026-10-20T08:00:${String(second).padStart(2, '0')}.000Z`;
 
@@ -161,5 +169,21 @@ describe('ingestFields', () => {
       'deliveryError',
     ]);
     expect(JSON.stringify(fields)).not.toMatch(/observed|preexisting|cause/);
+  });
+});
+
+describe('formatOpened', () => {
+  const reference = new Date(2026, 9, 20, 9, 15, 0).getTime();
+
+  it('is the clock time for an alert of the same day', () => {
+    const earlier = new Date(2026, 9, 20, 8, 0, 26).getTime();
+    expect(formatOpened(earlier, reference)).toBe(formatClockTime(earlier));
+  });
+
+  it('puts the day and month first for an alert of another day, so it is not read as today’s', () => {
+    const yesterday = new Date(2026, 9, 19, 17, 6, 41).getTime();
+    expect(formatOpened(yesterday, reference)).toBe(`19/10 ${formatClockTime(yesterday)}`);
+    const lastMonth = new Date(2026, 8, 3, 1, 2, 3).getTime();
+    expect(formatOpened(lastMonth, reference)).toMatch(/^03\/09 \d{2}:\d{2}:\d{2}$/);
   });
 });

@@ -372,3 +372,18 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
     scenario chip and the Cause row (SIM-08), "Show in twin", "Open in lab", "Retry now", the labels on the edges. "Retrying
     every 5 s" is "Retrying every 1 s", the poller's real cycle. The broker-disconnected state has no frame and was drawn in
     the language of frame 10. Frames 04 and 10 stay as drawn until they are redrawn.
+13. **Frame 13 differs from the build.** _Settled in SIM-07 (2026-10-20)._ The list is paged by the cursor the API returns,
+    so there is no "Page 1" button between _Newer_ and _Older_ (a page number would be wrong after a reload) and no count on
+    _Open_ (the API gives no total); the line says "Showing 5 alerts · newest first". The address holds the status, the
+    severity, the page size and the open alert, not the cursor: a reload opens the newest alerts. Ingest has no severity
+    parameter, so the severity filter hides rows of the page already loaded and the list says how many ("Filtering this page:
+    2 of 6 shown."). Every time in the trail says whose clock it is ("ingest", "observed", "recorded reading"), besides the
+    frame's note. States the frame does not draw were drawn in its language: a delivery that is pending, failed (with
+    ingest's error as text) or skipped, a delivery of unknown state, and, for a cleared alert, "Alert cleared" and "Clear
+    delivered". The list's delivery chip is the state of the alert's _latest_ outbox event, which for a cleared alert is the
+    clearing; the opening's delivery comes from what Studio saw, or says "Opening delivery not known". "Open incident"
+    is "Open command center": it goes to the console's root, since which page of the console shows an incident is its own
+    route, not checked here; the incident is named by its id beside it, with a copy button. The scenario that caused an
+    alert is named only when the simulator can show a run of Studio that played on the alert's device and metric around the
+    time it opened; an alert from the CLI's `--scenario`, from a fault added by hand, or from anything else has no cause.
+    Frame 13 stays as drawn until it is redrawn.

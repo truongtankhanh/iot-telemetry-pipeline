@@ -1,5 +1,6 @@
 import type { ObservedAlert, PagedAlert, Severity } from '../api/types';
 import type { SeverityFilter } from './alertsQuery';
+import { formatClockTime } from './time';
 
 const SEVERITIES: readonly Severity[] = ['critical', 'high', 'medium', 'low'];
 
@@ -75,4 +76,19 @@ export function ingestFields(alert: PagedAlert) {
     deliveryAttempts: alert.deliveryAttempts,
     deliveryError: alert.deliveryError,
   };
+}
+
+/**
+ * When an alert opened, for a column: the clock time if it is the same calendar day as `reference`, else the day and
+ * month first ("19/10 17:06:41"). Alerts outlive a session, and a bare clock time on one of yesterday would read as
+ * today's. `reference` is passed in (the page's fetch time), so this stays a pure function of its arguments.
+ */
+export function formatOpened(ms: number, reference: number): string {
+  const clock = formatClockTime(ms);
+  const day = new Date(ms);
+  const today = new Date(reference);
+  if (day.toDateString() === today.toDateString()) return clock;
+  const dd = String(day.getDate()).padStart(2, '0');
+  const mm = String(day.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm} ${clock}`;
 }

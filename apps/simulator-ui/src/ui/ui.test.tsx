@@ -9,6 +9,7 @@ import { Button } from './Button';
 import { Checkbox } from './Checkbox';
 import { Chip } from './Chip';
 import { ColumnChooser } from './ColumnChooser';
+import { CursorPager } from './CursorPager';
 import { DataLine } from './DataLine';
 import { type Column, DataTable } from './DataTable';
 import { DeliveryChip } from './DeliveryChip';
@@ -945,6 +946,77 @@ describe('SelectField', () => {
       <SelectField label="Severity" value="high" options={options} onChange={() => {}} />,
     );
     expect(screen.getByLabelText('Severity')).toHaveValue('high');
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('CursorPager', () => {
+  const props = {
+    size: 25,
+    sizes: [5, 25, 200],
+    position: 'Showing 5 alerts · newest first',
+    canNewer: true,
+    canOlder: true,
+    onSizeChange: vi.fn(),
+    onNewer: vi.fn(),
+    onOlder: vi.fn(),
+  };
+
+  it('is the navigation of the alert pages and says where the page is, politely', () => {
+    render(<CursorPager {...props} note="The API pages with a cursor." />);
+    const nav = screen.getByRole('navigation', { name: 'Alert pages' });
+    expect(within(nav).getByRole('status')).toHaveTextContent('Showing 5 alerts · newest first');
+    expect(within(nav).getByText('The API pages with a cursor.')).toBeVisible();
+  });
+
+  it('has Newer and Older and no page numbers', () => {
+    render(<CursorPager {...props} />);
+    expect(screen.getByRole('button', { name: 'Newer' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Older' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /^Page / })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(2);
+  });
+
+  it('reports a click on either end, and has no light at an end that is not there', async () => {
+    const user = userEvent.setup();
+    const onNewer = vi.fn();
+    const onOlder = vi.fn();
+    const { rerender } = render(<CursorPager {...props} onNewer={onNewer} onOlder={onOlder} />);
+    await user.click(screen.getByRole('button', { name: 'Older' }));
+    await user.click(screen.getByRole('button', { name: 'Newer' }));
+    expect(onOlder).toHaveBeenCalledTimes(1);
+    expect(onNewer).toHaveBeenCalledTimes(1);
+
+    rerender(<CursorPager {...props} canNewer={false} canOlder={false} />);
+    expect(screen.getByRole('button', { name: 'Newer' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Older' })).toBeDisabled();
+  });
+
+  it('changes the page size', async () => {
+    const user = userEvent.setup();
+    const onSizeChange = vi.fn();
+    render(<CursorPager {...props} onSizeChange={onSizeChange} />);
+    await user.selectOptions(screen.getByLabelText('Alerts per page'), '200');
+    expect(onSizeChange).toHaveBeenCalledWith(200);
+    expect(
+      within(screen.getByLabelText('Alerts per page'))
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['5', '25', '200']);
+  });
+
+  it('moves the keyboard to the other step when the one it was on stops being possible', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<CursorPager {...props} />);
+    await user.click(screen.getByRole('button', { name: 'Newer' }));
+    expect(screen.getByRole('button', { name: 'Newer' })).toHaveFocus();
+
+    rerender(<CursorPager {...props} canNewer={false} />);
+    expect(screen.getByRole('button', { name: 'Older' })).toHaveFocus();
+  });
+
+  it('has no accessibility violation', async () => {
+    const { container } = render(<CursorPager {...props} note="Note." />);
     expect(await axeViolations(container)).toEqual([]);
   });
 });

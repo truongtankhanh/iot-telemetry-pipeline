@@ -103,6 +103,24 @@ describe('useAlertsPage', () => {
     expect(hook.result.current.canNewer).toBe(false);
   });
 
+  it('goes back to the newest page from any page, also when the page it was on failed', async () => {
+    let refuse = false;
+    const { calls, hook } = setup(({ url }) => {
+      if (url.includes('before=')) return refuse ? failure(400, 'bad cursor') : page(rows);
+      return page(rows, 'c1');
+    });
+    await ready(hook);
+    refuse = true;
+    act(() => hook.result.current.older());
+    await waitFor(() => expect(hook.result.current.status).toBe('error'));
+    expect(hook.result.current.error).toBe('bad cursor');
+
+    act(() => hook.result.current.newest());
+    await ready(hook);
+    expect(hook.result.current.stack).toEqual([]);
+    expect(calls.at(-1)?.url).toBe('/api/alerts?limit=25');
+  });
+
   it('does nothing when asked to go older without a cursor, or newer from the newest page', async () => {
     const { calls, hook } = setup(() => page(rows));
     await ready(hook);

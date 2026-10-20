@@ -35,6 +35,8 @@ export interface AlertsPageResult {
   canOlder: boolean;
   older(): void;
   newer(): void;
+  /** Back to the newest page from wherever it is, also from a page that failed (a cursor ingest no longer accepts). */
+  newest(): void;
   /** Asks again for the page that failed. */
   retry(): void;
 }
@@ -123,6 +125,8 @@ export function useAlertsPage({ status, size }: AlertsPageQuery): AlertsPageResu
     setPaging({ key: queryKey, stack: goNewer(stack) });
   }, [result, queryKey, stack]);
 
+  const newest = useCallback(() => setPaging({ key: queryKey, stack: NEWEST_PAGE }), [queryKey]);
+
   const retry = useCallback(() => setRetries((count) => count + 1), []);
 
   return {
@@ -135,6 +139,7 @@ export function useAlertsPage({ status, size }: AlertsPageQuery): AlertsPageResu
     canOlder: page !== null && canGoOlder(page.next),
     older,
     newer,
+    newest,
     retry,
   };
 }
