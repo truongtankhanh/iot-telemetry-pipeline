@@ -1,11 +1,19 @@
 import { useState } from 'react';
+import type { RuleInfo } from '../api/types';
 import { kindIdentity } from '../lib/deviceIdentity';
+import { pageSelection, setPageSelected, toggleSelected } from '../lib/fleetQuery';
 import type { NodeStateName } from '../lib/nodeState';
+import type { Sample as Reading } from '../state/history';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { LineChart } from '../ui/charts/LineChart';
+import { RangeBar } from '../ui/charts/RangeBar';
+import { Sparkline } from '../ui/charts/Sparkline';
+import { Checkbox } from '../ui/Checkbox';
 import { Chip } from '../ui/Chip';
+import { ColumnChooser } from '../ui/ColumnChooser';
 import { DataLine } from '../ui/DataLine';
-import { type Column, DataTable } from '../ui/DataTable';
+import { type Column, DataTable, type SortState } from '../ui/DataTable';
 import { DeviceBadge } from '../ui/DeviceBadge';
 import { Icon } from '../ui/Icon';
 import { metricIcons, uiIcons } from '../ui/icons';
@@ -13,7 +21,10 @@ import { NodeState } from '../ui/NodeState';
 import { PageHeader } from '../ui/PageHeader';
 import { Pager } from '../ui/Pager';
 import { Pill } from '../ui/Pill';
+import { Segmented } from '../ui/Segmented';
 import { SeverityBadge } from '../ui/SeverityBadge';
+import { tabId } from '../ui/tabId';
+import { Tabs } from '../ui/Tabs';
 import styles from './foundations.module.css';
 
 const SURFACES = [
@@ -67,7 +78,7 @@ const SAMPLE: Sample[] = [
 ];
 
 const COLUMNS: Column<Sample>[] = [
-  { id: 'device', header: 'Device', cell: (row) => <code>{row.id}</code> },
+  { id: 'device', header: 'Device', cell: (row) => <code>{row.id}</code>, sortable: true },
   {
     id: 'state',
     header: 'State',
@@ -78,8 +89,42 @@ const COLUMNS: Column<Sample>[] = [
     ),
   },
   { id: 'reading', header: 'Reading', cell: (row) => row.reading, align: 'end' },
-  { id: 'seen', header: 'Seen', cell: (row) => row.seen, align: 'end' },
+  { id: 'seen', header: 'Seen', cell: (row) => row.seen, align: 'end', sortable: true },
 ];
+
+const CHOOSER_COLUMNS = [
+  { id: 'device', label: 'Device', locked: true },
+  { id: 'state', label: 'State' },
+  { id: 'reading', label: 'Reading' },
+  { id: 'seen', label: 'Seen' },
+];
+
+const STATE_TABS = [
+  { id: 'all', label: 'All', count: 31 },
+  { id: 'running', label: 'Running', count: 27 },
+  { id: 'anomaly', label: 'Anomaly', count: 1 },
+  { id: 'paused', label: 'Paused', count: 1 },
+];
+
+/** The rule of the sample charts: a copy of the server-room rule, so this page needs no simulator. */
+const HOT_RULE: RuleInfo = {
+  id: 'server-room-hot',
+  kind: 'server_room',
+  metric: 'temperature_c',
+  direction: 'above',
+  raise: 27,
+  clear: 25.5,
+  for: 3,
+  severity: 'high',
+  title: 'Server room temperature high',
+};
+
+/** `count` readings two seconds apart, the newest `agoMs` before `now`, from `value(i)`. */
+const readings = (now: number, count: number, value: (i: number) => number, agoMs = 0): Reading[] =>
+  Array.from({ length: count }, (_, i) => ({
+    t: now - agoMs - (count - 1 - i) * 2000,
+    v: Math.round(value(i) * 10) / 10,
+  }));
 
 /**
  * The electric language of Studio, built from the shared components (frame 00): tokens, status, type,
@@ -91,6 +136,27 @@ export function Foundations() {
   const [page, setPage] = useState(2);
   const [pageSize, setPageSize] = useState(25);
   const [selected, setSelected] = useState<string | null>('dc-env-01');
+  const [now] = useState(() => Date.now());
+  const [sort, setSort] = useState<SortState>({ columnId: 'device', direction: 'asc' });
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(() => new Set(['dc-env-01']));
+  const [shown, setShown] = useState<ReadonlySet<string>>(
+    () => new Set(['device', 'state', 'reading', 'seen']),
+  );
+  const [stateTab, setStateTab] = useState('all');
+  const [view, setView] = useState('table');
+  const [mode, setMode] = useState('simulated');
+  const [box, setBox] = useState(true);
+
+  const sortedRows = [...SAMPLE].sort((a, b) => {
+    const key = sort.columnId === 'seen' ? 'seen' : 'id';
+    const order = a[key].localeCompare(b[key], 'en', { numeric: true });
+    return sort.direction === 'asc' ? order : -order;
+  });
+  const sampleIds = sortedRows.map((row) => row.id);
+  const healthy = readings(now, 60, (i) => 22.4 + 0.3 * Math.sin(i / 3));
+  const breach = readings(now, 60, (i) => (i < 45 ? 22.4 + 0.3 * Math.sin(i / 3) : 29.3));
+  const paused = readings(now, 25, (i) => 22.4 + 0.3 * Math.sin(i / 3), 60_000);
+  const profile = { baseline: 22.5, noise: 0.3, dailySwing: 0 };
 
   return (
     <>
@@ -320,12 +386,116 @@ export function Foundations() {
         </p>
       </Card>
 
+      <Card title="Tabs, choices and boxes">
+        <p className={styles.muted}>
+          Tabs switch what one panel shows and carry a count; the arrow keys move and select. A
+          choice of one among a few is a radio group drawn as joined buttons. A box has a tick or a
+          dash, so its state is a shape.
+        </p>
+        <Tabs
+          tabs={STATE_TABS}
+          value={stateTab}
+          onChange={setStateTab}
+          label="State"
+          idPrefix="foundations-state"
+          panelId="foundations-state-panel"
+        />
+        <div
+          id="foundations-state-panel"
+          role="tabpanel"
+          aria-labelledby={tabId('foundations-state', stateTab)}
+          className={styles.row}
+        >
+          <Segmented
+            label="View"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'cards', label: 'Cards', disabled: true },
+              { value: 'table', label: 'Table' },
+            ]}
+          />
+          <Segmented
+            label="Mode"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'simulated', label: 'Simulated' },
+              { value: 'hold', label: 'Hold value' },
+            ]}
+          />
+          <Checkbox label="Checked" checked={box} onChange={setBox} />
+          <Checkbox label="Unchecked" checked={false} onChange={() => {}} />
+          <Checkbox label="Some" checked={false} indeterminate onChange={() => {}} />
+          <Checkbox label="Disabled" checked disabled onChange={() => {}} />
+        </div>
+      </Card>
+
+      <Card title="Charts">
+        <p className={styles.muted}>
+          The last two minutes of one metric: labelled axes, the rule&rsquo;s raise and clear lines,
+          the part beyond the raise line in amber, the last value as a tag, and a hatched gap with
+          its reason. There is no alert marker: the state is beside the device&rsquo;s name. At most
+          24 charts glow; the rest are drawn plain.
+        </p>
+        <div className={styles.charts}>
+          <LineChart
+            deviceId="dc-env-01"
+            metric="temperature_c"
+            samples={healthy}
+            now={now}
+            rule={HOT_RULE}
+            status={{ kind: 'running', since: null }}
+            intervalMs={2000}
+          />
+          <LineChart
+            deviceId="dc-env-01"
+            metric="temperature_c"
+            samples={breach}
+            now={now}
+            rule={HOT_RULE}
+            status={{ kind: 'anomaly', since: null }}
+            intervalMs={2000}
+          />
+          <LineChart
+            deviceId="stu-air-01"
+            metric="temperature_c"
+            samples={paused}
+            now={now}
+            rule={HOT_RULE}
+            status={{ kind: 'paused', since: now - 60_000 }}
+            intervalMs={2000}
+          />
+        </div>
+        <div className={styles.row}>
+          <span>Sparkline</span>
+          <Sparkline samples={healthy} now={now} label="Last 2 minutes: steady near 22.5" />
+          <Sparkline samples={breach} now={now} label="Last 2 minutes: a step to 29.3" />
+          <Sparkline samples={[]} now={now} label="No readings" />
+        </div>
+        <RangeBar metric="temperature_c" rule={HOT_RULE} profile={profile} value={22.4} />
+        <RangeBar metric="temperature_c" rule={HOT_RULE} profile={profile} value={29.3} />
+      </Card>
+
       <Card title="Tables and paging">
         <DataTable
           caption="Devices with their state and reading"
-          columns={COLUMNS}
-          rows={SAMPLE}
+          columns={COLUMNS.filter((column) => shown.has(column.id))}
+          rows={sortedRows}
           rowKey={(row) => row.id}
+          sort={sort}
+          onSortChange={(columnId) =>
+            setSort((was) => ({
+              columnId,
+              direction: was.columnId === columnId && was.direction === 'asc' ? 'desc' : 'asc',
+            }))
+          }
+          selection={{
+            selected: ticked,
+            pageState: pageSelection(ticked, sampleIds),
+            onToggle: (id) => setTicked((was) => toggleSelected(was, id)),
+            onTogglePage: (on) => setTicked((was) => setPageSelected(was, sampleIds, on)),
+          }}
           selectedKey={selected}
           onRowClick={(row) => setSelected(row.id)}
           rowAction={(row) => (
@@ -334,6 +504,9 @@ export function Foundations() {
             </Button>
           )}
         />
+        <div className={styles.row}>
+          <ColumnChooser columns={CHOOSER_COLUMNS} visible={shown} onChange={setShown} />
+        </div>
         <Pager
           page={page}
           pageSize={pageSize}

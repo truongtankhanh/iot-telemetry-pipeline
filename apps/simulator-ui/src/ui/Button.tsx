@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 import styles from './Button.module.css';
 import { Icon } from './Icon';
 import type { Glyph } from './icons';
@@ -14,6 +14,8 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   demoState?: 'hover' | 'pressed' | 'focus';
   /** A button with only an icon has no text: it needs an `aria-label`. */
   children?: ReactNode;
+  /** React 19 hands `ref` to a function component as a prop; it reaches the `<button>` through `rest`. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 /**

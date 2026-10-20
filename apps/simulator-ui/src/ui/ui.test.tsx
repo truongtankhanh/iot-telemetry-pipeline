@@ -3,9 +3,12 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AnimationBudget } from '../lib/animationBudget';
+import { axeViolations } from '../test-axe';
 import { AnimationBudgetProvider } from './AnimationBudget';
 import { Button } from './Button';
+import { Checkbox } from './Checkbox';
 import { Chip } from './Chip';
+import { ColumnChooser } from './ColumnChooser';
 import { DataLine } from './DataLine';
 import { type Column, DataTable } from './DataTable';
 import { DeviceBadge } from './DeviceBadge';
@@ -14,7 +17,10 @@ import { uiIcons } from './icons';
 import { NodeState } from './NodeState';
 import { Pager } from './Pager';
 import { Pill } from './Pill';
+import { Segmented } from './Segmented';
 import { SeverityBadge } from './SeverityBadge';
+import { tabId } from './tabId';
+import { Tabs } from './Tabs';
 
 const withBudget = (ui: ReactNode, budget = new AnimationBudget()) => (
   <AnimationBudgetProvider budget={budget}>{ui}</AnimationBudgetProvider>
@@ -421,5 +427,453 @@ describe('Pager', () => {
     expect(screen.getByRole('navigation', { name: 'Rows pages' })).toHaveTextContent(
       /Rows 0–0 of 0/,
     );
+  });
+});
+
+describe('Checkbox', () => {
+  it('is a checkbox with the name it was given, and reports the new state', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Checkbox label="Select dc-env-01" checked={false} onChange={onChange} />);
+    const box = screen.getByRole('checkbox', { name: 'Select dc-env-01' });
+    expect(box).not.toBeChecked();
+    await user.click(box);
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('toggles with Space from the keyboard', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Checkbox label="Select" checked onChange={onChange} />);
+    await user.tab();
+    await user.keyboard(' ');
+    expect(onChange).toHaveBeenCalledWith(false);
+  });
+
+  it('can be indeterminate, which a screen reader hears as mixed', () => {
+    render(<Checkbox label="Select this page" checked={false} indeterminate onChange={() => {}} />);
+    const box = screen.getByRole('checkbox', { name: 'Select this page' }) as HTMLInputElement;
+    expect(box.indeterminate).toBe(true);
+    expect(box).toBePartiallyChecked();
+  });
+
+  it('does nothing when disabled', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Checkbox label="x" checked={false} disabled onChange={onChange} />);
+    await user.click(screen.getByRole('checkbox'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('DataTable sorting', () => {
+  const sortable: Column<Row>[] = [
+    { id: 'device', header: 'Device', cell: (row) => row.device, sortable: true },
+    { id: 'reading', header: 'Reading', cell: (row) => row.reading, align: 'end' },
+  ];
+
+  it('makes a sortable header a button and asks for that column', async () => {
+    const user = userEvent.setup();
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        caption="Devices"
+        columns={sortable}
+        rows={rows}
+        rowKey={(r) => r.id}
+        onSortChange={onSortChange}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Device' }));
+    expect(onSortChange).toHaveBeenCalledWith('device');
+    expect(screen.queryByRole('button', { name: 'Reading' })).not.toBeInTheDocument();
+  });
+
+  it('says which column is sorted and which way, and "none" for the others that can be', () => {
+    render(
+      <DataTable
+        caption="Devices"
+        columns={[...sortable, { id: 'zone', header: 'Zone', cell: () => 'x', sortable: true }]}
+        rows={rows}
+        rowKey={(r) => r.id}
+        sort={{ columnId: 'device', direction: 'desc' }}
+        onSortChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole('columnheader', { name: 'Device' })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+    expect(screen.getByRole('columnheader', { name: 'Zone' })).toHaveAttribute('aria-sort', 'none');
+    expect(screen.getByRole('columnheader', { name: 'Reading' })).not.toHaveAttribute('aria-sort');
+  });
+
+  it('says ascending', () => {
+    render(
+      <DataTable
+        caption="Devices"
+        columns={sortable}
+        rows={rows}
+        rowKey={(r) => r.id}
+        sort={{ columnId: 'device', direction: 'asc' }}
+        onSortChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole('columnheader', { name: 'Device' })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+  });
+
+  it('leaves a header as plain text when nothing handles the sort', () => {
+    render(<DataTable caption="Devices" columns={sortable} rows={rows} rowKey={(r) => r.id} />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Device' })).not.toHaveAttribute('aria-sort');
+  });
+});
+
+describe('DataTable selection', () => {
+  const selection = (
+    selected: string[],
+    pageState: 'none' | 'some' | 'all',
+    handlers: { onToggle?: (key: string) => void; onTogglePage?: (on: boolean) => void } = {},
+  ) => ({
+    selected: new Set(selected),
+    pageState,
+    onToggle: handlers.onToggle ?? (() => {}),
+    onTogglePage: handlers.onTogglePage ?? (() => {}),
+    label: (row: Row) => `Select ${row.device}`,
+  });
+
+  it('adds a box to each row and one to the header, each with a name', () => {
+    render(
+      <DataTable
+        caption="Devices"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        selection={selection(['a'], 'some')}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'Select this page' })).toBePartiallyChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select dc-env-01' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select dc-env-02' })).not.toBeChecked();
+  });
+
+  it('names a row box "Select <key>" when no label is given', () => {
+    render(
+      <DataTable
+        caption="Devices"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        selection={{ ...selection([], 'none'), label: undefined }}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'Select a' })).toBeInTheDocument();
+  });
+
+  it('ticks all of the page from the header box, and clears it when all were selected', async () => {
+    const user = userEvent.setup();
+    const onTogglePage = vi.fn();
+    const none = render(
+      <DataTable
+        caption="D"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        selection={selection([], 'none', { onTogglePage })}
+      />,
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Select this page' }));
+    expect(onTogglePage).toHaveBeenLastCalledWith(true);
+    none.unmount();
+
+    render(
+      <DataTable
+        caption="D"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        selection={selection(['a', 'b'], 'all', { onTogglePage })}
+      />,
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Select this page' }));
+    expect(onTogglePage).toHaveBeenLastCalledWith(false);
+  });
+
+  it('toggles one row from its box without opening the row', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    const onRowClick = vi.fn();
+    render(
+      <DataTable
+        caption="D"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        onRowClick={onRowClick}
+        selection={selection([], 'none', { onToggle })}
+      />,
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Select dc-env-02' }));
+    expect(onToggle).toHaveBeenCalledWith('b');
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('toggles a row from the keyboard with Space, which does not open the row either', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    const onRowClick = vi.fn();
+    render(
+      <DataTable
+        caption="D"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        onRowClick={onRowClick}
+        selection={selection([], 'none', { onToggle })}
+      />,
+    );
+    screen.getByRole('checkbox', { name: 'Select dc-env-01' }).focus();
+    await user.keyboard(' ');
+    expect(onToggle).toHaveBeenCalledWith('a');
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('marks the selected rows for styling', () => {
+    render(
+      <DataTable
+        caption="D"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        selection={selection(['b'], 'some')}
+      />,
+    );
+    expect(screen.getByText('dc-env-02').closest('tr')).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByText('dc-env-01').closest('tr')).not.toHaveAttribute('data-selected');
+  });
+
+  it('has no accessibility violations with a sort and a selection', async () => {
+    const { container } = render(
+      <DataTable
+        caption="Devices"
+        columns={[{ id: 'device', header: 'Device', cell: (r) => r.device, sortable: true }]}
+        rows={rows}
+        rowKey={(r) => r.id}
+        sort={{ columnId: 'device', direction: 'asc' }}
+        onSortChange={() => {}}
+        selection={selection(['a'], 'some')}
+        stickyHeader
+      />,
+    );
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('Tabs', () => {
+  const tabs = [
+    { id: 'all', label: 'All', count: 31 },
+    { id: 'running', label: 'Running', count: 27 },
+    { id: 'paused', label: 'Paused', count: 1 },
+  ];
+  const setup = (value = 'all') => {
+    const onChange = vi.fn();
+    const view = render(
+      <>
+        <Tabs
+          tabs={tabs}
+          value={value}
+          onChange={onChange}
+          label="State"
+          idPrefix="fleet"
+          panelId="panel"
+        />
+        <div role="tabpanel" id="panel" aria-labelledby={tabId('fleet', value)} />
+      </>,
+    );
+    return { onChange, ...view };
+  };
+
+  it('is a tablist with a name, a tab for each with its count, and the selected one marked', () => {
+    setup('running');
+    expect(screen.getByRole('tablist', { name: 'State' })).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'All31',
+      'Running27',
+      'Paused1',
+    ]);
+    expect(screen.getByRole('tab', { name: /Running/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /All/ })).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('points the selected tab at its panel, and gives each tab an id a panel can name', () => {
+    setup('running');
+    expect(screen.getByRole('tab', { name: /Running/ })).toHaveAttribute('aria-controls', 'panel');
+    expect(screen.getByRole('tab', { name: /All/ })).not.toHaveAttribute('aria-controls');
+    expect(screen.getByRole('tab', { name: /Running/ })).toHaveAttribute(
+      'id',
+      tabId('fleet', 'running'),
+    );
+  });
+
+  it('is one tab stop: only the selected tab is in the tab order', () => {
+    setup('running');
+    expect(screen.getByRole('tab', { name: /Running/ })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tab', { name: /All/ })).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('selects on a click', async () => {
+    const user = userEvent.setup();
+    const { onChange } = setup();
+    await user.click(screen.getByRole('tab', { name: /Paused/ }));
+    expect(onChange).toHaveBeenCalledWith('paused');
+  });
+
+  it('moves with the arrow keys, Home and End, wrapping at the ends, and focuses what it selects', async () => {
+    const user = userEvent.setup();
+    const { onChange } = setup('all');
+    screen.getByRole('tab', { name: /All/ }).focus();
+    await user.keyboard('{ArrowRight}');
+    expect(onChange).toHaveBeenLastCalledWith('running');
+    expect(screen.getByRole('tab', { name: /Running/ })).toHaveFocus();
+    await user.keyboard('{ArrowLeft}{ArrowLeft}');
+    expect(onChange).toHaveBeenLastCalledWith('paused');
+    await user.keyboard('{Home}');
+    expect(onChange).toHaveBeenLastCalledWith('all');
+    await user.keyboard('{End}');
+    expect(onChange).toHaveBeenLastCalledWith('paused');
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = setup('running');
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('Segmented', () => {
+  const options = [
+    { value: 'cards', label: 'Cards' },
+    { value: 'table', label: 'Table' },
+  ];
+
+  it('is a radio group with a name; the chosen option is checked', () => {
+    render(<Segmented options={options} value="table" onChange={() => {}} label="View" />);
+    expect(screen.getByRole('radiogroup', { name: 'View' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Table' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Cards' })).not.toBeChecked();
+  });
+
+  it('chooses on a click and with the arrow keys', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Segmented options={options} value="cards" onChange={onChange} label="View" />);
+    await user.click(screen.getByText('Table'));
+    expect(onChange).toHaveBeenLastCalledWith('table');
+    screen.getByRole('radio', { name: 'Cards' }).focus();
+    await user.keyboard('{ArrowRight}');
+    expect(onChange).toHaveBeenLastCalledWith('table');
+  });
+
+  it('does not offer a disabled option', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <Segmented
+        options={[
+          { value: 'cards', label: 'Cards', disabled: true },
+          { value: 'table', label: 'Table' },
+        ]}
+        value="table"
+        onChange={onChange}
+        label="View"
+      />,
+    );
+    expect(screen.getByRole('radio', { name: 'Cards' })).toBeDisabled();
+    await user.click(screen.getByText('Cards'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <Segmented options={options} value="cards" onChange={() => {}} label="View" />,
+    );
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('ColumnChooser', () => {
+  const columns = [
+    { id: 'device', label: 'Device', locked: true },
+    { id: 'zone', label: 'Zone' },
+    { id: 'seen', label: 'Last seen' },
+  ];
+
+  it('is closed until the button is pressed, and says whether it is open', async () => {
+    const user = userEvent.setup();
+    render(<ColumnChooser columns={columns} visible={new Set(['zone'])} onChange={() => {}} />);
+    const button = screen.getByRole('button', { name: 'Columns' });
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('group', { name: 'Columns to show' })).not.toBeInTheDocument();
+    await user.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('group', { name: 'Columns to show' })).toBeInTheDocument();
+  });
+
+  it('lists each column with a box: ticked if shown, and the locked one ticked and fixed', async () => {
+    const user = userEvent.setup();
+    render(<ColumnChooser columns={columns} visible={new Set(['zone'])} onChange={() => {}} />);
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.getByRole('checkbox', { name: 'Device' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Device' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Zone' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Last seen' })).not.toBeChecked();
+  });
+
+  it('reports the new set without changing the one it was given', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const visible = new Set(['zone']);
+    render(<ColumnChooser columns={columns} visible={visible} onChange={onChange} />);
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Last seen' }));
+    expect([...(onChange.mock.calls[0]![0] as Set<string>)].sort()).toEqual(['seen', 'zone']);
+    await user.click(screen.getByRole('checkbox', { name: 'Zone' }));
+    expect([...(onChange.mock.calls[1]![0] as Set<string>)]).toEqual([]);
+    expect([...visible]).toEqual(['zone']);
+  });
+
+  it('closes on Esc and puts focus back on the button', async () => {
+    const user = userEvent.setup();
+    render(<ColumnChooser columns={columns} visible={new Set()} onChange={() => {}} />);
+    const button = screen.getByRole('button', { name: 'Columns' });
+    await user.click(button);
+    await user.tab();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('group', { name: 'Columns to show' })).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+
+  it('closes on a click elsewhere', async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <p>elsewhere</p>
+        <ColumnChooser columns={columns} visible={new Set()} onChange={() => {}} />
+      </div>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByText('elsewhere'));
+    expect(screen.queryByRole('group', { name: 'Columns to show' })).not.toBeInTheDocument();
+  });
+
+  it('has no accessibility violations when open', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ColumnChooser columns={columns} visible={new Set(['zone'])} onChange={() => {}} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(await axeViolations(container)).toEqual([]);
   });
 });

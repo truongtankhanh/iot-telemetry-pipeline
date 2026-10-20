@@ -8,6 +8,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router';
+import { AnimationBudget } from './lib/animationBudget';
 import { CommandPalette } from './palette/CommandPalette';
 import { readRailPinned, writeRailPinned } from './lib/preferences';
 import { type AppRoute, appRoutes, findRoute } from './lib/routes';
@@ -18,10 +19,12 @@ import { Header } from './shell/Header';
 import { LinkBanner } from './shell/LinkBanner';
 import { Navigation } from './shell/Navigation';
 import { Shell } from './shell/Shell';
+import { HistoryStore } from './state/history';
 import { connectStream } from './state/stream';
 import { createStudioStore } from './state/store';
 import { StudioProvider } from './state/StudioProvider';
 import { useStudio, useStudioStore } from './state/studioContext';
+import { AnimationBudgetProvider } from './ui/AnimationBudget';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import pagesStyles from './pages/pages.module.css';
@@ -173,16 +176,24 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
  */
 export function App() {
   const [store] = useState(() => createStudioStore({ railPinned: readRailPinned() }));
+  const [history] = useState(() => new HistoryStore());
+  // One animation budget for the window (12 animated nodes, 24 glowing lines). Without a provider nothing animates.
+  const [budget] = useState(() => new AnimationBudget());
   useEffect(() => {
-    const connection = connectStream(store);
-    return () => connection.close();
-  }, [store]);
+    const connection = connectStream(store, { history });
+    return () => {
+      connection.close();
+      history.dispose();
+    };
+  }, [store, history]);
 
   return (
-    <StudioProvider store={store}>
-      <BrowserRouter>
-        <StudioFrame />
-      </BrowserRouter>
+    <StudioProvider store={store} history={history}>
+      <AnimationBudgetProvider budget={budget}>
+        <BrowserRouter>
+          <StudioFrame />
+        </BrowserRouter>
+      </AnimationBudgetProvider>
     </StudioProvider>
   );
 }

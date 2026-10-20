@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { stateViewFixture as fixture } from './fixtures/stateView';
-import { ApiError, getState } from './client';
+import {
+  ApiError,
+  getState,
+  holdValue,
+  pauseDevice,
+  releaseValue,
+  setDeviceInterval,
+  startDevice,
+  stopDevice,
+} from './client';
 
 // A real `GET /api/state` body (see types.ts for how both sides are kept in step).
 const view = fixture;
@@ -191,5 +200,123 @@ describe('getState', () => {
     await expect(getState({ fetch: fetchFn as unknown as typeof fetch })).rejects.toMatchObject({
       name: 'AbortError',
     });
+  });
+});
+
+describe('device commands', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+  /** The method, URL, headers and body a command sent. */
+  const sent = (fn: ReturnType<typeof reply>) => {
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    return { url, method: init.method, headers: init.headers, body: init.body };
+  };
+
+  it.each([
+    ['start', startDevice],
+    ['pause', pauseDevice],
+    ['stop', stopDevice],
+  ] as const)(
+    '%s is a POST with no body, as JSON, and answers the new state',
+    async (action, run) => {
+      const fetchFn = reply(view);
+      const state = await run('dc-env-01', { fetch: asFetch(fetchFn) });
+      expect(state).toEqual(view);
+      expect(sent(fetchFn)).toEqual({
+        url: `/api/devices/dc-env-01/${action}`,
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: undefined,
+      });
+    },
+  );
+
+  it('puts the interval, or null for the engine default', async () => {
+    const fetchFn = reply(view);
+    await setDeviceInterval('dc-env-01', 500, { fetch: asFetch(fetchFn) });
+    expect(sent(fetchFn)).toMatchObject({
+      url: '/api/devices/dc-env-01/interval',
+      method: 'PUT',
+      body: '{"intervalMs":500}',
+    });
+    const other = reply(view);
+    await setDeviceInterval('dc-env-01', null, { fetch: asFetch(other) });
+    expect(sent(other).body).toBe('{"intervalMs":null}');
+  });
+
+  it('refuses an interval that is not a positive number before sending anything', async () => {
+    const fetchFn = reply(view);
+    for (const bad of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(
+        setDeviceInterval('dc-env-01', bad, { fetch: asFetch(fetchFn) }),
+      ).rejects.toBeInstanceOf(ApiError);
+    }
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('holds a value on a metric, and releases it', async () => {
+    const hold = reply(view);
+    await holdValue('dc-env-01', 'temperature_c', 31.5, { fetch: asFetch(hold) });
+    expect(sent(hold)).toMatchObject({
+      url: '/api/devices/dc-env-01/holds/temperature_c',
+      method: 'PUT',
+      body: '{"value":31.5}',
+    });
+    const release = reply(view);
+    await releaseValue('dc-env-01', 'temperature_c', { fetch: asFetch(release) });
+    expect(sent(release)).toMatchObject({
+      url: '/api/devices/dc-env-01/holds/temperature_c',
+      method: 'DELETE',
+      body: undefined,
+    });
+  });
+
+  it('holds 0 (a legitimate value), and refuses a value that is not a finite number before sending', async () => {
+    const fetchFn = reply(view);
+    await holdValue('hub-power-01', 'power_kw', 0, { fetch: asFetch(fetchFn) });
+    expect(sent(fetchFn).body).toBe('{"value":0}');
+    const never = reply(view);
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(
+        holdValue('dc-env-01', 'temperature_c', bad, { fetch: asFetch(never) }),
+      ).rejects.toBeInstanceOf(ApiError);
+    }
+    expect(never).not.toHaveBeenCalled();
+  });
+
+  it('percent-encodes the device id and the metric in the path', async () => {
+    const fetchFn = reply(view);
+    await holdValue('a b/c', 'x?y', 1, { fetch: asFetch(fetchFn) });
+    expect(sent(fetchFn).url).toBe('/api/devices/a%20b%2Fc/holds/x%3Fy');
+  });
+
+  it('turns a refusal of the simulator into an ApiError with its message', async () => {
+    const fetchFn = reply(
+      { statusCode: 404, error: 'Not Found', message: 'Unknown device "ghost"' },
+      { status: 404 },
+    );
+    const failure = await pauseDevice('ghost', { fetch: asFetch(fetchFn) }).catch(
+      (e: unknown) => e,
+    );
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(404);
+    expect((failure as ApiError).message).toBe('Unknown device "ghost"');
+  });
+
+  it('reports a simulator that does not answer, with status 0', async () => {
+    const fetchFn = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const failure = await stopDevice('dc-env-01', { fetch: asFetch(fetchFn) }).catch(
+      (e: unknown) => e,
+    );
+    expect((failure as ApiError).status).toBe(0);
+  });
+
+  it('passes an abort signal to the request', async () => {
+    const fetchFn = reply(view);
+    const controller = new AbortController();
+    await startDevice('dc-env-01', { fetch: asFetch(fetchFn), signal: controller.signal });
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.signal).toBe(controller.signal);
   });
 });

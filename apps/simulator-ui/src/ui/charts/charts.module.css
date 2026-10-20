@@ -1,0 +1,280 @@
+/* Charts of the Fleet (frames 01 and 02): drawn at true pixel width so the text stays 13 px; tokens only. */
+.figure {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chart {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.grid {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+
+.axis {
+  fill: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-variant-numeric: tabular-nums;
+}
+
+.areaTop {
+  stop-color: var(--flow);
+  stop-opacity: 0.22;
+}
+
+.areaBottom {
+  stop-color: var(--flow);
+  stop-opacity: 0;
+}
+
+.line,
+.lineBreach,
+.halo {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.line {
+  stroke: var(--flow);
+  stroke-width: 2;
+}
+
+/* Beyond the raise line the same line is drawn again in amber through a clip. */
+.lineBreach {
+  stroke: var(--warning);
+  stroke-width: 2.4;
+}
+
+/* The glow of the line: a wider, dim copy under it. Only while the animation budget lets this chart glow. */
+.halo {
+  stroke: var(--flow);
+  stroke-width: 6;
+  opacity: 0.18;
+}
+
+.dot {
+  fill: var(--flow-core);
+  stroke: var(--flow);
+  stroke-width: 1.5;
+}
+
+.raiseLine,
+.clearLine {
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+}
+
+.raiseLine {
+  stroke: var(--warning);
+}
+
+.clearLine {
+  stroke: var(--success);
+  opacity: 0.8;
+}
+
+.raiseText,
+.clearText {
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+}
+
+.raiseText {
+  fill: var(--warning);
+}
+
+.clearText {
+  fill: var(--success);
+}
+
+.hatch {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  opacity: 0.55;
+}
+
+.gap {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+
+.gapText {
+  fill: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+}
+
+.tag rect {
+  fill: var(--surface-2);
+  stroke: var(--accent-line);
+}
+
+.tag text {
+  fill: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.tag[data-beyond='true'] rect {
+  stroke: var(--warning);
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.caption b {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.headroom {
+  color: var(--text-secondary);
+}
+
+.headroom[data-beyond='true'] {
+  color: var(--warning);
+  font-weight: 500;
+}
+
+.collecting {
+  color: var(--text-tertiary);
+}
+
+.spark {
+  display: block;
+  overflow: visible;
+}
+
+.spark path {
+  fill: none;
+  stroke: var(--flow);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.spark circle {
+  fill: var(--flow-core);
+}
+
+.spark line[data-empty] {
+  stroke: var(--border-strong);
+  stroke-dasharray: 3 3;
+}
+
+/* The range bar: safe, hysteresis (hatched) and alarm zones, the baseline and a pin at the value. */
+.rangebar {
+  padding: 30px 52px 66px;
+  min-width: 0;
+}
+
+.inner {
+  position: relative;
+}
+
+.track {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-subtle);
+}
+
+.zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.zone[data-kind='safe'] {
+  background: var(--tint-ok);
+  border-radius: 7px 0 0 7px;
+}
+
+.zone[data-kind='hysteresis'] {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--tint-warn),
+    var(--tint-warn) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.zone[data-kind='alarm'] {
+  background: var(--tint-bad);
+  border-radius: 0 7px 7px 0;
+}
+
+/* When the rule fires below a value the safe zone is on the right. */
+.zone[data-kind='safe']:last-of-type {
+  border-radius: 0 7px 7px 0;
+}
+
+.zone[data-kind='alarm']:first-of-type {
+  border-radius: 7px 0 0 7px;
+}
+
+.baseline {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-secondary);
+}
+
+/* The current value: a diamond, so it is a shape and a label, not a colour. */
+.pin {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  background: var(--flow-core);
+  border: 2px solid var(--flow);
+  transform: rotate(45deg);
+  box-shadow: var(--neon-flow);
+}
+
+.pin[data-off-scale='true'] {
+  border-style: dashed;
+}
+
+.legend span {
+  position: absolute;
+  top: 22px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend span[data-row='above'] {
+  top: -28px;
+}
+
+/* The baseline label has a row of its own: it is close to the value when the device is healthy. */
+.legend span[data-row='low'] {
+  top: 44px;
+}
+
+.legend span[data-emphasis='true'] {
+  color: var(--text-primary);
+  font-weight: 500;
+}
