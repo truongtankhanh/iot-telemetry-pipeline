@@ -346,8 +346,10 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
    PostgreSQL are taken in the Compose stack).
 6. **Chart library.** The mockups draw SVG. Candidates for the live charts are a tree-shaken ECharts, uPlot, or
    hand-drawn SVG; SIM-06 decides after measuring the bundle. _SIM-05 drew its charts (the Fleet line chart, the
-   sparkline and the range bar) as hand-written SVG, with no dependency, because the Fleet comes first; the
-   decision stays open for the charts the later pages need._
+   sparkline and the range bar) as hand-written SVG, with no dependency, because the Fleet comes first._
+   _Settled in SIM-06 (2026-10-20): hand-written SVG stays._ Topology's detail row reuses those charts; React Flow draws the
+   graph and its cost is measured in [ADR-0011](../../adr/0011-simulator-studio-control-plane.md). ECharts and uPlot are not
+   adopted.
 7. **Delivery timestamps.** Showing when the outbox delivered, rather than when Studio saw it, needs ingest to expose
    the time in `/api/alerts`. That is a small change to ingest; it is not assumed here.
 8. **Twin.** _Decided 2026-10-19:_ option C with a spike, devices hand-placed and marked `illustrative`, the Pipeline hub
@@ -362,3 +364,11 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
     anything is sent how many devices it reaches and which it skips, and hands the work to the page's bulk run.
 11. **Scenario timeline at scale.** Frame 05 draws one lane per device; above 12 anomalies it groups by zone as the Lab's
     dock does (frame 19). SIM-11 draws the grouped state.
+12. **Frames 04 and 10 differ from the build.** _Settled in SIM-06 (2026-10-20)._ The build shows only what Studio can measure:
+    no "4 ms" on the Broker (no PUBACK time), no "12 buffered" on Ingest (not forwarded), no "Open" on the command center (Studio
+    never reads it); zones carry their code and device count, not a name ("BLD-DC · 2 devices"; the registry has no zone
+    names); the line under a device's id is its state in a word and an icon, not its metric; a silent device is grey, as
+    drawn, though the Fleet draws it red. Left out: the _Topology | Twin_ switch, the _Data flow | Alerts_ layer switch, the
+    scenario chip and the Cause row (SIM-08), "Show in twin", "Open in lab", "Retry now", the labels on the edges. "Retrying
+    every 5 s" is "Retrying every 1 s", the poller's real cycle. The broker-disconnected state has no frame and was drawn in
+    the language of frame 10. Frames 04 and 10 stay as drawn until they are redrawn.

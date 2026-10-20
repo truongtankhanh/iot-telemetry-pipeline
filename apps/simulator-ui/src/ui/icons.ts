@@ -18,16 +18,21 @@ import {
   CircleQuestionMark,
   Cloud,
   Command,
+  ChevronDown,
   Copy,
   CornerDownLeft,
   Cpu,
+  Database,
   Droplets,
   FlaskConical,
+  Focus,
   Gauge,
+  Inbox,
   Info,
   Layers,
   LayoutDashboard,
   type LucideIcon,
+  Minus,
   Network,
   OctagonAlert,
   PanelRightOpen,
@@ -35,10 +40,14 @@ import {
   Pin,
   PinOff,
   Play,
+  Plus,
   Presentation,
+  Radio,
   RotateCcw,
+  Scale,
   Search,
   Server,
+  Shield,
   Square,
   Terminal,
   Thermometer,
@@ -50,6 +59,7 @@ import {
 } from 'lucide-react';
 import type { Severity } from '../api/types';
 import type { DeviceGlyph, MetricIconName } from '../lib/deviceIdentity';
+import type { StageId } from '../lib/pipeline';
 import type { NavIconName } from '../lib/routes';
 
 /** A drawable glyph. Components take this type, never the icon set's own. */
@@ -120,4 +130,19 @@ export const uiIcons = {
   copy: Copy,
   reset: RotateCcw,
   inspect: PanelRightOpen,
+  plus: Plus,
+  minus: Minus,
+  fit: Focus,
+  chevronDown: ChevronDown,
 } satisfies Record<string, Glyph>;
+
+/** The glyph of each stage of the pipeline in the topology. */
+export const stageGlyphs: Record<StageId, Glyph> = {
+  broker: Server,
+  ingest: Radio,
+  database: Database,
+  rules: Scale,
+  alert: Bell,
+  outbox: Inbox,
+  commandCenter: Shield,
+};

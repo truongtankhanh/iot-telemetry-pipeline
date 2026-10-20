@@ -1,0 +1,817 @@
+/*
+ * The topology (frames 04 and 10): nodes, zones and the neon edge. Tokens only. A state is an edge light, a border
+ * style, an icon and a word; every animation hangs off `data-animated` or `data-glowing`, which the one block at the
+ * end of tokens.css stops under `prefers-reduced-motion`. Keyframes live here, with the rules that use them.
+ */
+
+@keyframes pulseWarn {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 194, 61, 0.5),
+      0 0 8px rgba(255, 194, 61, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 194, 61, 0.9),
+      0 0 20px rgba(255, 194, 61, 0.7);
+  }
+}
+
+@keyframes glowSelected {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(149, 155, 255, 0.5),
+      0 0 8px rgba(149, 155, 255, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(149, 155, 255, 0.85),
+      0 0 20px rgba(149, 155, 255, 0.65);
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.55;
+  }
+  12% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  54% {
+    opacity: 1;
+  }
+}
+
+@keyframes haloBreath {
+  0%,
+  100% {
+    stroke-opacity: 0.14;
+  }
+  50% {
+    stroke-opacity: 0.4;
+  }
+}
+
+@keyframes march {
+  to {
+    stroke-dashoffset: -34;
+  }
+}
+
+/* ---- the node: a device and a stage ---- */
+.node {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 0 10px 0 8px;
+  background: var(--surface-1);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.node:hover {
+  border-color: var(--flow);
+}
+
+/* A stage stacks its lines: label, state, figure, detail. */
+.node[data-kind='stage'] {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  padding: 6px 10px;
+}
+
+.node[data-state='healthy'] {
+  border-color: rgba(61, 240, 174, 0.6);
+  box-shadow: var(--neon-ok);
+}
+
+.node[data-state='anomaly'] {
+  border-color: var(--warning);
+  box-shadow: var(--neon-warn);
+}
+
+.node[data-state='down'] {
+  border-style: dashed;
+  border-color: var(--danger);
+  box-shadow: var(--neon-bad);
+}
+
+/* Paused, stopped, silent, or not known: dark and dashed, with no light. */
+.node[data-state='stale'] {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+  background: var(--surface-0);
+  box-shadow: none;
+}
+
+.node[data-selected='true'] {
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--accent);
+  box-shadow: var(--neon-accent);
+}
+
+/* Old data: dashed and without light. The words stay readable, so no opacity. */
+.node[data-dimmed='true'] {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.node[data-animated='true'][data-state='anomaly'] {
+  animation: pulseWarn 1.3s ease-in-out infinite;
+}
+
+.node[data-animated='true'][data-state='down'] {
+  animation: flicker 2.4s steps(1, end) infinite;
+}
+
+.node[data-animated='true'][data-selected='true'] {
+  animation: glowSelected 2.4s ease-in-out infinite;
+}
+
+/* The node is the wrapper's focus target: the ring is drawn on the node, never removed. */
+:global(.react-flow__node:focus-visible) .node,
+:global(.react-flow__node:focus-visible) .zone {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* React Flow places handles at the node's edges; they only give the edges a place to meet and show nothing. */
+.node .handle,
+.zone .handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The shape of the kind (frame 00): the shape is the class of device, the light is its state. */
+.face {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.face[data-shape='rounded-square'] {
+  border-radius: 7px;
+}
+
+.face[data-shape='circle'] {
+  border-radius: 50%;
+}
+
+.face[data-shape='rounded'] {
+  border-radius: 10px;
+}
+
+.face[data-shape='hexagon'] {
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+}
+
+.face[data-state='healthy'] {
+  background: rgba(61, 240, 174, 0.14);
+  color: var(--success);
+}
+
+.face[data-state='anomaly'] {
+  background: rgba(255, 194, 61, 0.18);
+  color: var(--warning);
+}
+
+.face[data-state='down'] {
+  background: rgba(255, 98, 128, 0.16);
+  color: var(--danger);
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  flex: none;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.node[data-state='stale'] .value {
+  color: var(--text-secondary);
+}
+
+/* The icon and the word of a state. */
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  font-size: var(--fs-min);
+  line-height: 1.3;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mark[data-state='healthy'] {
+  color: var(--success);
+}
+
+.mark[data-state='anomaly'] {
+  color: var(--warning);
+}
+
+.mark[data-state='down'] {
+  color: var(--danger);
+}
+
+.stageHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.stageLabel {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.headline {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--fs-min);
+  line-height: 1.25;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node[data-compact='true'] .detail {
+  display: none;
+}
+
+/* ---- the zone: a box for its devices when open, one node for them when not ---- */
+.zone {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+/* Closed, a zone is a node of its own and carries the worst state of its devices. */
+.zone[data-mode='closed'],
+.zone[data-mode='counts'] {
+  background: var(--surface-1);
+  border-width: 1.5px;
+  border-color: var(--border-strong);
+  cursor: pointer;
+}
+
+.zone[data-mode='closed'][data-state='healthy'],
+.zone[data-mode='counts'][data-state='healthy'] {
+  border-color: rgba(61, 240, 174, 0.6);
+  box-shadow: var(--neon-ok);
+}
+
+.zone[data-mode='closed'][data-state='anomaly'],
+.zone[data-mode='counts'][data-state='anomaly'] {
+  border-color: var(--warning);
+  box-shadow: var(--neon-warn);
+}
+
+.zone[data-mode='closed'][data-state='down'],
+.zone[data-mode='counts'][data-state='down'] {
+  border-style: dashed;
+  border-color: var(--danger);
+  box-shadow: var(--neon-bad);
+}
+
+.zone[data-mode='closed'][data-state='stale'],
+.zone[data-mode='counts'][data-state='stale'] {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+  background: var(--surface-0);
+}
+
+.zone[data-selected='true'] {
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--accent);
+  box-shadow: var(--neon-accent);
+}
+
+.zone[data-dimmed='true'] {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.zone[data-animated='true'][data-state='anomaly'] {
+  animation: pulseWarn 1.3s ease-in-out infinite;
+}
+
+.zoneHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 12px;
+}
+
+.zoneCode {
+  font-size: var(--fs-min);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.zoneCount {
+  overflow: hidden;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.chevron:hover {
+  color: var(--flow);
+}
+
+.chevron:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.chevron[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+/* Open because of the selection, a search or "All devices": the viewer cannot close it from here. */
+.chevron[aria-disabled='true'] {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.zoneBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.bar {
+  display: flex;
+  gap: 1px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.bar span {
+  min-width: 3px;
+  background: var(--text-tertiary);
+}
+
+.bar span[data-state='healthy'] {
+  background: var(--success);
+}
+
+.bar span[data-state='anomaly'] {
+  background: var(--warning);
+}
+
+.bar span[data-state='down'] {
+  background: var(--danger);
+}
+
+.more {
+  position: absolute;
+  bottom: 5px;
+  left: 14px;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+}
+
+/* ---- the edge: halo, core and pulse; light only where energy moves ---- */
+.edge {
+  pointer-events: none;
+}
+
+.edge path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Nothing flows: a dim dashed wire, no light. */
+.edge .halo,
+.edge .pulse {
+  display: none;
+}
+
+.edge .core {
+  stroke: var(--border-strong);
+  stroke-dasharray: 5 6;
+}
+
+/* A thin wire. Only here is the width set in CSS: a lit edge takes its width (by devices behind it) from the path. */
+.edge[data-state='off'] .core {
+  stroke-width: 1.5;
+}
+
+.edge[data-state='bad'] .core {
+  stroke: var(--danger);
+  stroke-width: 1.6;
+}
+
+.edge[data-state='flowing'],
+.edge[data-state='warn'],
+.edge[data-state='ok'] {
+  filter: drop-shadow(0 0 3px rgba(71, 215, 255, 0.55));
+}
+
+.edge[data-state='warn'] {
+  filter: drop-shadow(0 0 3px rgba(255, 194, 61, 0.6));
+}
+
+.edge[data-state='ok'] {
+  filter: drop-shadow(0 0 3px rgba(61, 240, 174, 0.55));
+}
+
+.edge[data-state='flowing'] .halo,
+.edge[data-state='warn'] .halo,
+.edge[data-state='ok'] .halo,
+.edge[data-state='flowing'] .pulse,
+.edge[data-state='warn'] .pulse,
+.edge[data-state='ok'] .pulse {
+  display: inline;
+}
+
+.edge[data-state='flowing'] .halo,
+.edge[data-state='flowing'] .core {
+  stroke: var(--flow);
+  stroke-dasharray: none;
+}
+
+.edge[data-state='warn'] .halo,
+.edge[data-state='warn'] .core {
+  stroke: var(--warning);
+  stroke-dasharray: none;
+}
+
+.edge[data-state='ok'] .halo,
+.edge[data-state='ok'] .core {
+  stroke: var(--success);
+  stroke-dasharray: none;
+}
+
+.edge .halo {
+  stroke-opacity: 0.2;
+}
+
+.edge .pulse {
+  stroke: var(--flow-core);
+  stroke-dasharray: 2 15;
+}
+
+.edge[data-state='warn'] .pulse {
+  stroke: var(--warn-core);
+}
+
+.edge[data-state='ok'] .pulse {
+  stroke: var(--ok-core);
+}
+
+.edge[data-glowing='true'] .halo {
+  animation: haloBreath 2.6s ease-in-out infinite;
+}
+
+.edge[data-glowing='true'] .pulse {
+  animation: march 1.1s linear infinite;
+}
+
+.dots circle {
+  fill: var(--flow-core);
+  stroke: var(--flow);
+  stroke-width: 1;
+}
+
+.edge[data-state='warn'] .dots circle {
+  fill: var(--warn-core);
+  stroke: var(--warning);
+}
+
+.edge[data-state='ok'] .dots circle {
+  fill: var(--ok-core);
+  stroke: var(--success);
+}
+
+/* ---- the page: toolbar, canvas, legend ---- */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* The link to the simulator is lost: what is shown is the last data, dimmed. */
+.page[data-stale='true'] .canvasWrap {
+  opacity: 0.7;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+}
+
+.problems {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  background: var(--tint-warn);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--warning);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.problems[aria-pressed='true'] {
+  border-color: var(--warning);
+  box-shadow: var(--neon-warn);
+}
+
+.problems:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.search {
+  display: inline-flex;
+  flex: 0 1 260px;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  min-width: 180px;
+  padding: 0 10px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  color: var(--text-secondary);
+}
+
+.search:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.zoomValue {
+  min-width: 44px;
+  text-align: center;
+  font-size: var(--fs-min);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+/* The canvas has a real height (React Flow measures it); the frame caps the graph at 640 px. */
+.canvasWrap {
+  min-width: 0;
+}
+
+.canvas {
+  position: relative;
+  height: min(640px, 70vh);
+  min-height: 420px;
+  overflow: hidden;
+  background-color: var(--surface-0);
+  background-image: radial-gradient(rgba(166, 184, 197, 0.16) 1px, transparent 1px);
+  background-size: 22px 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  --xy-minimap-background-color: var(--surface-1);
+  --xy-minimap-mask-background-color: rgba(8, 19, 29, 0.6);
+  --xy-minimap-mask-stroke-color: var(--accent);
+  --xy-minimap-mask-stroke-width: 1.5;
+}
+
+.canvas :global(.react-flow) {
+  background: transparent;
+}
+
+/* The minimap draws each node in its state, so a problem shows there too. */
+.miniHealthy {
+  fill: var(--success);
+}
+
+.miniAnomaly {
+  fill: var(--warning);
+}
+
+.miniDown {
+  fill: var(--danger);
+}
+
+.miniStale {
+  fill: var(--text-tertiary);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 2px 4px 0;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+}
+
+.legendList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legendList li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 14px;
+  height: 10px;
+  background: var(--surface-1);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+}
+
+.swatch[data-state='healthy'] {
+  border-color: var(--success);
+}
+
+.swatch[data-state='anomaly'] {
+  border-color: var(--warning);
+}
+
+.swatch[data-state='stale'] {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+}
+
+.swatch[data-state='down'] {
+  border-style: dashed;
+  border-color: var(--danger);
+}
+
+.swatch[data-state='selected'] {
+  border-width: 2px;
+  border-color: var(--accent);
+}
+
+.shape {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background: var(--text-secondary);
+}
+
+.shape[data-shape='rounded-square'] {
+  border-radius: 3px;
+}
+
+.shape[data-shape='circle'] {
+  border-radius: 50%;
+}
+
+.shape[data-shape='hexagon'] {
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+}
+
+.legendNote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 0 auto;
+}
+
+.legendNote a {
+  color: var(--text-secondary);
+}
+
+.notice {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--tint-warn);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}

@@ -63,6 +63,9 @@
   /* Electric cyan is energy moving (data lines, focus). It is not the accent. */
   --flow: #47d7ff;
   --flow-core: #d8f6ff;
+  /* The pulse inside an amber and a green edge (an anomaly, a delivered alert): the lit core of the line. */
+  --warn-core: #fff3d6;
+  --ok-core: #dcfff0;
   --edge-flow: rgba(71, 215, 255, 0.22);
   --neon-accent: 0 0 0 1px rgba(149, 155, 255, 0.55), 0 0 14px rgba(149, 155, 255, 0.45);
   --neon-flow: 0 0 0 1px rgba(71, 215, 255, 0.5), 0 0 14px rgba(71, 215, 255, 0.4);

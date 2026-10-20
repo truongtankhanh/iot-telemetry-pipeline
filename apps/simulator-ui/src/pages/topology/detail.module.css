@@ -1,0 +1,344 @@
+/* The row under the graph (frame 04): the device, the rule evaluation and the alerts in three columns. Tokens only. */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(300px, 0.9fr) minmax(300px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.whoText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.whoText > span:first-child {
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.reading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+}
+
+/* Only numerals of 24 px and up glow; the headroom beside it is plain text. */
+.big {
+  font-size: var(--fs-numeral);
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: #e6fbff;
+  text-shadow:
+    0 0 8px rgba(71, 215, 255, 0.6),
+    0 0 20px rgba(71, 215, 255, 0.3);
+}
+
+.unit {
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.headroom {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* A link that looks like a small outlined button: it goes somewhere, so it is a link. */
+.actionLink {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-2);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.actionLink:hover {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.actionLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The rule evaluation: label and value rows. */
+.facts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+}
+
+.facts th,
+.facts td {
+  padding: 5px 0;
+  border-top: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.facts tr:first-child th,
+.facts tr:first-child td {
+  border-top: 0;
+}
+
+.facts th {
+  padding-right: 12px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.facts td {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.facts td[data-mono='true'] {
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.facts td[data-warn='true'] {
+  color: var(--warning);
+}
+
+.note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+/* The alerts. */
+.alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Old data: dashed and without light, the words as readable as ever (no opacity). */
+.alerts[data-dimmed='true'] .alert {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.alertList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alert {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+}
+
+.alert[data-open='true'] {
+  border-color: var(--warning);
+  box-shadow: var(--neon-warn);
+}
+
+.alertHead,
+.alertFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.alertHead .mono {
+  margin-left: auto;
+  color: var(--text-secondary);
+}
+
+.alertTitle {
+  font-weight: 600;
+}
+
+.incident {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.incident a {
+  color: var(--text-primary);
+}
+
+/* No selection and a dependency in trouble (frame 10): the checks and the last alerts, two columns. */
+.row[data-columns='2'] {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+}
+
+@media (max-width: 1100px) {
+  .row[data-columns='2'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* A zone's devices: a list of buttons that choose one. */
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.member:hover {
+  border-color: var(--flow);
+}
+
+.member:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.memberValue {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+/* The checks: an icon, a name with its sentence, and a chip. */
+.checks {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.check:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.checkText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The banners above the graph: what is wrong with what the pipeline depends on. */
+.banners {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.banner[data-tone='bad'] {
+  background: var(--tint-bad);
+  border-color: var(--danger);
+}
+
+.banner[data-tone='warn'] {
+  background: var(--tint-warn);
+  border-color: var(--warning);
+}
+
+.bannerText {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
