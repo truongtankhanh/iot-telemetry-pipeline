@@ -53,11 +53,12 @@ pnpm docker:up                                                                  
 
 ## Progress
 
-| Ticket           | Status                                           |
-| ---------------- | ------------------------------------------------ |
-| SIM-00           | Done 2026-10-19                                  |
-| SIM-01           | Done 2026-10-20 (PR #46, `bcb036e`)              |
-| SIM-02 to SIM-22 | Not started (SIM-02 is next; SIM-16 is not used) |
+| Ticket           | Status                                                     |
+| ---------------- | ---------------------------------------------------------- |
+| SIM-00           | Done 2026-10-19                                            |
+| SIM-01           | Done 2026-10-20 (PR #46, `bcb036e`)                        |
+| SIM-02           | In review 2026-10-20 (branch `feat/sim-02-extract-engine`) |
+| SIM-03 to SIM-22 | Not started (SIM-03 is next; SIM-16 is not used)           |
 
 Each task in the phase files carries its own **Status** line; update it, and this table, in the pull request that
 finishes the ticket.

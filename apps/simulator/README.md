@@ -25,7 +25,7 @@ pnpm --filter @itp/simulator start -- --scenario server-room-overheat
 | ------------------- | --------------------------------------------------------------------------------------------- |
 | `--broker <url>`    | MQTT broker (default `MQTT_URL`, else `mqtt://localhost:1883`)                                |
 | `--registry <path>` | `devices.json` to simulate (default the ingest service's)                                     |
-| `--interval <ms>`   | Publish interval per device (default 2000)                                                    |
+| `--interval <ms>`   | Publish interval per device (default 2000); above 0                                           |
 | `--anomaly <spec>`  | `device:metric:value:startAt:duration`, repeatable, e.g. `dc-env-01:temperature_c:29.5:20:60` |
 | `--scenario <name>` | Preset anomalies: `server-room-overheat`, `crowded-lecture`                                   |
 | `--duration <s>`    | Stop after this many seconds (default: until Ctrl+C)                                          |
@@ -71,12 +71,24 @@ Run from the repository root.
 
 ```
 src/
-  main.ts          publishes continuously (scenarios, anomalies)
-  bench.ts         throughput benchmark
-  gap-report.ts    accounts for every message of a benchmark run
-  signals.ts       per-device-kind baselines, daily curves and anomalies
-  signals.test.ts
+  main.ts            command line: arguments, broker connection, shutdown; runs the engine
+  bench.ts           throughput benchmark
+  gap-report.ts      accounts for every message of a benchmark run
+  engine.ts          the publish loop: devices, anomalies, held values, Step and Reset, events
+  clock.ts           the engine's time: the system clock, and a manual clock for tests and Step
+  device-source.ts   where devices come from (today the ingest registry, devices.json)
+  scenarios.ts       the presets behind --scenario
+  signals.ts         per-device-kind baselines, daily curves and anomaly shapes (step, ramp, spike)
+  random.ts          a seeded random source for reproducible readings
+  *.test.ts          next to the code they test
 ```
+
+`main.ts` is a thin caller of the engine. The engine has no process or argument handling, so
+something else can drive it while it runs: it starts, pauses and stops devices, changes their
+interval, adds and removes anomalies, holds a value, and emits an event for every change and every
+message. On a manual clock time moves only when it is stepped, which makes a run reproducible.
+Anomaly shapes other than a step are for the engine's callers; `--anomaly` still takes the five
+fields and means a step.
 
 A new device kind or metric needs a baseline in `src/signals.ts`; see the
 [development guide](../../docs/development.md).

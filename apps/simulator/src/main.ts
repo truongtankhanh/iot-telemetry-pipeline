@@ -1,8 +1,9 @@
-import { telemetryTopic, type TelemetryPayload } from '@itp/telemetry-contract';
 import { connectAsync } from 'mqtt';
-import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { type Anomaly, type DeviceSpec, parseAnomaly, sample } from './signals.ts';
+import { JsonFileDeviceSource } from './device-source.ts';
+import { Engine } from './engine.ts';
+import { SCENARIOS } from './scenarios.ts';
+import { parseAnomaly } from './signals.ts';
 
 const HELP = `Usage: node src/main.ts [options]
 
@@ -14,12 +15,6 @@ const HELP = `Usage: node src/main.ts [options]
   --scenario <name>     preset anomalies: server-room-overheat | crowded-lecture
   --duration <s>        stop after this many seconds (default: run until Ctrl+C)
 `;
-
-const SCENARIOS: Record<string, string[]> = {
-  // Overheats row A for a minute, then recovers: opens and clears "Server room temperature high".
-  'server-room-overheat': ['dc-env-01:temperature_c:29.2:20:60'],
-  'crowded-lecture': ['lha-air-01:co2_ppm:1450:20:90'],
-};
 
 const { values } = parseArgs({
   options: {
@@ -41,9 +36,8 @@ if (values.help) {
   process.exit(0);
 }
 
-const devices = (JSON.parse(readFileSync(values.registry, 'utf8')) as { devices: DeviceSpec[] })
-  .devices;
-const anomalies: Anomaly[] = [
+const devices = await new JsonFileDeviceSource(values.registry).load();
+const anomalies = [
   ...(values.scenario ? (SCENARIOS[values.scenario] ?? []) : []),
   ...values.anomaly,
 ].map(parseAnomaly);
@@ -54,9 +48,13 @@ const client = await connectAsync(values.broker, {
   protocolVersion: 5,
   clientId: `simulator-${process.pid}`,
 });
-const started = Date.now();
-const seq = new Map<string, number>();
-let published = 0;
+const engine = new Engine({
+  devices,
+  publisher: { publish: (topic, payload, options) => client.publishAsync(topic, payload, options) },
+  intervalMs: Number(values.interval),
+  anomalies,
+});
+engine.on('tick-error', (error) => console.error(error.message));
 
 console.log(`Simulating ${devices.length} devices → ${values.broker}, every ${values.interval} ms`);
 for (const a of anomalies) {
@@ -65,45 +63,18 @@ for (const a of anomalies) {
   );
 }
 
-async function tick(): Promise<void> {
-  const now = new Date();
-  const elapsed = (now.getTime() - started) / 1000;
-  await Promise.all(
-    devices.map((device) => {
-      const next = (seq.get(device.id) ?? 0) + 1;
-      seq.set(device.id, next);
-      const payload: TelemetryPayload = {
-        seq: next,
-        ts: now.toISOString(),
-        metrics: Object.fromEntries(
-          device.metrics.map((m) => [m, sample(device, m, now, elapsed, anomalies)]),
-        ),
-      };
-      published++;
-      return client.publishAsync(
-        telemetryTopic({ zoneCode: device.zoneCode, deviceId: device.id }),
-        JSON.stringify(payload),
-        { qos: 1 },
-      );
-    }),
-  );
-}
-
-const timer = setInterval(
-  () => void tick().catch((e: Error) => console.error(e.message)),
-  Number(values.interval),
-);
-const report = setInterval(() => console.log(`published ${published} messages`), 10_000);
+const report = setInterval(() => console.log(`published ${engine.published} messages`), 10_000);
 
 async function stop(): Promise<void> {
-  clearInterval(timer);
+  engine.stop();
   clearInterval(report);
   await client.endAsync();
-  console.log(`stopped after ${published} messages`);
+  console.log(`stopped after ${engine.published} messages`);
   process.exit(0);
 }
 
 process.on('SIGINT', () => void stop());
 process.on('SIGTERM', () => void stop());
 if (values.duration) setTimeout(() => void stop(), Number(values.duration) * 1000);
-await tick();
+// The first tick is awaited without a catch, as before: if it fails the process exits with the error.
+await engine.start();

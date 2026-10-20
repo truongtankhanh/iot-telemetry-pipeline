@@ -1,10 +1,9 @@
 import { telemetryTopic } from '@itp/telemetry-contract';
 import { connectAsync } from 'mqtt';
-import { readFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
-import type { DeviceSpec } from './signals.ts';
+import { JsonFileDeviceSource } from './device-source.ts';
 
 /**
  * End-to-end throughput: publishes N messages as fast as the broker accepts them, then waits until
@@ -33,8 +32,7 @@ const { values } = parseArgs({
 const log = values.json ? console.error : console.log;
 
 const total = Number(values.messages);
-const devices = (JSON.parse(readFileSync(values.registry, 'utf8')) as { devices: DeviceSpec[] })
-  .devices;
+const devices = await new JsonFileDeviceSource(values.registry).load();
 const db = new pg.Pool({ connectionString: values.database });
 const client = await connectAsync(values.broker, {
   protocolVersion: 5,

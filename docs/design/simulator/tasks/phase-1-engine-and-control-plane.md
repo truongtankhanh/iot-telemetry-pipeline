@@ -5,7 +5,7 @@ Part of the [implementation order](../implementation-order.md). Nothing here has
 ## SIM-02: Extract the engine
 
 - **Depends on:** SIM-00
-- **Status:** Not started
+- **Status:** In review 2026-10-20 (branch `feat/sim-02-extract-engine`)
 - **Area:** `apps/simulator`
 
 ### Scope
