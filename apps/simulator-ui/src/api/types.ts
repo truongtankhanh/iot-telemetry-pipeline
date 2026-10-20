@@ -95,6 +95,29 @@ export interface AlertsFeed {
   stale: boolean;
 }
 
+/** Why an alert exists, when Studio can tell: a scenario it started (`cause` of `GET /api/alerts`). */
+export interface AlertCause {
+  scenario: string;
+  /** When Studio saw the run start (wall time, ISO 8601). */
+  startedAt: string;
+}
+
+/**
+ * An alert of `GET /api/alerts`: the observed alert of the state view, and its cause. A manual mirror of
+ * `PagedAlert` in `apps/simulator/src/control-routes.ts`, kept honest by `fixtures/alerts-page.json`: both sides
+ * compare their keys with that file.
+ */
+export interface PagedAlert extends ObservedAlert {
+  cause: AlertCause | null;
+}
+
+/** One page of alerts, newest first, and the cursor of the next one: ingest's `X-Next-Cursor`, unchanged. */
+export interface AlertsPage {
+  alerts: PagedAlert[];
+  /** `null` on the last page. Opaque: only ever sent back as `before`, never read or built. */
+  next: string | null;
+}
+
 export interface MetricSample {
   name: string;
   labels: Record<string, string>;

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import type { ObservedAlert } from '../../api/types';
+import { severityOf } from '../../lib/alertRows';
 import { formatClockTime } from '../../lib/time';
 import { consoleHref } from '../../lib/topologyDetail';
 import { Card } from '../../ui/Card';
 import { Chip } from '../../ui/Chip';
+import { DeliveryChip } from '../../ui/DeliveryChip';
 import { toneIcons } from '../../ui/icons';
 import { Segmented } from '../../ui/Segmented';
 import { SeverityBadge } from '../../ui/SeverityBadge';
@@ -21,35 +23,6 @@ export interface AlertsCardProps {
   consoleUrl: string | null;
   /** Ingest does not answer: the alerts are the last it said, dimmed and dated (ms of the last good read). */
   asOf: number | null;
-}
-
-const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
-
-function Delivery({ alert }: { alert: ObservedAlert }) {
-  const attempts =
-    alert.deliveryAttempts === null ? '' : ` · ${plural(alert.deliveryAttempts, 'attempt')}`;
-  switch (alert.deliveryStatus) {
-    case 'delivered':
-      return (
-        <Chip tone="ok" icon={toneIcons.ok}>
-          Delivered{attempts}
-        </Chip>
-      );
-    case 'pending':
-      return <Chip tone="warn">Pending{attempts}</Chip>;
-    case 'failed':
-      return (
-        <Chip tone="bad" icon={toneIcons.bad}>
-          Failed{attempts}
-          {alert.deliveryError ? ` · ${alert.deliveryError}` : ''}
-        </Chip>
-      );
-    case 'skipped':
-      return <Chip>Skipped</Chip>;
-    default:
-      // A status ingest adds later, or none: said as unknown, never as delivered.
-      return <Chip>Delivery unknown</Chip>;
-  }
 }
 
 /**
@@ -119,7 +92,7 @@ export function AlertsCard({ alerts, scope, consoleUrl, asOf }: AlertsCardProps)
                     : ` · cleared ${formatClockTime(Date.parse(alert.clearedAt))}${alert.clearedValue === null ? '' : ` at ${alert.clearedValue}`}`}
                 </div>
                 <div className={styles.alertFoot}>
-                  <Delivery alert={alert} />
+                  <DeliveryChip alert={alert} />
                   {alert.externalRef ? (
                     <span className={styles.incident}>
                       Incident <span className={styles.mono}>{alert.externalRef.slice(0, 8)}…</span>
@@ -141,12 +114,4 @@ export function AlertsCard({ alerts, scope, consoleUrl, asOf }: AlertsCardProps)
       </div>
     </Card>
   );
-}
-
-const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
-/** A severity ingest sends that Studio does not know is drawn as the lowest, not hidden. */
-function severityOf(value: string): (typeof SEVERITIES)[number] {
-  return (SEVERITIES as readonly string[]).includes(value)
-    ? (value as (typeof SEVERITIES)[number])
-    : 'low';
 }

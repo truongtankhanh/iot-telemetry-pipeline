@@ -11,6 +11,7 @@ import { Chip } from './Chip';
 import { ColumnChooser } from './ColumnChooser';
 import { DataLine } from './DataLine';
 import { type Column, DataTable } from './DataTable';
+import { DeliveryChip } from './DeliveryChip';
 import { DeviceBadge } from './DeviceBadge';
 import { Icon } from './Icon';
 import { uiIcons } from './icons';
@@ -18,6 +19,7 @@ import { NodeState } from './NodeState';
 import { Pager } from './Pager';
 import { Pill } from './Pill';
 import { Segmented } from './Segmented';
+import { SelectField } from './SelectField';
 import { SeverityBadge } from './SeverityBadge';
 import { tabId } from './tabId';
 import { Tabs } from './Tabs';
@@ -874,6 +876,75 @@ describe('ColumnChooser', () => {
       <ColumnChooser columns={columns} visible={new Set(['zone'])} onChange={() => {}} />,
     );
     await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('DeliveryChip', () => {
+  const chip = (
+    deliveryStatus: string | null,
+    deliveryAttempts: number | null = 1,
+    deliveryError: string | null = null,
+  ) => render(<DeliveryChip alert={{ deliveryStatus, deliveryAttempts, deliveryError }} />);
+
+  it('says delivered with its attempts, in words and with an icon', () => {
+    const { container } = chip('delivered', 2);
+    expect(screen.getByText(/Delivered · 2 attempts/)).toHaveAttribute('data-tone', 'ok');
+    expect(container.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('says pending, failed with ingest’s error, and skipped', () => {
+    const { unmount } = chip('pending', 1);
+    expect(screen.getByText(/Pending · 1 attempt$/)).toHaveAttribute('data-tone', 'warn');
+    unmount();
+
+    const failed = chip('failed', 3, 'HTTP 502');
+    expect(screen.getByText(/Failed · 3 attempts · HTTP 502/)).toHaveAttribute('data-tone', 'bad');
+    failed.unmount();
+
+    chip('skipped', 0);
+    expect(screen.getByText('Skipped')).toBeInTheDocument();
+  });
+
+  it('leaves out the attempts when ingest gives none', () => {
+    chip('delivered', null);
+    expect(screen.getByText('Delivered')).toBeInTheDocument();
+  });
+
+  it('never says delivered for a status it does not know, or for none', () => {
+    const { unmount } = chip('quarantined');
+    expect(screen.getByText('Delivery unknown')).toBeInTheDocument();
+    unmount();
+    chip(null, null);
+    expect(screen.getByText('Delivery unknown')).toBeInTheDocument();
+    expect(screen.queryByText(/Delivered/)).not.toBeInTheDocument();
+  });
+});
+
+describe('SelectField', () => {
+  const options = [
+    { value: 'all', label: 'All severities' },
+    { value: 'high', label: 'high' },
+  ];
+
+  it('is named by its label and reports a choice', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<SelectField label="Severity" value="all" options={options} onChange={onChange} />);
+    await user.selectOptions(screen.getByLabelText('Severity'), 'high');
+    expect(onChange).toHaveBeenCalledWith('high');
+    expect(
+      within(screen.getByLabelText('Severity'))
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['All severities', 'high']);
+  });
+
+  it('shows the value it is given and has no accessibility violation', async () => {
+    const { container } = render(
+      <SelectField label="Severity" value="high" options={options} onChange={() => {}} />,
+    );
+    expect(screen.getByLabelText('Severity')).toHaveValue('high');
     expect(await axeViolations(container)).toEqual([]);
   });
 });
