@@ -18,18 +18,20 @@
 
 ## Decision records
 
-| ADR                                                               | Decision                                                                                    |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [0001](adr/0001-mqtt-shared-subscriptions.md)                     | Scale ingest horizontally with MQTT 5 shared subscriptions                                  |
-| [0002](adr/0002-ack-on-receipt-with-bounded-loss.md)              | Acknowledge on receipt; bound and measure the loss window                                   |
-| [0003](adr/0003-plain-postgres-partitions-and-rollups.md)         | Plain PostgreSQL: daily partitions + write-time rollups                                     |
-| [0004](adr/0004-rules-with-hysteresis.md)                         | Threshold rules with consecutive-breach count and a separate clear threshold                |
-| [0005](adr/0005-alert-outbox.md)                                  | Deliver alerts through a transactional outbox                                               |
-| [0006](adr/0006-client-credentials-to-the-command-center.md)      | Authenticate to the command center with client credentials                                  |
-| [0007](adr/0007-pipeline-as-the-single-telemetry-source.md)       | The pipeline becomes the platform's single telemetry source; the command center consumes it |
-| [0008](adr/0008-api-docs-switch-and-network-only-access.md)       | OpenAPI UI behind a switch (off by default); the API stays network-only for V1              |
-| [0009](adr/0009-contract-check-against-command-center-openapi.md) | The command center integration is checked against its OpenAPI document                      |
-| [0010](adr/0010-parity-test-against-platform-aws.md)              | Values platform-aws hard-codes are checked against this service by a parity test            |
+| ADR                                                               | Decision                                                                                                      |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [0001](adr/0001-mqtt-shared-subscriptions.md)                     | Scale ingest horizontally with MQTT 5 shared subscriptions                                                    |
+| [0002](adr/0002-ack-on-receipt-with-bounded-loss.md)              | Acknowledge on receipt; bound and measure the loss window                                                     |
+| [0003](adr/0003-plain-postgres-partitions-and-rollups.md)         | Plain PostgreSQL: daily partitions + write-time rollups                                                       |
+| [0004](adr/0004-rules-with-hysteresis.md)                         | Threshold rules with consecutive-breach count and a separate clear threshold                                  |
+| [0005](adr/0005-alert-outbox.md)                                  | Deliver alerts through a transactional outbox                                                                 |
+| [0006](adr/0006-client-credentials-to-the-command-center.md)      | Authenticate to the command center with client credentials                                                    |
+| [0007](adr/0007-pipeline-as-the-single-telemetry-source.md)       | The pipeline becomes the platform's single telemetry source; the command center consumes it                   |
+| [0008](adr/0008-api-docs-switch-and-network-only-access.md)       | OpenAPI UI behind a switch (off by default); the API stays network-only for V1                                |
+| [0009](adr/0009-contract-check-against-command-center-openapi.md) | The command center integration is checked against its OpenAPI document                                        |
+| [0010](adr/0010-parity-test-against-platform-aws.md)              | Values platform-aws hard-codes are checked against this service by a parity test                              |
+| [0011](adr/0011-simulator-studio-control-plane.md)                | Simulator Studio: a control plane inside the simulator process                                                |
+| [0012](adr/0012-simulator-studio-digital-twin.md)                 | Simulator Studio: a lean three.js digital twin on the command center's conventions; spike decides go or no-go |
 
 ## Conventions for these documents
 

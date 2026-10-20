@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Alerts</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);gap:16px;align-items:start}
+@media (max-width:1100px){.cols{grid-template-columns:1fr}}
+.tbl td{white-space:nowrap}
+.step{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:start;padding:10px 0;position:relative}
+.step::after{content:'';position:absolute;left:13px;top:38px;bottom:0;width:2px;border-radius:1px;background:var(--flow);box-shadow:0 0 6px var(--flow)}
+.step + .step::before{content:'';position:absolute;left:13px;top:0;height:10px;width:2px;border-radius:1px;background:var(--flow);box-shadow:0 0 6px var(--flow)}
+.step:last-child::after{display:none}
+.step .n{border:2px solid var(--border-strong);background:var(--surface-1)}
+.step.is-ok .n{border-color:var(--success)}
+.step.is-warn .n{border-color:var(--warning)}
+.step .n{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-2);color:var(--text-secondary)}
+.step.is-ok .n{background:rgba(61, 240, 174,0.16);color:var(--success)}
+.step.is-warn .n{background:rgba(255, 194, 61,0.16);color:var(--warning)}
+.step b{display:block;font-weight:600}
+.step span.d{font-size:13px;color:var(--text-secondary)}
+.step .tm{font-family:var(--font-mono);font-size:13px;color:var(--text-tertiary)}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"></path></symbol>
+<symbol id="i-thermo" viewBox="0 0 24 24"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"></path><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M7 21h10"></path></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item is-active" type="button" aria-label="Alerts" title="Alerts" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h">
+<div>
+<h2 class="page-t">Alerts</h2>
+<p class="page-d">What the rules raised, why, and where each one went. An alert becomes an incident only in the Command Center.</p>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:12px">
+<div class="seg" role="group" aria-label="Status"><button type="button">Open <span class="faint">1</span></button><button class="is-on" type="button">All</button></div>
+<div class="input" style="width:150px"><span>All severities</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+</div>
+</div>
+
+<div class="cols">
+<section class="card" aria-label="Alert list" style="overflow:hidden">
+<table class="tbl">
+<thead><tr><th>#</th><th>Severity</th><th>Alert</th><th>Device</th><th>Opened</th><th>Status</th><th>Delivery</th></tr></thead>
+<tbody>
+<tr class="is-selected"><td class="mono">7</td><td><span class="sev" data-sev="high"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>High</span></td><td style="color:var(--text-primary)">Server room temperature high</td><td class="mono">dc-env-01</td><td class="num">09:14:15</td><td><span class="chip is-warn">Open</span></td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Delivered</span></td></tr>
+<tr><td class="mono">6</td><td><span class="sev" data-sev="medium"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Medium</span></td><td>Poor air quality (CO₂)</td><td class="mono">lha-air-01</td><td class="num">09:06:41</td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Cleared</span></td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Delivered</span></td></tr>
+<tr><td class="mono">5</td><td><span class="sev" data-sev="low"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Low</span></td><td>Power draw above contracted capacity</td><td class="mono">hub-power-01</td><td class="num">09:01:10</td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Cleared</span></td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Delivered</span></td></tr>
+<tr><td class="mono">4</td><td><span class="sev" data-sev="medium"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Medium</span></td><td>Server room humidity high</td><td class="mono">dc-env-02</td><td class="num">08:52:30</td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Cleared</span></td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Delivered</span></td></tr>
+<tr><td class="mono">3</td><td><span class="sev" data-sev="high"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>High</span></td><td>Server room temperature high</td><td class="mono">dc-env-01</td><td class="num">08:44:19</td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Cleared</span></td><td><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Delivered</span></td></tr>
+</tbody>
+</table>
+<div class="pager" role="navigation" aria-label="Alert pages">
+<span>Rows per page</span><div class="input" style="width:78px;height:30px"><span class="num">5</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<span class="range" aria-live="polite">Showing <b>1–5</b> · newest first</span>
+<span class="faint" style="font-size:12px">The API pages with a cursor: no page numbers, no total.</span>
+<span class="sp"></span>
+<div class="pages"><button class="pg" type="button" disabled>‹ Newer</button><span class="pg is-on" aria-current="page">Page 1</span><button class="pg" type="button">Older ›</button></div>
+</div>
+<p class="faint" style="font-size:13px;padding:0 16px 14px">Delivery: <b>Delivered</b>, <b>Pending</b>, <b>Failed</b>, or <b>Skipped</b> when no alert sink was configured at the time (<span class="mono">OCC_API_URL</span> unset on ingest).</p>
+</section>
+
+<aside class="card is-selected" aria-label="Alert detail">
+<div class="card-h"><span class="sev" data-sev="high"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>High</span><div class="sp"><h3 class="card-t">Server room temperature high</h3></div><span class="faint mono" style="font-size:13px">#7</span></div>
+<div class="card-b col" style="gap:16px">
+<div class="banner" style="font-size:14px;align-items:flex-start"><svg class="ic" aria-hidden="true"><use href="#i-thermo"></use></svg><span><b>Why:</b> <span class="mono">dc-env-01</span> temperature_c was above 27 °C for 3 readings in a row (29.2, 29.4, 29.3). Injected by the scenario <span class="mono">server-room-overheat</span> started in Studio.</span></div>
+<div>
+<span class="lbl">Delivery trail</span>
+<div style="margin-top:6px">
+<div class="step is-warn"><span class="n"><svg class="ic ic-s" aria-hidden="true"><use href="#i-thermo"></use></svg></span><div><b>First breaching reading</b><span class="d">29.2 °C, above the raise threshold</span></div><span class="tm">09:14:11</span></div>
+<div class="step is-warn"><span class="n"><svg class="ic ic-s" aria-hidden="true"><use href="#i-scale"></use></svg></span><div><b>Rule raised</b><span class="d"><span class="mono">server-room-hot</span> · 3 of 3</span></div><span class="tm">09:14:15</span></div>
+<div class="step is-warn"><span class="n"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg></span><div><b>Alert opened</b><span class="d">High · recorded in PostgreSQL</span></div><span class="tm">09:14:15</span></div>
+<div class="step is-ok"><span class="n"><svg class="ic ic-s" aria-hidden="true"><use href="#i-inbox"></use></svg></span><div><b>Outbox delivered</b><span class="d">1 attempt · first seen delivered by Studio</span></div><span class="tm">09:14:16</span></div>
+<div class="step is-ok"><span class="n"><svg class="ic ic-s" aria-hidden="true"><use href="#i-shield"></use></svg></span><div><b>Incident in Command Center</b><span class="d mono">c3a1…</span></div><span class="tm">09:14:16</span></div>
+</div>
+</div>
+<div class="row wrap" style="gap:8px"><button class="btn outline sm" type="button">Open incident<svg class="ic ic-s" aria-hidden="true"><use href="#i-ext"></use></svg></button><button class="btn outline sm" type="button">Show in topology</button><button class="btn ghost sm" type="button">Copy as JSON</button></div>
+<p class="faint" style="font-size:13px">Times after the alert are when Studio first saw the state change, to within its 1 s polling interval: <span class="mono">GET /api/alerts</span> has no delivery timestamp.</p>
+</div>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

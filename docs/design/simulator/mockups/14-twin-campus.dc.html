@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Digital twin campus</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.row3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:16px;align-items:start}
+@media (max-width:1100px){.row2,.row3{grid-template-columns:1fr}}
+.fk{display:flex;flex-wrap:wrap;gap:6px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--border-subtle);font-size:14px;color:var(--text-secondary)}
+.kv:first-child{border-top:0}
+.kv b{color:var(--text-primary);font-weight:500;text-align:right}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-building" viewBox="0 0 24 24"><rect width="16" height="20" x="4" y="2" rx="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M12 5v14"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"></path></symbol>
+<symbol id="i-focus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path></symbol>
+<symbol id="i-rotl" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></symbol>
+<symbol id="i-rotr" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></symbol>
+<symbol id="i-step" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" x2="19" y1="5" y2="19"></line></symbol>
+<symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"></path><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M7 21h10"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></symbol>
+<filter id="neon" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+<filter id="neon-soft" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+<symbol id="i-rack" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M8 6h.01"></path><path d="M8 12h.01"></path><path d="M8 18h.01"></path></symbol>
+<symbol id="i-wind" viewBox="0 0 24 24"><path d="M12.8 19.6A2 2 0 1 0 14 16H2"></path><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"></path><path d="M9.8 4.4A2 2 0 1 1 11 8H2"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item is-active" type="button" aria-label="Digital twin" title="Digital twin" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h">
+<div>
+<h2 class="page-t">Digital twin</h2>
+<p class="page-d">The campus as it is simulated. Pick a building or a device, then inject a fault where it happens.</p>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:12px">
+<div class="seg" role="group" aria-label="Camera"><button class="is-on" type="button">Campus</button><button type="button">Data Center</button><button type="button">Top</button></div>
+<div class="seg" role="group" aria-label="View"><button type="button">Topology</button><button class="is-on" type="button">Twin</button></div>
+</div>
+</div>
+
+<div class="row2">
+<section class="tw-stage" aria-label="Campus in 3D">
+<svg class="scene" viewBox="0 0 1086 567" role="img" aria-label="Campus in isometric 3D. Six devices sit in five buildings. The Data Center is selected and in alarm; the Student Center and the Innovation Hub are not reporting.">
+<polygon class="tw-boundary" points="24,287 536,543 1062,280 550,24"></polygon>
+<polygon class="tw-flat tw-outdoor" points="530,106 651,167 721,131 600,71"></polygon>
+<polygon class="tw-flat tw-utility" points="766,209 876,264 951,227 840,172"></polygon>
+<polygon class="tw-flat tw-parking" points="113,264 204,310 274,275 184,229"></polygon>
+<polygon class="tw-flat tw-outdoor" points="515,290 625,345 696,310 585,254"></polygon>
+<polygon class="tw-flat tw-water" points="206,329 316,384 379,352 269,297"></polygon>
+<polygon class="tw-flat tw-gate" points="301,410 345,432 367,421 323,399"></polygon>
+<polygon class="tw-flat tw-gate" points="719,429 742,440 776,423 753,412"></polygon>
+<polygon class="tw-flat tw-parking" points="600,438 661,468 709,444 649,414"></polygon>
+
+<g class="tw-b" id="BLD-SPORTS"><polygon class="f-s" points="692,145 756,177 756,196 692,164"></polygon><polygon class="f-e" points="756,177 814,148 814,167 756,196"></polygon><polygon class="f-t" points="692,145 756,177 814,148 750,116"></polygon></g>
+<g class="tw-b" id="BLD-ADMIN"><polygon class="f-s" points="280,158 356,196 356,215 280,177"></polygon><polygon class="f-e" points="356,196 409,170 409,189 356,215"></polygon><polygon class="f-t" points="280,158 356,196 409,170 332,132"></polygon></g>
+<g class="tw-b is-stale" id="BLD-HUB"><polygon class="f-s" points="466,159 540,196 540,229 466,192"></polygon><polygon class="f-e" points="540,196 584,174 584,207 540,229"></polygon><polygon class="f-t" points="466,159 540,196 584,174 510,137"></polygon></g>
+<g class="tw-b is-ok" id="BLD-LIB"><polygon class="f-s" points="702,220 756,247 756,272 702,244"></polygon><polygon class="f-e" points="756,247 790,230 790,254 756,272"></polygon><polygon class="f-t" points="702,220 756,247 790,230 736,203"></polygon></g>
+<g class="tw-b" id="BLD-LAB"><polygon class="f-s" points="908,240 982,278 982,299 908,262"></polygon><polygon class="f-e" points="982,278 1030,253 1030,275 982,299"></polygon><polygon class="f-t" points="908,240 982,278 1030,253 956,216"></polygon></g>
+<g class="tw-b is-ok" id="BLD-LHA"><polygon class="f-s" points="370,283 435,315 435,337 370,305"></polygon><polygon class="f-e" points="435,315 459,303 459,325 435,337"></polygon><polygon class="f-t" points="370,283 435,315 459,303 395,271"></polygon></g>
+<g class="tw-b is-warn is-sel" id="BLD-DC"><polygon class="f-s" points="764,335 808,357 808,376 764,354"></polygon><polygon class="f-e" points="808,357 838,342 838,361 808,376"></polygon><polygon class="f-t" points="764,335 808,357 838,342 794,320"></polygon></g>
+<g class="tw-b is-stale" id="BLD-STU"><polygon class="f-s" points="555,371 611,399 611,415 555,387"></polygon><polygon class="f-e" points="611,399 646,382 646,398 611,415"></polygon><polygon class="f-t" points="555,371 611,399 646,382 589,354"></polygon></g>
+<g class="tw-b" id="BLD-DORA"><polygon class="f-s" points="431,383 505,420 505,447 431,410"></polygon><polygon class="f-e" points="505,420 536,405 536,432 505,447"></polygon><polygon class="f-t" points="431,383 505,420 536,405 462,368"></polygon></g>
+<g class="tw-b" id="BLD-SEC"><polygon class="f-s" points="361,428 377,436 377,444 361,436"></polygon><polygon class="f-e" points="377,436 388,430 388,438 377,444"></polygon><polygon class="f-t" points="361,428 377,436 388,430 372,422"></polygon></g>
+<g class="tw-b" id="BLD-DORB"><polygon class="f-s" points="531,433 602,469 602,496 531,460"></polygon><polygon class="f-e" points="602,469 633,453 633,480 602,496"></polygon><polygon class="f-t" points="531,433 602,469 633,453 562,418"></polygon></g>
+<g class="tw-b" id="BLD-CLINIC"><polygon class="f-s" points="478,483 539,514 539,528 478,497"></polygon><polygon class="f-e" points="539,514 579,494 579,507 539,528"></polygon><polygon class="f-t" points="478,483 539,514 579,494 518,463"></polygon></g>
+
+<!-- catalogue assets at campus level: outdoor and roof only (the others appear with their building); not simulated in V1 -->
+<line x1="795" y1="346" x2="795" y2="327" stroke="#8aa0af" stroke-opacity="0.5" stroke-dasharray="2 3"></line><rect class="tw-asset" x="791" y="323" width="8" height="8" rx="2"><title>CT-01</title></rect><line x1="808" y1="353" x2="808" y2="334" stroke="#8aa0af" stroke-opacity="0.5" stroke-dasharray="2 3"></line><rect class="tw-asset" x="804" y="330" width="8" height="8" rx="2"><title>CT-02</title></rect><rect class="tw-asset" x="837" y="367" width="8" height="8" rx="2"><title>GEN-01</title></rect><rect class="tw-asset" x="893" y="224" width="8" height="8" rx="2"><title>TR-01</title></rect><rect class="tw-asset" x="843" y="201" width="8" height="8" rx="2"><title>SWG-01</title></rect><rect class="tw-asset" x="812" y="200" width="8" height="8" rx="2"><title>CH-01</title></rect><rect class="tw-asset" x="336" y="416" width="8" height="8" rx="2"><title>BAR-01</title></rect><rect class="tw-asset" x="743" y="422" width="8" height="8" rx="2"><title>BAR-02</title></rect><line x1="515" y1="194" x2="515" y2="162" stroke="#8aa0af" stroke-opacity="0.5" stroke-dasharray="2 3"></line><rect class="tw-asset" x="511" y="158" width="8" height="8" rx="2"><title>AHU-H1</title></rect>
+<!-- logical pipeline hub: not a place on the campus -->
+<ellipse class="tw-hub" cx="605" cy="205" rx="52" ry="20"></ellipse>
+<line x1="605" y1="225" x2="605" y2="300" stroke="#959bff" stroke-opacity="0.45" stroke-dasharray="3 4"></line>
+<ellipse cx="605" cy="300" rx="14" ry="5" fill="none" stroke="#959bff" stroke-opacity="0.45" stroke-dasharray="3 3"></ellipse>
+
+<!-- data arcs: device pin to the hub -->
+<g class="tel is-warn"><path class="te-halo" d="M791,315 Q700,150 605,205"></path><path class="te-core" d="M791,315 Q700,150 605,205"></path><path class="te-flow" d="M791,315 Q700,150 605,205"></path></g>
+<g class="tel"><path class="te-halo" d="M811,325 Q725,185 605,205"></path><path class="te-core" d="M811,325 Q725,185 605,205"></path><path class="te-flow" d="M811,325 Q725,185 605,205"></path></g>
+<g class="tel"><path class="te-halo" d="M746,206 Q690,120 605,205"></path><path class="te-core" d="M746,206 Q690,120 605,205"></path><path class="te-flow" d="M746,206 Q690,120 605,205"></path></g>
+<g class="tel"><path class="te-halo" d="M415,274 Q490,170 605,205"></path><path class="te-core" d="M415,274 Q490,170 605,205"></path><path class="te-flow" d="M415,274 Q490,170 605,205"></path></g>
+<g class="tel is-off"><path class="te-halo" d="M600,357 Q645,300 605,205"></path><path class="te-core" d="M600,357 Q645,300 605,205"></path><path class="te-flow" d="M600,357 Q645,300 605,205"></path></g>
+<g class="tel is-off"><path class="te-halo" d="M525,148 Q565,110 605,205"></path><path class="te-core" d="M525,148 Q565,110 605,205"></path><path class="te-flow" d="M525,148 Q565,110 605,205"></path></g>
+<circle class="fd warn" r="3.5"><animateMotion dur="1.8s" repeatCount="indefinite" path="M791,315 Q700,150 605,205"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="1.8s" begin="0.4s" repeatCount="indefinite" path="M811,325 Q725,185 605,205"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="1.8s" begin="0.8s" repeatCount="indefinite" path="M746,206 Q690,120 605,205"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite" path="M415,274 Q490,170 605,205"></animateMotion></circle>
+
+<!-- device pins -->
+<g class="tw-pin is-warn is-sel"><line x1="791" y1="315" x2="791" y2="333"></line><circle class="tw-beacon" cx="791" cy="315" r="16"><animate attributeName="r" values="11;26" dur="1.6s" repeatCount="indefinite"></animate><animate attributeName="opacity" values="0.9;0" dur="1.6s" repeatCount="indefinite"></animate></circle><rect class="p" x="783" y="307" width="16" height="16" rx="3"></rect></g>
+<g class="tw-pin is-ok"><line x1="811" y1="325" x2="811" y2="343"></line><rect class="p" x="804" y="318" width="14" height="14" rx="3"></rect></g>
+<g class="tw-pin is-ok"><line x1="746" y1="206" x2="746" y2="225"></line><circle class="p" cx="746" cy="206" r="7"></circle></g>
+<g class="tw-pin is-ok"><line x1="415" y1="274" x2="415" y2="293"></line><circle class="p" cx="415" cy="274" r="7"></circle></g>
+<g class="tw-pin is-stale"><line x1="600" y1="357" x2="600" y2="376"></line><circle class="p" cx="600" cy="357" r="7"></circle></g>
+<g class="tw-pin is-stale"><line x1="525" y1="148" x2="525" y2="167"></line><polygon class="p" points="534.0,148.0 529.5,155.8 520.5,155.8 516.0,148.0 520.5,140.2 529.5,140.2"></polygon></g>
+</svg>
+
+<!-- labels are DOM overlays (fixed 13 px, as in the command center); positions are the pin's share of the scene -->
+<div class="tw-l is-warn is-sel" style="left:72.8%;top:51.4%;transform:translate(-50%,-100%)"><b><svg class="ic ic-s" aria-hidden="true"><use href="#i-rack"></use></svg>dc-env-01</b><span>Data Center · 29.3 °C</span><em class="sev" data-sev="high"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>High · #7</em></div>
+<div class="tw-l" style="left:75.4%;top:60.8%"><b><svg class="ic ic-s" aria-hidden="true"><use href="#i-rack"></use></svg>dc-env-02</b><span>22.4 °C</span></div>
+<div class="tw-l" style="left:68.7%;top:32.2%;transform:translate(-50%,-100%)"><b><svg class="ic ic-s" aria-hidden="true"><use href="#i-wind"></use></svg>lib-air-01</b><span>Library · 702 ppm</span></div>
+<div class="tw-l" style="left:38.2%;top:44.4%;transform:translate(-50%,-100%)"><b><svg class="ic ic-s" aria-hidden="true"><use href="#i-wind"></use></svg>lha-air-01</b><span>Lecture Hall A · 688 ppm</span></div>
+<div class="tw-l is-stale" style="left:55.2%;top:66.4%;transform:translate(-50%,0)"><b><svg class="ic ic-s" aria-hidden="true"><use href="#i-wind"></use></svg>stu-air-01</b><span>Student Center · paused</span></div>
+<div class="tw-l is-stale" style="left:48.3%;top:22.2%;transform:translate(-50%,-100%)"><b><svg class="ic ic-s" aria-hidden="true"><use href="#i-zap"></use></svg>hub-power-01</b><span>Innovation Hub · silent</span></div>
+<div class="tw-l is-logical" style="left:55.7%;top:42.2%;transform:translate(-50%,0)"><b>Pipeline</b><span>broker, ingest · logical</span></div>
+
+<div class="tw-ctl" style="left:12px;top:12px">
+<div class="row" style="gap:8px"><span class="pill is-ok"><span class="dot"></span>Live</span><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-flask"></use></svg>server-room-overheat · 41 s in</span></div>
+<div class="tw-card" style="width:178px;padding:10px 12px">
+<div class="lbl" style="margin-bottom:6px">Layers</div>
+<div class="col" style="gap:7px;font-size:14px">
+<div class="row"><span class="switch is-on" role="img" aria-label="On"></span>Devices</div>
+<div class="row"><span class="switch is-on" role="img" aria-label="On"></span>Data flow</div>
+<div class="row"><span class="switch is-on" role="img" aria-label="On"></span>Alerts</div>
+<div class="row"><span class="switch is-on" role="img" aria-label="On"></span>Catalogue · 9</div>
+<div class="row"><span class="switch" role="img" aria-label="Off"></span><span class="muted">Heat</span></div>
+</div>
+</div>
+</div>
+<div class="tw-ctl" style="right:12px;bottom:12px;flex-direction:row;align-items:flex-end">
+<div class="topo-tools" style="position:static"><button class="icon-btn sm" type="button" aria-label="Rotate left"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rotl"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Rotate right"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rotr"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Zoom in"><svg class="ic ic-s" aria-hidden="true"><use href="#i-plus"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Zoom out"><svg class="ic ic-s" aria-hidden="true"><use href="#i-minus"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Reset camera"><svg class="ic ic-s" aria-hidden="true"><use href="#i-focus"></use></svg></button></div>
+</div>
+<div class="topo-legend" style="left:12px;bottom:12px;max-width:760px"><span><i class="ok"></i>Healthy</span><span><i class="warn"></i>Anomaly</span><span><i class="stale"></i>Paused or silent</span><span><i class="sel"></i>Selected</span><span><i style="border-color:var(--accent);border-style:dashed"></i>Logical, not a place</span><span class="kind-key"><svg viewBox="0 0 14 14" aria-hidden="true" style="stroke-dasharray:2 2"><rect x="3" y="3" width="8" height="8" rx="2"></rect></svg>Catalogue asset, not simulated</span><span class="kind-key"><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="2" width="10" height="10" rx="2.5"></rect></svg>Server room</span><span class="kind-key"><svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5"></circle></svg>Indoor air</span><span class="kind-key"><svg viewBox="0 0 14 14" aria-hidden="true"><polygon points="4,1.5 10,1.5 13,7 10,12.5 4,12.5 1,7"></polygon></svg>Power meter</span></div>
+</section>
+
+<aside class="col" style="gap:16px" aria-label="Selection">
+<section class="card is-selected">
+<div class="card-h"><span class="itile is-accent"><svg class="ic" aria-hidden="true"><use href="#i-building"></use></svg></span><div class="sp"><h3 class="card-t">Data Center</h3><div class="faint mono" style="font-size:13px">BLD-DC · data_center · 14 m</div></div><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Anomaly</span></div>
+<div class="card-b" style="padding-top:8px">
+<div class="kv"><span>Devices</span><b>2 · 1 in anomaly</b></div>
+<div class="kv"><span><span class="mono">dc-env-01</span></span><b style="color:var(--warning)">29.3 °C</b></div>
+<div class="kv"><span><span class="mono">dc-env-02</span></span><b>22.4 °C</b></div>
+<div class="kv"><span>Catalogue assets</span><b>8 · not simulated</b></div>
+<div class="kv"><span>Open alerts</span><b><span class="sev" data-sev="high" style="height:22px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>1 high</span></b></div>
+<div class="row" style="gap:8px;margin-top:10px"><button class="btn primary sm" type="button">Focus building <span class="kbd" style="background:rgba(8,19,29,0.15);border-color:rgba(8,19,29,0.4);color:var(--accent-ink)">F</span></button><button class="btn outline sm" type="button">Show alert</button></div>
+</div>
+</section>
+<section class="card">
+<div class="card-h"><h3 class="card-t sp">Inject at <span class="mono" style="font-size:14px">dc-env-01</span></h3></div>
+<div class="card-b col" style="gap:10px">
+<div class="fk"><span class="chip is-accent">Breach</span><span class="chip">Silent</span><span class="chip">Drop</span><span class="chip">Delay</span><span class="chip">Malformed</span></div>
+<div class="row" style="gap:8px"><div class="field sp"><label>Value</label><div class="input"><span class="num">29.2</span><span class="unit">°C</span></div></div><div class="field sp"><label>Duration</label><div class="input"><span class="num">60</span><span class="unit">s</span></div></div></div>
+<button class="btn primary" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-zap"></use></svg>Inject now</button>
+</div>
+</section>
+</aside>
+</div>
+
+<div class="row3">
+<section class="card" aria-label="Simulation controls">
+<div class="card-h"><h3 class="card-t sp">Simulation</h3><span class="chip is-warn">Running</span></div>
+<div class="card-b col" style="gap:12px">
+<div class="input mono"><span>server-room-overheat</span><svg class="ic ic-s" style="margin-left:auto" aria-hidden="true"><use href="#i-chevron"></use></svg></div>
+<div class="phase" role="group" aria-label="Scenario progress: normal, anomaly, recovery">
+<div class="phase-bar">
+<i class="p-norm" style="width:22.2%"></i><i class="p-anom" style="width:23.3%"></i><i class="p-anom rest" style="width:43.3%"></i><i class="p-rec" style="width:11.2%"></i>
+<span class="p-flag warn" style="left:26.7%" title="Alert opened at 24 s"></span><span class="p-flag todo" style="left:88.9%" title="Alert clears at 80 s"></span><span class="p-head" style="left:45.6%" data-t="41 s"></span>
+</div>
+<div class="phase-lbl"><span style="left:0"><b>Normal</b>0–20 s</span><span style="left:32%"><b>Anomaly · 29.2 °C</b>20–80 s</span><span style="right:0;text-align:right"><b>Recovery</b>80–90 s</span></div>
+<div class="phase-sum"><span><i style="background:var(--sev-high)"></i>Alert opened <b>24 s</b> ✓</span><span><i style="border:2px solid var(--success)"></i>Alert clears <b>80 s</b>, in <b>39 s</b></span></div>
+</div>
+<div class="row wrap" style="gap:8px"><button class="btn sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-pause"></use></svg>Pause</button><button class="btn sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-step"></use></svg>Step +2 s</button><button class="btn sm ghost" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rotate"></use></svg>Reset</button></div>
+</div>
+</section>
+<section class="card" aria-label="Event timeline">
+<div class="card-h"><h3 class="card-t sp">Event timeline</h3><span class="faint" style="font-size:13px">newest first</span></div>
+<div class="card-b" style="padding:8px 0 0">
+<div class="ev is-new"><span class="tm">09:14:16</span><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-shield"></use></svg>Command Center</span><span>Incident <b class="mono">c3a1…</b> created in zone BLD-DC</span></div>
+<div class="ev"><span class="tm">09:14:15</span><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-scale"></use></svg>Rule</span><span><b class="mono">server-room-hot</b> raised: 3 readings above 27 °C</span></div>
+<div class="ev"><span class="tm">09:14:11</span><span class="chip"><svg class="ic ic-s" aria-hidden="true"><use href="#i-flask"></use></svg>Scenario</span><span>Anomaly started on <b class="mono">dc-env-01</b></span></div>
+</div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

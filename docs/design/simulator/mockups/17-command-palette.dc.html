@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Command palette</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dim{opacity:0.45;pointer-events:none}
+.veil{position:absolute;inset:56px 0 0 64px;background:rgba(8,15,21,0.62);display:flex;justify-content:center;align-items:flex-start;padding-top:72px;z-index:6}
+.scope{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+@media (max-width:1100px){.scope{grid-template-columns:1fr}}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-rack" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M8 6h.01"></path><path d="M8 12h.01"></path><path d="M8 18h.01"></path></symbol>
+<symbol id="i-building" viewBox="0 0 24 24"><rect width="16" height="20" x="4" y="2" rx="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></symbol>
+<symbol id="i-corner" viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"></polyline><path d="M20 4v7a4 4 0 0 1-4 4H4"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages" style="border-color:var(--accent);color:var(--text-secondary)"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item is-active" type="button" aria-label="Overview" title="Overview" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Topology" title="Topology"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h dim">
+<div>
+<h2 class="page-t">Overview</h2>
+<p class="page-d">The page behind the palette stays where it is; the palette does not navigate until a result is chosen.</p>
+</div>
+</div>
+
+<div class="scope">
+<section class="card">
+<div class="card-h"><h3 class="card-t">What ⌘ K searches</h3></div>
+<div class="card-b" style="padding-top:8px">
+<table class="tbl" style="font-size:13px">
+<thead><tr><th>Group</th><th>Matches on</th><th>Opens</th></tr></thead>
+<tbody>
+<tr><td>Pages</td><td>Page names</td><td>The page</td></tr>
+<tr><td>Devices</td><td>Id, name, zone code, kind</td><td>Fleet, device inspector open</td></tr>
+<tr><td>Zones</td><td>Code and name</td><td>Topology or the twin, zone in focus</td></tr>
+<tr><td>Alerts</td><td>Id, title, device, rule</td><td>Alerts, that alert selected</td></tr>
+<tr><td>Scenarios</td><td>Name and device</td><td>Scenarios, that card selected</td></tr>
+<tr><td>Topics</td><td>Topic text</td><td>Event stream, filtered</td></tr>
+<tr><td>Actions</td><td>Verbs: run, pause, step, reset</td><td>Runs after a confirmation</td></tr>
+</tbody></table>
+</div>
+</section>
+<section class="card">
+<div class="card-h"><h3 class="card-t">Behaviour</h3></div>
+<div class="card-b col" style="gap:8px;font-size:14px;color:var(--text-secondary)">
+<div class="row"><span class="kbd">⌘ K</span><span>opens it from anywhere; <span class="kbd">/</span> too, outside a field</span></div>
+<div class="row"><span class="kbd">↑</span><span class="kbd">↓</span><span>move; <span class="kbd">↵</span> opens; <span class="kbd">⌘ ↵</span> opens in the background</span></div>
+<div class="row"><span class="kbd">Esc</span><span>closes it and returns focus to where it was</span></div>
+<p class="faint" style="font-size:13px;margin-top:4px">Type a prefix to narrow the group: <span class="mono">d:</span> devices, <span class="mono">a:</span> alerts, <span class="mono">s:</span> scenarios, <span class="mono">&gt;</span> actions. Results are ranked by match quality, then by severity, so an open alert comes before a cleared one. Only the first 5 of each group show; the rest sit behind <i>Show all</i>.</p>
+</div>
+</section>
+<section class="card">
+<div class="card-h"><h3 class="card-t">At scale</h3></div>
+<div class="card-b col" style="gap:8px;font-size:14px;color:var(--text-secondary)">
+<p>With the command center's catalogue (31 assets) or more, search is how a device is reached: every list, graph and the twin accept a result by id.</p>
+<p>Matching runs in the browser on the lists Studio already holds, so it costs no request; the event log is searched only inside the selected range.</p>
+</div>
+</section>
+</div>
+</main>
+
+<div class="veil" role="dialog" aria-modal="true" aria-label="Search">
+<div class="cmdk">
+<div class="cmdk-in"><svg class="ic" aria-hidden="true" style="color:var(--accent)"><use href="#i-search"></use></svg><span style="color:var(--text-primary)">dc</span><span style="width:2px;height:20px;background:var(--accent)"></span><span class="sp"></span><span class="chip">6 results</span><span class="kbd">Esc</span></div>
+<div class="cmdk-g"><span class="lbl">Devices</span>
+<div class="cmdk-i is-on"><span class="dg sq is-warn" style="width:28px;height:28px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rack"></use></svg></span><span><mark>dc</mark>-env-01 <span class="faint">· Data center — row A</span></span><span class="sub">BLD-DC · anomaly <span class="kbd" style="margin-left:6px">↵</span></span></div>
+<div class="cmdk-i"><span class="dg sq" style="width:28px;height:28px"><svg class="ic ic-s" aria-hidden="true"><use href="#i-rack"></use></svg></span><span><mark>dc</mark>-env-02 <span class="faint">· Data center — row B</span></span><span class="sub">BLD-DC · running</span></div>
+</div>
+<div class="cmdk-g"><span class="lbl">Alerts</span>
+<div class="cmdk-i"><svg class="ic" aria-hidden="true" style="color:var(--sev-high)"><use href="#i-bell"></use></svg><span>#7 Server room temperature high <span class="faint">· <mark>dc</mark>-env-01</span></span><span class="sub">high · open</span></div>
+<div class="cmdk-i"><svg class="ic" aria-hidden="true" style="color:var(--text-tertiary)"><use href="#i-bell"></use></svg><span>#4 Server room humidity high <span class="faint">· <mark>dc</mark>-env-02</span></span><span class="sub">medium · cleared</span></div>
+</div>
+<div class="cmdk-g"><span class="lbl">Zones</span>
+<div class="cmdk-i"><svg class="ic" aria-hidden="true"><use href="#i-building"></use></svg><span>Data Center <span class="faint">· BLD-<mark>DC</mark></span></span><span class="sub">8 catalogue assets · 2 devices</span></div>
+</div>
+<div class="cmdk-g"><span class="lbl">Scenarios</span>
+<div class="cmdk-i"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg><span>server-room-overheat <span class="faint">· <mark>dc</mark>-env-01</span></span><span class="sub">running · 41 s</span></div>
+</div>
+<div class="cmdk-f"><span><span class="kbd">↑</span> <span class="kbd">↓</span> move</span><span><span class="kbd">↵</span> open</span><span><span class="kbd">⌘ ↵</span> open in background</span><span class="sp"></span><span>Prefix: <span class="mono">d:</span> <span class="mono">a:</span> <span class="mono">s:</span> <span class="mono">&gt;</span></span></div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

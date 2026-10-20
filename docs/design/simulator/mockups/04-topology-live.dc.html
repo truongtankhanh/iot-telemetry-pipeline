@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Topology live</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1100px){.cols{grid-template-columns:1fr}}
+.dots{display:inline-flex;gap:5px;align-items:center}
+.dots i{width:10px;height:10px;border-radius:50%;background:var(--warning)}
+</style>
+</helmet>
+<div class="app is-rail">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></symbol>
+<symbol id="i-fleet" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></symbol>
+<symbol id="i-topology" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"></rect><path d="M7 11v4a2 2 0 0 0 2 2h4"></path><rect width="8" height="8" x="13" y="13" rx="2"></rect></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path><path d="M6.453 15h11.094"></path><path d="M8.5 2h7"></path></symbol>
+<symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect><rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></symbol>
+<symbol id="i-wind" viewBox="0 0 24 24"><path d="M12.8 19.6A2 2 0 1 0 14 16H2"></path><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"></path><path d="M9.8 4.4A2 2 0 1 1 11 8H2"></path></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></symbol>
+<symbol id="i-radio" viewBox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19.1"></path></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"></path><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M7 21h10"></path></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M12 5v14"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"></path></symbol>
+<symbol id="i-focus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></symbol>
+<symbol id="i-twin" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></symbol>
+<filter id="neon" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+<filter id="neon-soft" filterUnits="userSpaceOnUse" x="-100" y="-100" width="2600" height="1800"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+<symbol id="i-rack" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M8 6h.01"></path><path d="M8 12h.01"></path><path d="M8 18h.01"></path></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></symbol>
+<symbol id="i-thermo" viewBox="0 0 24 24"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path></symbol>
+<symbol id="i-droplets" viewBox="0 0 24 24"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Simulator Studio</h1>
+<div class="brand-sub">Langbiang Tech Campus</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker <small class="mono">:1883</small></span>
+<span class="pill is-ok"><span class="dot"></span>Ingest <small class="mono">:3100</small></span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="pill is-ok"><span class="dot"></span>Running <small>4 devices · 2.0 msg/s</small></span>
+<button class="searchbox" type="button" aria-label="Search devices, zones, alerts, scenarios and pages"><svg class="ic ic-s" aria-hidden="true"><use href="#i-search"></use></svg><span>Search devices, alerts, scenarios…</span><span class="kbd">⌘ K</span></button>
+<span class="clock">09:14:32</span>
+</div>
+</header>
+
+<nav class="nav" aria-label="Studio">
+<button class="nav-item" type="button" aria-label="Overview" title="Overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Device fleet" title="Device fleet"><svg class="ic" aria-hidden="true"><use href="#i-fleet"></use></svg></button>
+<button class="nav-item is-active" type="button" aria-label="Topology" title="Topology" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-topology"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Digital twin" title="Digital twin"><svg class="ic" aria-hidden="true"><use href="#i-twin"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Event stream" title="Event stream"><svg class="ic" aria-hidden="true"><use href="#i-terminal"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Alerts" title="Alerts"><svg class="ic" aria-hidden="true"><use href="#i-bell"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Simulation lab" title="Simulation lab"><svg class="ic" aria-hidden="true"><use href="#i-flask"></use></svg></button>
+<button class="nav-item" type="button" aria-label="Guided demo" title="Guided demo"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg></button>
+<span class="rail-sep"></span>
+<button class="nav-item" type="button" aria-label="Analytics" title="Analytics"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg></button>
+<span class="rail-foot"></span>
+<button class="nav-item" type="button" aria-label="Expand navigation" title="Expand navigation"><svg class="ic" aria-hidden="true"><use href="#i-panel"></use></svg></button>
+<span class="rail-v1" title="V1 demo, local only. Not for production">V1</span>
+</nav>
+
+<main class="main">
+<div class="page-h">
+<div>
+<h2 class="page-t">Topology</h2>
+<p class="page-d">Every component between a device and an incident. Lines show direction; moving dots are messages.</p>
+</div>
+<div class="row sp" style="justify-content:flex-end;gap:12px">
+<div class="seg" role="group" aria-label="View"><button class="is-on" type="button">Topology</button><button type="button">Twin</button></div>
+<div class="seg" role="group" aria-label="Layer"><button class="is-on" type="button">Data flow</button><button type="button">Alerts</button></div>
+</div>
+</div>
+
+<div class="scale-bar" role="toolbar" aria-label="Find and arrange the graph">
+<span class="pill is-ok"><span class="dot"></span>Live</span><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-flask"></use></svg>server-room-overheat · 41 s in</span>
+<span style="width:1px;height:22px;background:var(--border-subtle)"></span>
+<div class="seg" role="group" aria-label="Grouping"><button type="button">Grouped by zone</button><button class="is-on" type="button">All devices</button></div>
+<button class="chip is-warn" type="button" style="height:28px;border:0">Problems only <b style="margin-left:2px">3</b></button>
+<div class="input" style="width:240px;height:28px"><svg class="ic ic-s" aria-hidden="true" style="color:var(--text-tertiary)"><use href="#i-search"></use></svg><span class="faint">Find a device or zone</span></div>
+<button class="btn ghost sm" type="button">Collapse all zones</button>
+<span class="sp"></span><span class="faint" style="font-size:13px">6 devices · 5 zones · groups automatically above 12 devices</span><div class="row" style="gap:4px"><button class="icon-btn sm" type="button" aria-label="Zoom out"><svg class="ic ic-s" aria-hidden="true"><use href="#i-minus"></use></svg></button><span class="num faint" style="min-width:40px;text-align:center;font-size:13px">100%</span><button class="icon-btn sm" type="button" aria-label="Zoom in"><svg class="ic ic-s" aria-hidden="true"><use href="#i-plus"></use></svg></button><button class="icon-btn sm" type="button" aria-label="Fit to screen"><svg class="ic ic-s" aria-hidden="true"><use href="#i-focus"></use></svg></button></div>
+</div>
+<section class="topo" aria-label="System topology" style="margin-top:0">
+<svg style="max-height:640px" viewBox="0 0 1116 496" role="img" aria-label="Topology: six devices in five zones publish to the broker, which feeds ingest, the rules, the alert, the outbox and the Command Center. dc-env-01 is selected and breaching; stu-air-01 is paused and hub-power-01 is silent.">
+
+<!-- zones -->
+<g class="zone"><rect class="zb" x="12" y="8" width="232" height="124" rx="12"></rect><text class="zl" x="26" y="26">BLD-DC · Data center</text><text class="zl" x="232" y="26" text-anchor="end" style="letter-spacing:0">2 ▾</text></g>
+<g class="zone"><rect class="zb" x="12" y="144" width="232" height="76" rx="12"></rect><text class="zl" x="26" y="162">BLD-LIB · Library</text><text class="zl" x="232" y="162" text-anchor="end" style="letter-spacing:0">1 ▾</text></g>
+<g class="zone"><rect class="zb" x="12" y="232" width="232" height="76" rx="12"></rect><text class="zl" x="26" y="250">BLD-LHA · Lecture Hall A</text><text class="zl" x="232" y="250" text-anchor="end" style="letter-spacing:0">1 ▾</text></g>
+<g class="zone"><rect class="zb" x="12" y="320" width="232" height="76" rx="12"></rect><text class="zl" x="26" y="338">BLD-STU · Student Center</text><text class="zl" x="232" y="338" text-anchor="end" style="letter-spacing:0">1 ▾</text></g>
+<g class="zone"><rect class="zb" x="12" y="408" width="232" height="76" rx="12"></rect><text class="zl" x="26" y="426">BLD-HUB · Innovation Hub</text><text class="zl" x="232" y="426" text-anchor="end" style="letter-spacing:0">1 ▾</text></g>
+
+<!-- edges: devices to broker -->
+<g class="tel is-warn"><path class="te-halo" d="M230,58 C275,58 275,250 320,250"></path><path class="te-core" d="M230,58 C275,58 275,250 320,250"></path><path class="te-flow" d="M230,58 C275,58 275,250 320,250"></path></g>
+<g class="tel"><path class="te-halo" d="M230,104 C275,104 275,250 320,250"></path><path class="te-core" d="M230,104 C275,104 275,250 320,250"></path><path class="te-flow" d="M230,104 C275,104 275,250 320,250"></path></g>
+<g class="tel"><path class="te-halo" d="M230,194 C275,194 275,250 320,250"></path><path class="te-core" d="M230,194 C275,194 275,250 320,250"></path><path class="te-flow" d="M230,194 C275,194 275,250 320,250"></path></g>
+<g class="tel"><path class="te-halo" d="M230,282 C275,282 275,250 320,250"></path><path class="te-core" d="M230,282 C275,282 275,250 320,250"></path><path class="te-flow" d="M230,282 C275,282 275,250 320,250"></path></g>
+<g class="tel is-off"><path class="te-halo" d="M230,370 C275,370 275,250 320,250"></path><path class="te-core" d="M230,370 C275,370 275,250 320,250"></path><path class="te-flow" d="M230,370 C275,370 275,250 320,250"></path></g>
+<g class="tel is-off"><path class="te-halo" d="M230,458 C275,458 275,250 320,250"></path><path class="te-core" d="M230,458 C275,458 275,250 320,250"></path><path class="te-flow" d="M230,458 C275,458 275,250 320,250"></path></g>
+<!-- edges: pipeline -->
+<g class="tel"><path class="te-halo" d="M432,250 L482,250"></path><path class="te-core" d="M432,250 L482,250"></path><path class="te-flow" d="M432,250 L482,250"></path></g>
+<g class="tel"><path class="te-halo" d="M606,250 L656,250"></path><path class="te-core" d="M606,250 L656,250"></path><path class="te-flow" d="M606,250 L656,250"></path></g>
+<g class="tel"><path class="te-halo" d="M544,294 L544,346"></path><path class="te-core" d="M544,294 L544,346"></path><path class="te-flow" d="M544,294 L544,346"></path></g>
+<g class="tel is-warn"><path class="te-halo" d="M780,250 L830,250"></path><path class="te-core" d="M780,250 L830,250"></path><path class="te-flow" d="M780,250 L830,250"></path></g>
+<g class="tel is-warn"><path class="te-halo" d="M892,294 L892,346"></path><path class="te-core" d="M892,294 L892,346"></path><path class="te-flow" d="M892,294 L892,346"></path></g>
+<g class="tel is-ok"><path class="te-halo" d="M954,378 C972,378 972,250 990,250"></path><path class="te-core" d="M954,378 C972,378 972,250 990,250"></path><path class="te-flow" d="M954,378 C972,378 972,250 990,250"></path></g>
+<text class="el" x="457" y="242" text-anchor="middle">2.0/s</text>
+<text class="el" x="805" y="242" text-anchor="middle">raised</text>
+
+<!-- moving dots: one per live edge, driven by the engine in the real app -->
+<circle class="fd warn" r="3.5"><animateMotion dur="2s" repeatCount="indefinite" path="M230,58 C275,58 275,250 320,250"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="2s" begin="0.3s" repeatCount="indefinite" path="M230,104 C275,104 275,250 320,250"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="2s" begin="0.6s" repeatCount="indefinite" path="M230,194 C275,194 275,250 320,250"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="2s" begin="0.9s" repeatCount="indefinite" path="M230,282 C275,282 275,250 320,250"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="1.2s" repeatCount="indefinite" path="M432,250 L482,250"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="1.2s" begin="0.4s" repeatCount="indefinite" path="M606,250 L656,250"></animateMotion></circle>
+<circle class="fd" r="3.5"><animateMotion dur="1.2s" begin="0.2s" repeatCount="indefinite" path="M544,294 L544,346"></animateMotion></circle>
+
+<!-- devices -->
+<g class="tn is-selected is-warn"><rect class="halo" x="23" y="35" width="210" height="46" rx="13"></rect><rect class="b" x="26" y="38" width="204" height="40" rx="9"></rect><rect class="kind" x="31" y="44" width="28" height="28" rx="7"></rect><use class="ico" href="#i-rack" x="36" y="49" width="18" height="18"></use><text class="t" x="62" y="55">dc-env-01</text><text class="s" x="62" y="70">temperature_c</text><text class="v" x="218" y="63" text-anchor="end">29.3 °C</text></g>
+<g class="tn is-ok"><rect class="b" x="26" y="84" width="204" height="40" rx="9"></rect><rect class="kind" x="31" y="90" width="28" height="28" rx="7"></rect><use class="ico" href="#i-rack" x="36" y="95" width="18" height="18"></use><text class="t" x="62" y="101">dc-env-02</text><text class="s" x="62" y="116">temperature_c</text><text class="v" x="218" y="109" text-anchor="end">22.4 °C</text></g>
+<g class="tn is-ok"><rect class="b" x="26" y="174" width="204" height="40" rx="9"></rect><circle class="kind" cx="45" cy="194" r="14"></circle><use class="ico" href="#i-wind" x="36" y="185" width="18" height="18"></use><text class="t" x="62" y="191">lib-air-01</text><text class="s" x="62" y="206">co2_ppm</text><text class="v" x="218" y="199" text-anchor="end">702 ppm</text></g>
+<g class="tn is-ok"><rect class="b" x="26" y="262" width="204" height="40" rx="9"></rect><circle class="kind" cx="45" cy="282" r="14"></circle><use class="ico" href="#i-wind" x="36" y="273" width="18" height="18"></use><text class="t" x="62" y="279">lha-air-01</text><text class="s" x="62" y="294">co2_ppm</text><text class="v" x="218" y="287" text-anchor="end">688 ppm</text></g>
+<g class="tn is-stale"><rect class="b" x="26" y="350" width="204" height="40" rx="9"></rect><circle class="kind" cx="45" cy="370" r="14"></circle><use class="ico" href="#i-wind" x="36" y="361" width="18" height="18"></use><text class="t" x="62" y="367">stu-air-01</text><text class="s" x="62" y="382">co2_ppm</text><text class="v" x="218" y="375" text-anchor="end">Paused</text></g>
+<g class="tn is-stale"><rect class="b" x="26" y="438" width="204" height="40" rx="9"></rect><polygon class="kind" points="59.0,458.0 52.0,470.1 38.0,470.1 31.0,458.0 38.0,445.9 52.0,445.9"></polygon><use class="ico" href="#i-zap" x="36" y="449" width="18" height="18"></use><text class="t" x="62" y="455">hub-power-01</text><text class="s" x="62" y="470">power_kw</text><text class="v" x="218" y="463" text-anchor="end">Silent</text></g>
+
+<!-- pipeline nodes -->
+<g class="tn is-ok"><rect class="b" x="320" y="206" width="112" height="88" rx="10"></rect><use class="ico" href="#i-server" x="332" y="217" width="18" height="18"></use><text class="t" x="356" y="231">Broker</text><text class="s" x="332" y="254">Mosquitto</text><text class="v" x="332" y="278">4 ms</text></g>
+<g class="tn is-ok"><rect class="b" x="482" y="206" width="124" height="88" rx="10"></rect><use class="ico" href="#i-radio" x="494" y="217" width="18" height="18"></use><text class="t" x="518" y="231">Ingest</text><text class="s" x="494" y="254">lag 0.04 s</text><text class="v" x="494" y="278">12 buffered</text></g>
+<g class="tn is-ok"><rect class="b" x="482" y="346" width="124" height="64" rx="10"></rect><use class="ico" href="#i-db" x="494" y="357" width="18" height="18"></use><text class="t" x="518" y="371">Database</text><text class="s" x="494" y="396">stored readings</text></g>
+<g class="tn is-warn"><rect class="b" x="656" y="206" width="124" height="88" rx="10"></rect><use class="ico" href="#i-scale" x="668" y="217" width="18" height="18"></use><text class="t" x="692" y="231">Rules</text><text class="s" x="668" y="254">server-room-hot</text><text class="v" x="668" y="278">3 of 3</text></g>
+<g class="tn is-warn"><rect class="b" x="830" y="206" width="124" height="88" rx="10"></rect><use class="ico" href="#i-bell" x="842" y="217" width="18" height="18"></use><text class="t" x="866" y="231">Alert</text><text class="s" x="842" y="254">#7 · high</text><text class="v" x="842" y="278">09:14:15</text></g>
+<g class="tn is-ok"><rect class="b" x="830" y="346" width="124" height="64" rx="10"></rect><use class="ico" href="#i-inbox" x="842" y="357" width="18" height="18"></use><text class="t" x="866" y="371">Outbox</text><text class="s" x="842" y="396">delivered ✓</text></g>
+<g class="tn is-ok"><rect class="b" x="990" y="206" width="112" height="88" rx="10"></rect><use class="ico" href="#i-shield" x="1002" y="217" width="18" height="18"></use><text class="t" x="1026" y="231">OCC</text><text class="s" x="1002" y="254">incident c3a1…</text><text class="v" x="1002" y="278">Open</text></g>
+</svg>
+<div class="minimap" aria-label="Minimap: the whole graph is in view">
+<svg viewBox="0 0 150 90" aria-hidden="true"><rect x="0.5" y="0.5" width="149" height="89" rx="6" fill="#0c1a25" stroke="#46627a"></rect>
+<rect x="8" y="6" width="34" height="78" rx="3" fill="rgba(255,255,255,0.05)"></rect>
+<rect x="11" y="10" width="28" height="6" rx="2" fill="#ffc23d"></rect><rect x="11" y="19" width="28" height="6" rx="2" fill="#3df0ae"></rect><rect x="11" y="33" width="28" height="6" rx="2" fill="#3df0ae"></rect><rect x="11" y="48" width="28" height="6" rx="2" fill="#3df0ae"></rect><rect x="11" y="62" width="28" height="6" rx="2" fill="#91a5b4"></rect><rect x="11" y="75" width="28" height="6" rx="2" fill="#91a5b4"></rect>
+<rect x="52" y="34" width="14" height="14" rx="2" fill="#3df0ae"></rect><rect x="72" y="34" width="14" height="14" rx="2" fill="#3df0ae"></rect><rect x="92" y="34" width="14" height="14" rx="2" fill="#ffc23d"></rect><rect x="112" y="34" width="14" height="14" rx="2" fill="#ffc23d"></rect><rect x="132" y="34" width="12" height="14" rx="2" fill="#3df0ae"></rect>
+<rect x="3" y="3" width="144" height="84" rx="5" fill="none" stroke="#959bff" stroke-width="1.5"></rect></svg></div>
+</section>
+<div class="topo-legend" style="position:static;box-shadow:none;background:transparent;border:0;padding:10px 4px 0"><span><i class="ok"></i>Healthy</span><span><i class="warn"></i>Anomaly</span><span><i class="stale"></i>Paused or silent</span><span><i class="bad"></i>Down</span><span><i class="sel"></i>Selected</span><span class="kind-key"><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="2" width="10" height="10" rx="2.5"></rect></svg>Server room</span><span class="kind-key"><svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5"></circle></svg>Indoor air</span><span class="kind-key"><svg viewBox="0 0 14 14" aria-hidden="true"><polygon points="4,1.5 10,1.5 13,7 10,12.5 4,12.5 1,7"></polygon></svg>Power meter</span><span class="sp"></span><span class="faint">A zone with more than 6 devices shows 6 and “+ n more”; click it to open the list.</span></div>
+<div style="display:grid;grid-template-columns:minmax(0,2.3fr) minmax(300px,0.9fr) minmax(300px,1fr);gap:16px;align-items:start">
+<section class="card chart" aria-label="Device detail">
+<div class="card-h" style="flex-wrap:nowrap;gap:12px">
+<span class="dg sq is-warn"><svg class="ic" aria-hidden="true"><use href="#i-rack"></use></svg></span>
+<div style="min-width:0;flex:0 1 auto"><h3 class="card-t" style="white-space:nowrap">dc-env-01 <span class="dcode">DC·1</span></h3><div class="faint" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Data center — row A</div></div>
+<span class="chip is-warn" style="flex:none;align-self:flex-start;margin-top:2px" title="The latest reading is outside the range the rule allows"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Anomaly <span style="font-weight:400;opacity:0.9">· 29.3 °C, above 27 °C</span></span>
+<span class="sp"></span>
+</div>
+<div class="row" style="padding:10px 16px 0;gap:12px;flex-wrap:nowrap">
+<span class="mono faint" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">campus/BLD-DC/dc-env-01/telemetry · seq 1,284</span>
+</div>
+<div class="card-b" style="padding-top:8px">
+<div class="row" style="align-items:baseline;gap:10px;flex-wrap:nowrap"><span class="m-val is-breach" style="font-size:34px">29.3<small>°C</small></span><span class="mi mono" style="font-size:13px"><svg class="ic" aria-hidden="true"><use href="#i-thermo"></use></svg>temperature_c</span><span class="faint" style="font-size:13px;white-space:nowrap">2.3 °C above raise</span><span class="sp"></span><span class="faint" style="font-size:13px;white-space:nowrap">min <b style="color:var(--text-primary)">22.3</b> · avg <b style="color:var(--text-primary)">24.0</b> · max <b style="color:var(--text-primary)">29.4</b></span></div>
+<svg class="cx" viewBox="0 0 760 230" role="img" aria-label="temperature_c of dc-env-01, last 2 minutes: steady near 22.5, then a step to 29.3 above the raise line at 27"><defs><linearGradient id="gan" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#47d7ff" stop-opacity="0.34"></stop><stop offset="1" stop-color="#47d7ff" stop-opacity="0"></stop></linearGradient><pattern id="hatchn" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#5a7488" stroke-opacity="0.35" stroke-width="2"></line></pattern></defs><rect x="50" y="10" width="692" height="70.9" fill="#ff8f3a" fill-opacity="0.06"></rect><line class="gl" x1="50" x2="742" y1="187.1" y2="187.1"></line><text class="v" x="42" y="191.1" text-anchor="end">21</text><line class="gl" x1="50" x2="742" y1="134.0" y2="134.0"></line><text class="v" x="42" y="138.0" text-anchor="end">24</text><line class="gl" x1="50" x2="742" y1="80.9" y2="80.9"></line><text class="v" x="42" y="84.9" text-anchor="end">27</text><line class="gl" x1="50" x2="742" y1="27.7" y2="27.7"></line><text class="v" x="42" y="31.7" text-anchor="end">30</text><line class="gl major" x1="50.0" x2="50.0" y1="10" y2="196"></line><text x="50.0" y="214" text-anchor="start">−2 min</text><line class="gl major" x1="396.0" x2="396.0" y1="10" y2="196"></line><text x="396.0" y="214" text-anchor="middle">−1 min</text><line class="gl major" x1="742.0" x2="742.0" y1="10" y2="196"></line><text x="742.0" y="214" text-anchor="end">now</text><line class="raise" x1="50" x2="742" y1="80.9" y2="80.9"></line><text class="raise-l" x="56" y="75.9">raise 27</text><line class="clear" x1="50" x2="742" y1="107.4" y2="107.4"></line><text class="clear-l" x="56" y="121.4">clear 25.5</text><polygon points="50.0,196 50.0,160.6 61.7,160.6 73.5,155.3 85.2,160.6 96.9,160.6 108.6,158.8 120.4,164.1 132.1,160.6 143.8,158.8 155.6,157.0 167.3,164.1 179.0,162.3 190.7,164.1 202.5,157.0 214.2,158.8 225.9,165.9 237.7,155.3 249.4,155.3 261.1,158.8 272.8,158.8 284.6,164.1 296.3,165.9 308.0,160.6 319.8,165.9 331.5,164.1 343.2,164.1 354.9,165.9 366.7,160.6 378.4,160.6 390.1,157.0 401.9,160.6 413.6,158.8 425.3,160.6 437.1,158.8 448.8,160.6 460.5,162.3 472.2,155.3 484.0,155.3 495.7,157.0 507.4,158.8 519.2,162.3 530.9,164.1 542.6,162.3 554.3,165.9 566.1,157.0 577.8,162.3 589.5,157.0 601.3,162.3 613.0,155.3 624.7,43.7 636.4,40.1 648.2,38.3 659.9,43.7 671.6,40.1 683.4,41.9 695.1,38.3 706.8,41.9 718.5,41.9 730.3,40.1 742.0,40.1 742.0,196" fill="url(#gan)"></polygon><polyline class="ser" points="50.0,160.6 61.7,160.6 73.5,155.3 85.2,160.6 96.9,160.6 108.6,158.8 120.4,164.1 132.1,160.6 143.8,158.8 155.6,157.0 167.3,164.1 179.0,162.3 190.7,164.1 202.5,157.0 214.2,158.8 225.9,165.9 237.7,155.3 249.4,155.3 261.1,158.8 272.8,158.8 284.6,164.1 296.3,165.9 308.0,160.6 319.8,165.9 331.5,164.1 343.2,164.1 354.9,165.9 366.7,160.6 378.4,160.6 390.1,157.0 401.9,160.6 413.6,158.8 425.3,160.6 437.1,158.8 448.8,160.6 460.5,162.3 472.2,155.3 484.0,155.3 495.7,157.0 507.4,158.8 519.2,162.3 530.9,164.1 542.6,162.3 554.3,165.9 566.1,157.0 577.8,162.3 589.5,157.0 601.3,162.3 613.0,155.3 624.7,43.7 636.4,40.1 648.2,38.3 659.9,43.7 671.6,40.1 683.4,41.9 695.1,38.3 706.8,41.9 718.5,41.9 730.3,40.1 742.0,40.1"></polyline><polyline class="ser warn" points="613.0,155.3 624.7,43.7 636.4,40.1 648.2,38.3 659.9,43.7 671.6,40.1 683.4,41.9 695.1,38.3 706.8,41.9 718.5,41.9 730.3,40.1 742.0,40.1"></polyline><circle cx="742.0" cy="40.1" r="9" fill="#ffc23d" fill-opacity="0.25"></circle><circle cx="742.0" cy="40.1" r="4" fill="#e3f9ff" stroke="#ffc23d" stroke-width="2"></circle><rect x="684.0" y="32.0" width="46" height="22" rx="6" fill="#284256" stroke="#ffc23d"></rect><text class="hi" x="707.0" y="47.0" text-anchor="middle">29.3</text></svg>
+<svg class="cx" viewBox="0 0 620 78" role="img" aria-label="29.3 °C on a scale from 20 to 32; clear below 25.5, raise above 27"><defs><pattern id="hzn" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="rgba(255, 194, 61,0.18)"></rect><line x1="0" y1="0" x2="0" y2="6" stroke="#ffc23d" stroke-opacity="0.65" stroke-width="2"></line></pattern></defs><rect x="14" y="36" width="271.3" height="12" rx="6" fill="#3df0ae" fill-opacity="0.38"></rect><rect x="285.3" y="36" width="74.0" height="12" fill="url(#hzn)"></rect><rect x="359.3" y="36" width="246.7" height="12" rx="6" fill="#ff8f3a" fill-opacity="0.5"></rect><line x1="137.3" x2="137.3" y1="30" y2="54" stroke="#e4edf3" stroke-opacity="0.7" stroke-width="2" stroke-dasharray="2 2"></line><text x="285.3" y="70" text-anchor="middle" style="fill:#3df0ae;font-size:12px">clear 25.5</text><text x="359.3" y="70" text-anchor="middle" style="fill:#ff8f3a;font-size:12px">raise 27</text><text x="14" y="70" style="font-size:12px">20</text><text x="606" y="70" text-anchor="end" style="font-size:12px">32</text><text x="137.3" y="26" text-anchor="middle" style="font-size:12px">baseline 22.5</text><circle cx="472.8" cy="42" r="11" fill="#ffc23d" fill-opacity="0.25"></circle><circle cx="472.8" cy="42" r="6" fill="#e3f9ff" stroke="#ffc23d" stroke-width="3" style="filter:url(#neon)"></circle><rect x="439.0" y="2" width="67.6" height="22" rx="6" fill="#284256" stroke="#ffc23d"></rect><text class="hi" x="472.8" y="17" text-anchor="middle" style="font-size:13px">29.3 °C</text></svg>
+<div class="row" style="gap:8px;margin-top:8px;flex-wrap:nowrap"><button class="btn outline sm" type="button" style="white-space:nowrap">Open device</button><button class="btn outline sm" type="button">Show in twin</button><button class="btn ghost sm" type="button">Open in lab</button></div>
+</div>
+</section>
+<section class="card" aria-label="Rule evaluation">
+<div class="card-h"><h3 class="card-t sp">Rule evaluation</h3><span class="chip is-warn">Raised</span></div>
+<div class="card-b" style="padding-top:8px">
+<table class="tbl" style="font-size:14px"><tbody>
+<tr><td>Rule</td><td class="mono" style="text-align:right;color:var(--text-primary)">server-room-hot</td></tr>
+<tr><td>Condition</td><td style="text-align:right;color:var(--text-primary)">above 27 °C, 3 readings in a row</td></tr>
+<tr><td>Readings</td><td style="text-align:right"><span class="mono" style="color:var(--warning)">29.2 · 29.4 · 29.3</span></td></tr>
+<tr><td>Clears</td><td style="text-align:right;color:var(--text-primary)">below 25.5 °C</td></tr>
+<tr><td>Raised</td><td class="num" style="text-align:right;color:var(--text-primary)">09:14:15</td></tr>
+<tr><td>Reaction time</td><td class="num" style="text-align:right;color:var(--text-primary);font-weight:600">4 s</td></tr>
+<tr><td>Cause</td><td style="text-align:right;color:var(--text-primary)">scenario <span class="mono">server-room-overheat</span></td></tr>
+</tbody></table>
+<p class="faint" style="font-size:12px;margin-top:6px">Reaction time: first breaching reading (09:14:11) to alert opened (09:14:15).</p>
+</div>
+</section>
+<section class="card" aria-label="Alerts">
+<div class="card-h"><h3 class="card-t sp">Alerts</h3><div class="seg" role="group" aria-label="Status"><button class="is-on" type="button">Open <span class="faint">1</span></button><button type="button">All <span class="faint">7</span></button></div></div>
+<div class="card-b" style="padding:12px 0 0">
+<div class="feed-i is-open">
+<div class="row"><span class="sev" data-sev="high"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>High</span><span class="chip is-warn">Open</span><span class="sp"></span><span class="faint mono" style="font-size:13px">#7</span></div>
+<div class="card-t">Server room temperature high</div>
+<div class="muted" style="font-size:14px"><span class="mono">dc-env-01</span> · 29.3 °C · opened 09:14:15</div>
+<div class="row" style="gap:8px;flex-wrap:wrap"><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Delivered · 1 attempt</span><button class="btn ghost sm" type="button">Incident <span class="mono">c3a1…</span><svg class="ic ic-s" aria-hidden="true"><use href="#i-ext"></use></svg></button></div>
+</div>
+<div class="feed-i">
+<div class="row"><span class="sev" data-sev="medium"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"></use></svg>Medium</span><span class="chip is-ok"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg>Cleared</span><span class="sp"></span><span class="faint mono" style="font-size:13px">#6</span></div>
+<div class="card-t">Poor air quality (CO₂)</div>
+<div class="muted" style="font-size:14px"><span class="mono">lha-air-01</span> · cleared 09:08:36 at 988 ppm</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

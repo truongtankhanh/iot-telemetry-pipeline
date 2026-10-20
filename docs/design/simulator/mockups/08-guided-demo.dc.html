@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Guided demo</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.pres{display:grid;grid-template-columns:340px minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:1000px){.pres{grid-template-columns:1fr}}
+.step{display:flex;gap:14px;padding:12px 14px;border-radius:var(--radius-3);align-items:flex-start}
+.step .n{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--surface-2);color:var(--text-secondary);flex:none}
+.step b{font-family:var(--font-ui);font-size:17px;font-weight:600;display:block;line-height:1.25}
+.step span.d{font-size:14px;color:var(--text-tertiary)}
+.step.is-done .n{background:rgba(61, 240, 174,0.16);color:var(--success)}
+.step.is-done b{color:var(--text-secondary)}
+.step.is-current{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.step.is-current .n{background:var(--accent);color:var(--accent-ink)}
+.big{font-family:var(--font-ui);font-size:40px;font-weight:600;line-height:1.1}
+.say{font-size:20px;line-height:1.45;color:var(--text-primary);max-width:62ch}
+.wait{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--radius-3);background:var(--surface-0);border:1px dashed var(--accent-line)}
+.spin{width:18px;height:18px;border-radius:50%;border:3px solid var(--surface-3);border-top-color:var(--accent);flex:none}
+.hot{display:flex;gap:18px;flex-wrap:wrap}
+.hot > div{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text-secondary)}
+</style>
+</helmet>
+<div class="app" style="grid-template-columns:minmax(0,1fr)">
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></symbol>
+<symbol id="i-radio" viewBox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19.1"></path></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"></path><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"></path><path d="M7 21h10"></path></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></symbol>
+<symbol id="i-thermo" viewBox="0 0 24 24"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path></symbol>
+</defs></svg>
+
+<header class="hdr">
+<div class="brand">
+<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#284256"></rect><path d="M6 19h4l3-8 4 13 3-9 2 4h4" fill="none" stroke="#e4edf3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="26" cy="19" r="2" fill="#959bff"></circle></svg>
+<div>
+<h1 class="brand-name">Guided demo</h1>
+<div class="brand-sub">Overheat to incident</div>
+</div>
+</div>
+<div class="hdr-env">
+<span class="pill is-ok"><span class="dot"></span>Broker</span>
+<span class="pill is-ok"><span class="dot"></span>Ingest</span>
+<span class="pill is-ok"><span class="dot"></span>Command Center</span>
+</div>
+<div class="hdr-end">
+<span class="chip"><svg class="ic ic-s" aria-hidden="true"><use href="#i-clock"></use></svg>Step 3 of 6 · 02:48 in</span>
+<button class="btn outline sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-x"></use></svg>Exit presenter <span class="kbd">Esc</span></button>
+</div>
+</header>
+
+<main class="main" style="padding:28px 36px 32px;gap:24px">
+<div class="pres">
+
+<nav aria-label="Demo steps" class="col" style="gap:4px">
+<div class="step is-done"><span class="n"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg></span><div><b>Everything is normal</b><span class="d">Four devices, 2.0 msg/s</span></div></div>
+<div class="step is-done"><span class="n"><svg class="ic ic-s" aria-hidden="true"><use href="#i-check"></use></svg></span><div><b>The rule behind the alert</b><span class="d">Raise 27 °C, clear 25.5 °C, 3 in a row</span></div></div>
+<div class="step is-current" aria-current="step"><span class="n">3</span><div><b>Heat the server room</b><span class="d">dc-env-01 → 29.2 °C for 60 s</span></div></div>
+<div class="step"><span class="n">4</span><div><b>The alert opens</b><span class="d">Rule, alert, outbox</span></div></div>
+<div class="step"><span class="n">5</span><div><b>The incident appears</b><span class="d">In the Command Center</span></div></div>
+<div class="step"><span class="n">6</span><div><b>It recovers by itself</b><span class="d">Hysteresis clears the alert</span></div></div>
+<div class="faint" style="font-size:14px;padding:14px 14px 0">Script: <span class="mono">overheat-to-incident</span> · 6 steps · about 4 min</div>
+</nav>
+
+<div class="col" style="gap:20px">
+<section class="card" aria-label="Current step">
+<div class="card-b col" style="gap:20px;padding:28px 32px 28px">
+<div class="row"><span class="chip is-accent">Step 3</span><span class="chip is-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-play"></use></svg>Scenario running · 14 s in</span></div>
+<h2 class="big">Heat the server room</h2>
+<p class="say">“Row A in the data center just got hotter than it should be. Nothing in the pipeline knows that yet. Watch the rule count the readings.”</p>
+<div class="wait" role="status">
+<span class="spin" aria-hidden="true"></span>
+<div class="col" style="gap:2px"><b style="font-family:var(--font-ui);font-size:17px">Waiting for the rule to raise</b><span class="muted" style="font-size:14px"><span class="mono">server-room-hot</span> has 2 of 3 readings above 27 °C</span></div>
+<span class="sp"></span>
+<span class="m-val is-breach" style="font-size:32px">29.3<small>°C</small></span>
+</div>
+<div class="hot"><div><svg class="ic ic-s" style="color:var(--success)" aria-hidden="true"><use href="#i-check"></use></svg>Scenario started</div><div><svg class="ic ic-s" style="color:var(--success)" aria-hidden="true"><use href="#i-check"></use></svg>Broker accepts the readings</div><div><svg class="ic ic-s" style="color:var(--text-tertiary)" aria-hidden="true"><use href="#i-clock"></use></svg>Alert opens about 4 s from now</div></div>
+</div>
+<div class="sheet-f" style="border-radius:0 0 var(--radius-3) var(--radius-3);padding:16px 32px">
+<button class="btn ghost" type="button">Back <span class="kbd">←</span></button>
+<button class="btn ghost" type="button">Restart step</button>
+<span class="sp"></span>
+<span class="faint" style="font-size:14px">Moves on by itself when the alert opens</span>
+<button class="btn primary lg" type="button">Next: The alert opens <span class="kbd" style="background:rgba(12,24,33,0.15);border-color:rgba(12,24,33,0.4);color:var(--accent-ink)">Space</span></button>
+</div>
+</section>
+
+<section class="strip" aria-label="Topology so far">
+<div class="stg is-live"><div class="stg-h"><svg class="ic ic-s" aria-hidden="true"><use href="#i-thermo"></use></svg>Device</div><div class="stg-v">29.3<small>°C</small></div><div class="stg-s">dc-env-01</div></div>
+<div class="link" style="flex-basis:40px"><i></i></div>
+<div class="stg is-live"><div class="stg-h"><svg class="ic ic-s" aria-hidden="true"><use href="#i-db"></use></svg>Ingest</div><div class="stg-v">0.04<small>s lag</small></div><div class="stg-s">storing readings</div></div>
+<div class="link" style="flex-basis:40px"><i></i></div>
+<div class="stg is-live"><div class="stg-h"><svg class="ic ic-s" aria-hidden="true"><use href="#i-scale"></use></svg>Rule</div><div class="stg-v">2<small>of 3</small></div><div class="stg-s">counting</div></div>
+<div class="link is-idle" style="flex-basis:40px"><i></i></div>
+<div class="stg is-idle"><div class="stg-h"><svg class="ic ic-s" aria-hidden="true"><use href="#i-bell"></use></svg>Alert</div><div class="stg-v">—</div><div class="stg-s">not yet</div></div>
+<div class="link is-idle" style="flex-basis:40px"><i></i></div>
+<div class="stg is-idle"><div class="stg-h"><svg class="ic ic-s" aria-hidden="true"><use href="#i-shield"></use></svg>Command Center</div><div class="stg-v">—</div><div class="stg-s">not yet</div></div>
+</section>
+<div class="row faint" style="font-size:14px;gap:14px;flex-wrap:wrap"><span><span class="kbd">Space</span> next</span><span><span class="kbd">←</span> back</span><span><span class="kbd">P</span> pause scenario</span><span><span class="kbd">R</span> restart</span><span><span class="kbd">N</span> presenter notes</span><span><span class="kbd">Esc</span> exit</span></div>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
