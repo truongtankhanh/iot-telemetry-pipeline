@@ -7,11 +7,14 @@ export interface DeviceSpec {
   metrics: MetricName[];
 }
 
+interface Profile {
+  base: number;
+  noise: number;
+  daily?: number;
+}
+
 /** Baseline and noise per metric and device kind — plausible values, not physics. */
-const PROFILES: Record<
-  string,
-  Partial<Record<MetricName, { base: number; noise: number; daily?: number }>>
-> = {
+const PROFILES: Record<string, Partial<Record<MetricName, Profile>>> = {
   server_room: {
     temperature_c: { base: 22.5, noise: 0.3 },
     humidity_pct: { base: 45, noise: 1.5 },
@@ -25,15 +28,25 @@ const PROFILES: Record<
   power_meter: { power_kw: { base: 120, noise: 8, daily: 35 } },
 };
 
+export const ANOMALY_SHAPES = ['step', 'ramp', 'spike'] as const;
+export type AnomalyShape = (typeof ANOMALY_SHAPES)[number];
+
 export interface Anomaly {
   deviceId: string;
   metric: MetricName;
-  /** Value to hold during the anomaly. */
+  /** Value to hold during the anomaly (`step`), or to reach (`ramp`, `spike`). */
   value: number;
   /** Seconds after start. */
   startAt: number;
   /** Seconds the anomaly lasts. */
   duration: number;
+  /**
+   * How the value is approached. Absent means `step`: the value is held for the whole window.
+   * `ramp` rises linearly from the baseline and approaches `value` by the end of the window (the
+   * window is half-open, so it is not reached); `spike` rises to `value` at the midpoint and falls
+   * back to the baseline at the end.
+   */
+  shape?: AnomalyShape;
 }
 
 /** Parses `device:metric:value:startAt:duration`, e.g. `dc-env-01:temperature_c:29.5:20:60`. */
@@ -52,6 +65,35 @@ export function parseAnomaly(text: string): Anomaly {
   };
 }
 
+function profileOf(device: DeviceSpec, metric: MetricName): Profile {
+  return PROFILES[device.kind]?.[metric] ?? { base: 50, noise: 1 };
+}
+
+/** Noise-free value of a metric at a moment in time: what a ramp or a spike starts from. */
+export function baselineValue(device: DeviceSpec, metric: MetricName, at: Date): number {
+  const profile = profileOf(device, metric);
+  const hour = at.getUTCHours() + 7 + at.getUTCMinutes() / 60; // campus is UTC+7
+  const daily = profile.daily
+    ? profile.daily * Math.max(0, Math.sin(((hour - 7) / 12) * Math.PI))
+    : 0;
+  return profile.base + daily;
+}
+
+/** The value an active anomaly aims at, before jitter. */
+function anomalyTarget(
+  anomaly: Anomaly,
+  device: DeviceSpec,
+  metric: MetricName,
+  at: Date,
+  elapsedS: number,
+): number {
+  if (!anomaly.shape || anomaly.shape === 'step') return anomaly.value;
+  const progress = (elapsedS - anomaly.startAt) / anomaly.duration;
+  const weight = anomaly.shape === 'spike' ? 1 - Math.abs(2 * progress - 1) : progress;
+  const baseline = baselineValue(device, metric, at);
+  return baseline + (anomaly.value - baseline) * weight;
+}
+
 /** Value for one metric at a moment in time, with any active anomaly applied. */
 export function sample(
   device: DeviceSpec,
@@ -68,14 +110,12 @@ export function sample(
       elapsedS >= a.startAt &&
       elapsedS < a.startAt + a.duration,
   );
-  if (active) return round(active.value + (random() - 0.5) * 0.2);
+  if (active) {
+    return round(anomalyTarget(active, device, metric, at, elapsedS) + (random() - 0.5) * 0.2);
+  }
 
-  const profile = PROFILES[device.kind]?.[metric] ?? { base: 50, noise: 1 };
-  const hour = at.getUTCHours() + 7 + at.getUTCMinutes() / 60; // campus is UTC+7
-  const daily = profile.daily
-    ? profile.daily * Math.max(0, Math.sin(((hour - 7) / 12) * Math.PI))
-    : 0;
-  return round(profile.base + daily + (random() - 0.5) * 2 * profile.noise);
+  const { noise } = profileOf(device, metric);
+  return round(baselineValue(device, metric, at) + (random() - 0.5) * 2 * noise);
 }
 
 const round = (n: number) => Math.round(n * 10) / 10;

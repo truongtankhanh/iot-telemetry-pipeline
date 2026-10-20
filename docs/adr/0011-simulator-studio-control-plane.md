@@ -99,3 +99,32 @@ least 4.6:1 on surface-2). Token names are unchanged, so the command center can 
 `:root`. The rules that keep it legible, the tokens and the animation timings are in the
 [design brief](../design/simulator/brief.md) (revision 12) and `docs/design/simulator/mockups/studio.css`. The decision
 above, which keeps the engine, the control plane and the UI contract as they were, is not affected.
+
+## Amendment, 2026-10-20: engine behaviour as built (SIM-02)
+
+The engine ([engine.ts](../../apps/simulator/src/engine.ts)) is the module decision 1 describes. What it does, so that SIM-03 and
+later tickets build on it and nobody has to infer it from the code:
+
+- **Seams.** Time comes from a `Clock` and messages go to a `Publisher`, both passed in; the engine owns neither the wall clock
+  nor the MQTT client. `main.ts` adapts the client; tests use a manual clock.
+- **Simulated-clock mode** is the engine running on a `ManualClock`, chosen when it is built. `step()` moves the clock by one
+  default publish interval and sends the tick that falls due. `ts` follows the clock, so stepping far ahead of real time makes
+  ingest reject the messages as `future` (more than 5 minutes ahead, [telemetry contract](../telemetry-contract.md)); nothing
+  guards against it.
+- **Reset** clears anomalies and held values and restarts the anomaly clock at zero. It never touches `seq`, `ts` or device
+  states, so ingest never reads a Reset as a device restart.
+- **Devices.** Pause and stop both stop publishing and keep `seq`. A device that is started again publishes after one of its
+  intervals. A device can have its own interval; the engine's applies otherwise.
+- **Held value.** Per device and metric, published exactly with no noise, and it wins over an anomaly on the same metric.
+- **Anomalies** can be added and removed while running; `startAt` is in seconds on the anomaly clock (since start or the last
+  Reset). Shapes: `step` (the existing one), `ramp` and `spike`. `--anomaly` still takes five fields and always means a step.
+  Anomalies passed at construction (the CLI) are not validated; `addAnomaly` checks the device, the metric, the numbers and the
+  shape.
+- **Failures.** The first tick's failure rejects `start()`, as the old loop's un-caught first tick did; a later failing tick is
+  reported once as a `tick-error` event and the loop goes on. After a long stall the missed ticks are skipped, not sent.
+- **Events and state.** `state` (every change an operator can make), `published` (a message the publisher accepted) and
+  `tick-error`; `snapshot()` returns the whole state. These are what the control server (SIM-03) forwards. The 200-entry publish
+  log and the observation store are SIM-03's.
+- **One intended change to the command line.** An `--interval` that is not a positive number now stops with a `RangeError`;
+  before, `--interval abc` made the loop publish every millisecond. Everything else about the flags, output and exit
+  behaviour is as before.
