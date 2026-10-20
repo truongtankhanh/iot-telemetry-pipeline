@@ -2,6 +2,7 @@ import { getState as fetchState } from '../api/client';
 import type { PublishedMessage, Snapshot, StateView } from '../api/types';
 import { RateCounter } from '../lib/rate';
 import type { HistoryStore } from './history';
+import type { PulseBus } from './pulses';
 import type { StudioStore } from './store';
 
 /** The part of `EventSource` the stream uses, so a test can pass a fake (jsdom has none). */
@@ -21,6 +22,8 @@ export interface StreamOptions {
   rateWindowMs?: number;
   /** Where readings are kept for the charts: seeded by each snapshot, fed by each `published` message. */
   history?: HistoryStore;
+  /** Told when each device publishes, for the dots on the topology's edges (nothing renders per message). */
+  pulses?: PulseBus;
   /** How often the publish rate is written to the store. */
   rateEveryMs?: number;
 }
@@ -40,7 +43,8 @@ export interface StreamConnection {
  * - `published` is not stored in the Zustand store: it feeds the rate and, when a `history` is given, that
  *   history (it arrives about fifteen times a second, and nothing may render per message; the history tells
  *   its listeners at most once a second). A snapshot seeds the history from its publish log, replacing what was
- *   there, so a reconnect does not double the readings.
+ *   there, so a reconnect does not double the readings. With `pulses`, each `published` message also tells that bus
+ *   which device published (the topology's dots); the publish log of a snapshot is the past and is not replayed.
  * - `tick-error` and `observation` are not used by the shell.
  *
  * The browser reconnects an `EventSource` by itself. The link is `live` while it is open and `lost`
@@ -101,7 +105,11 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     }, refetchDelayMs);
   });
 
-  on<PublishedMessage>('published', (message) => options.history?.record(message));
+  on<PublishedMessage>('published', (message, at) => {
+    options.history?.record(message);
+    // A message that names no device cannot draw a dot on a device's edge.
+    if (typeof message.deviceId === 'string') options.pulses?.emit(message.deviceId, at);
+  });
   source.addEventListener('published', () => rate.record(now()));
 
   const rateTimer = setInterval(() => {

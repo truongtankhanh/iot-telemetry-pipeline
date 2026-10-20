@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { PublishedMessage, Snapshot, StateView } from '../api/types';
 import { HistoryStore } from './history';
+import { PulseBus } from './pulses';
 import { createStudioStore } from './store';
 import { connectStream, type EventSourceLike } from './stream';
 
@@ -31,7 +32,9 @@ class FakeSource implements EventSourceLike {
   }
 }
 
-function setup(options: { getState?: () => Promise<StateView>; history?: HistoryStore } = {}) {
+function setup(
+  options: { getState?: () => Promise<StateView>; history?: HistoryStore; pulses?: PulseBus } = {},
+) {
   const store = createStudioStore();
   const source = new FakeSource();
   const getState = options.getState ?? vi.fn(async () => ({ ...view, observationCursor: 99 }));
@@ -39,6 +42,7 @@ function setup(options: { getState?: () => Promise<StateView>; history?: History
     createSource: () => source,
     getState,
     ...(options.history ? { history: options.history } : {}),
+    ...(options.pulses ? { pulses: options.pulses } : {}),
   });
   return { store, source, getState, connection };
 }
@@ -252,5 +256,78 @@ describe('the history', () => {
     for (let i = 0; i < 5; i++) source.emit('published', published('dc-env-01', T0 + i, 1));
     await vi.advanceTimersByTimeAsync(1000);
     expect(store.getState().publishRate).toBe(5);
+  });
+});
+
+describe('the pulses', () => {
+  const published = (deviceId: string, atMs: number): PublishedMessage => {
+    const ts = new Date(atMs).toISOString();
+    return {
+      deviceId,
+      topic: `campus/BLD-DC/${deviceId}/telemetry`,
+      payload: JSON.stringify({ seq: 1, ts, metrics: { temperature_c: 22.4 } }),
+      seq: 1,
+      ts,
+    };
+  };
+
+  it('tells the bus which device published, when the message arrived', () => {
+    const pulses = new PulseBus();
+    const heard: [string, number][] = [];
+    pulses.subscribe(['dc-env-01', 'dc-env-02'], (deviceId, at) => heard.push([deviceId, at]));
+    const { source } = setup({ pulses });
+    source.emit('snapshot', { ...view, publishLog: [] });
+
+    vi.setSystemTime(T0 + 1000);
+    source.emit('published', published('dc-env-01', T0));
+    vi.setSystemTime(T0 + 2500);
+    source.emit('published', published('dc-env-02', T0 + 2000));
+    expect(heard).toEqual([
+      ['dc-env-01', T0 + 1000],
+      ['dc-env-02', T0 + 2500],
+    ]);
+  });
+
+  it('does not replay the publish log of a snapshot as pulses: it is the past', () => {
+    const pulses = new PulseBus();
+    const heard: string[] = [];
+    pulses.subscribe(['dc-env-01'], (deviceId) => heard.push(deviceId));
+    const { source } = setup({ pulses });
+    source.emit('snapshot', {
+      ...view,
+      publishLog: [published('dc-env-01', T0 - 4000), published('dc-env-01', T0 - 2000)],
+    });
+    expect(heard).toEqual([]);
+  });
+
+  it('feeds the history and the bus from the same message', () => {
+    const history = new HistoryStore();
+    const pulses = new PulseBus();
+    const heard: string[] = [];
+    pulses.subscribe(['dc-env-01'], (deviceId) => heard.push(deviceId));
+    const { source } = setup({ history, pulses });
+    source.emit('snapshot', { ...view, publishLog: [] });
+    source.emit('published', published('dc-env-01', T0));
+    expect(heard).toEqual(['dc-env-01']);
+    expect(history.lastSeen('dc-env-01')).toBe(T0);
+  });
+
+  it('ignores a message that is not JSON, and one that names no device', () => {
+    const pulses = new PulseBus();
+    const heard: string[] = [];
+    pulses.subscribe(['dc-env-01'], (deviceId) => heard.push(deviceId));
+    const { source } = setup({ pulses });
+    source.emit('published', 'not json');
+    source.emit('published', { seq: 3 });
+    source.emit('published', { deviceId: 7 });
+    expect(heard).toEqual([]);
+  });
+
+  it('works without a bus: the rate and the history do not need one', async () => {
+    const { store, source } = setup();
+    source.emit('snapshot', { ...view, publishLog: [] });
+    for (let i = 0; i < 3; i++) source.emit('published', published('dc-env-01', T0 + i));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(store.getState().publishRate).toBe(3);
   });
 });
