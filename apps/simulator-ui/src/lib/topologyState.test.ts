@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { type DeviceStatusKind, STATUS_WORDS } from './deviceStatus';
-import { deviceTopologyState, TOPOLOGY_WORDS, type TopologyState, worstOf } from './topologyState';
+import {
+  deviceTopologyState,
+  TOPOLOGY_TONES,
+  TOPOLOGY_WORDS,
+  type TopologyState,
+  worstOf,
+} from './topologyState';
 
 describe('worstOf', () => {
   it('orders down, anomaly, paused or silent, healthy', () => {
@@ -46,5 +52,13 @@ describe('TOPOLOGY_WORDS', () => {
   it('has a word for every look, so a state is never colour alone', () => {
     expect(Object.values(TOPOLOGY_WORDS).every((word) => word.length > 0)).toBe(true);
     expect(TOPOLOGY_WORDS.stale).toBe('Paused or silent');
+  });
+});
+
+describe('TOPOLOGY_TONES', () => {
+  it('gives every look its own icon tone, so no two states share one', () => {
+    const tones = Object.values(TOPOLOGY_TONES);
+    expect(new Set(tones).size).toBe(tones.length);
+    expect(TOPOLOGY_TONES.stale).toBe('unknown');
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MetricSample, MetricsFeed } from '../api/types';
-import { ingestRates } from './ingestRates';
+import { ingestRates, storedReadings } from './ingestRates';
 
 const at = (second: number) => new Date(Date.UTC(2026, 9, 20, 9, 14, second)).toISOString();
 
@@ -95,5 +95,21 @@ describe('ingestRates', () => {
     });
     const empty: MetricsFeed = { lastOkAt: at(1), stale: false, samples: [] };
     expect(ingestRates(bare(0, 1), empty)).toEqual({ storedPerSecond: null, lagSeconds: null });
+  });
+});
+
+describe('storedReadings', () => {
+  it('is the total of the stored readings', () => {
+    expect(storedReadings(feed(0, { stored: 42 }))).toBe(42);
+  });
+
+  it('counts only stored, not duplicates', () => {
+    // `feed` also has a `duplicate` sample of 99
+    expect(storedReadings(feed(0, { stored: 1 }))).toBe(1);
+  });
+
+  it('is null when the feed is stale or the counter was not exported', () => {
+    expect(storedReadings(feed(0, { stored: 42 }, true))).toBeNull();
+    expect(storedReadings({ lastOkAt: at(0), stale: false, samples: [] })).toBeNull();
   });
 });

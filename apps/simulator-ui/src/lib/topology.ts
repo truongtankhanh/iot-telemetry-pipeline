@@ -41,7 +41,7 @@ export type Grouping = 'zone' | 'all';
 /** A node needs attention when it is anything but healthy: an anomaly, or dark (paused, stopped, silent). */
 export const isProblem = (state: TopologyState): boolean => state !== 'healthy';
 
-export interface DeviceNodeData {
+export type DeviceNodeData = {
   kind: 'device';
   deviceId: string;
   name: string;
@@ -60,9 +60,9 @@ export interface DeviceNodeData {
   selected: boolean;
   dimmed: boolean;
   ariaLabel: string;
-}
+};
 
-export interface ZoneNodeData {
+export type ZoneNodeData = {
   kind: 'zone';
   code: string;
   count: number;
@@ -72,17 +72,22 @@ export interface ZoneNodeData {
   counts: Record<TopologyState, number>;
   /** Devices that match the filters but are not drawn: "+ n more". */
   more: number;
+  /**
+   * The zone is open for a reason other than the viewer's own click (all devices are shown, a search or _Problems only_
+   * matches in it, or it holds the selection): its chevron cannot close it, and says why.
+   */
+  locked: boolean;
   selected: boolean;
   dimmed: boolean;
   ariaLabel: string;
-}
+};
 
-export interface StageNodeData {
+export type StageNodeData = {
   kind: 'stage';
   stage: StageNode;
   selected: boolean;
   ariaLabel: string;
-}
+};
 
 export type TopoNodeData = DeviceNodeData | ZoneNodeData | StageNodeData;
 
@@ -370,6 +375,7 @@ export function buildTopology(input: TopologyInput): Topology {
         mode: p.mode,
         counts,
         more: p.more,
+        locked: p.mode === 'open' && !expanded.has(p.code),
         selected: selectedZone,
         dimmed,
         ariaLabel: `${p.code}, ${plural(p.members.length, 'device')}, ${TOPOLOGY_WORDS[worst].toLowerCase()}`,

@@ -20,6 +20,7 @@ import { LinkBanner } from './shell/LinkBanner';
 import { Navigation } from './shell/Navigation';
 import { Shell } from './shell/Shell';
 import { HistoryStore } from './state/history';
+import { PulseBus } from './state/pulses';
 import { connectStream } from './state/stream';
 import { createStudioStore } from './state/store';
 import { StudioProvider } from './state/StudioProvider';
@@ -38,6 +39,11 @@ const Foundations = __FOUNDATIONS__
 // The Fleet is its own chunk: it brings the charts, the table and the inspector, which no other page needs yet.
 const Fleet = lazy(() =>
   import('./pages/fleet/Fleet').then((module) => ({ default: module.Fleet })),
+);
+
+// The Topology is its own chunk: it brings React Flow, which no other page needs.
+const Topology = lazy(() =>
+  import('./pages/topology/Topology').then((module) => ({ default: module.Topology })),
 );
 
 const TITLE = 'Simulator Studio';
@@ -83,6 +89,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Fleet />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/topology"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Topology />
           </Suspense>
         }
       />
@@ -195,18 +209,21 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
 export function App() {
   const [store] = useState(() => createStudioStore({ railPinned: readRailPinned() }));
   const [history] = useState(() => new HistoryStore());
+  // Told when a device publishes, for the dots on the topology's edges.
+  const [pulses] = useState(() => new PulseBus());
   // One animation budget for the window (12 animated nodes, 24 glowing lines). Without a provider nothing animates.
   const [budget] = useState(() => new AnimationBudget());
   useEffect(() => {
-    const connection = connectStream(store, { history });
+    const connection = connectStream(store, { history, pulses });
     return () => {
       connection.close();
       history.dispose();
+      pulses.dispose();
     };
-  }, [store, history]);
+  }, [store, history, pulses]);
 
   return (
-    <StudioProvider store={store} history={history}>
+    <StudioProvider store={store} history={history} pulses={pulses}>
       <AnimationBudgetProvider budget={budget}>
         <BrowserRouter>
           <StudioFrame />

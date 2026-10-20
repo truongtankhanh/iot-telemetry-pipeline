@@ -11,11 +11,9 @@ export type PulseListener = (deviceId: string, at: number) => void;
  */
 export class PulseBus {
   private readonly listeners = new Map<string, Set<PulseListener>>();
-  private disposed = false;
 
   /** Calls the listeners of a device. One that throws is logged and does not stop the others, nor the stream that called. */
   emit(deviceId: string, at: number): void {
-    if (this.disposed) return;
     for (const listener of this.listeners.get(deviceId) ?? []) {
       try {
         listener(deviceId, at);
@@ -43,12 +41,21 @@ export class PulseBus {
     };
   }
 
-  /** Forgets every listener; later `emit`s do nothing. */
+  /**
+   * Forgets every listener. The bus can be used again afterwards: React's StrictMode runs an effect's cleanup and then
+   * the effect again, and the stream that closes here is opened again with the same bus.
+   */
   dispose(): void {
-    this.disposed = true;
     this.listeners.clear();
   }
 }
+
+/**
+ * The id under which something downstream advanced: a hop of the pipeline (`ingest>rules`) is told on the same bus as a
+ * device, under a name no device id has: the telemetry contract only accepts ids of letters, digits, `_` and `-`
+ * (`SEGMENT` in `packages/telemetry-contract/src/index.ts`), so an id never contains `:`.
+ */
+export const hopKey = (hop: string): string => `hop:${hop}`;
 
 /** Dots alive at once on one edge (the brief: at most 4). */
 export const MAX_DOTS_PER_EDGE = 4;

@@ -26,10 +26,11 @@ describe('appRoutes', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('builds the Overview, the Fleet and Foundations only; every other page names the ticket that builds it', () => {
+  it('builds the Overview, the Fleet, the Topology and Foundations only; every other page names the ticket that builds it', () => {
     expect(routes.filter((r) => r.built).map((r) => r.path)).toEqual([
       '/',
       '/fleet',
+      '/topology',
       '/foundations',
     ]);
     for (const route of routes.filter((r) => !r.built)) {

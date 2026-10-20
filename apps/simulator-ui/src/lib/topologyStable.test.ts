@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sameValue, stabilize } from './topologyStable';
+import { sameValue, Stable, stabilize } from './topologyStable';
 
 interface Item {
   id: string;
@@ -91,5 +91,29 @@ describe('stabilize', () => {
     const frozen = structuredClone({ previous, next });
     stabilize(previous, next);
     expect({ previous, next }).toEqual(frozen);
+  });
+});
+
+describe('Stable', () => {
+  it('keeps the objects of what did not change from one call to the next', () => {
+    const stable = new Stable<Item>();
+    const first = stable.next([item('a'), item('b')]);
+    const second = stable.next([item('a'), item('b', 'changed')]);
+    expect(second[0]).toBe(first[0]);
+    expect(second[1]).not.toBe(first[1]);
+  });
+
+  it('gives the same array for the same content, so a second render is harmless', () => {
+    const stable = new Stable<Item>();
+    const first = stable.next([item('a')]);
+    expect(stable.next([item('a')])).toBe(first);
+  });
+
+  it('compares with the last list only: an item that left and came back is a new object', () => {
+    const stable = new Stable<Item>();
+    const a = item('a');
+    stable.next([a]);
+    stable.next([]);
+    expect(stable.next([item('a')])[0]).not.toBe(a);
   });
 });

@@ -130,6 +130,10 @@ describe('up to 12 devices: every device is a node', () => {
     expect(t.matches).toBe(6);
   });
 
+  it('locks the chevron of a zone that is open only because every device is shown', () => {
+    expect(ofType(t, 'zone').every((n) => (n.data as ZoneNodeData).locked)).toBe(true);
+  });
+
   it('has no "+ n more" at this size', () => {
     expect(ofType(t, 'zone').every((n) => (n.data as ZoneNodeData).more === 0)).toBe(true);
   });
@@ -298,9 +302,9 @@ describe('grouping', () => {
     expect(edge(t, 'zone:BLD-HUB>broker')).toMatchObject({ state: 'off', devices: [] });
   });
 
-  it('opens a zone in place when the viewer asks', () => {
+  it('opens a zone in place when the viewer asks, and lets the viewer close it again', () => {
     const t = campus({ group: 'zone', expanded: ['BLD-LIB'] });
-    expect(zoneData(t, 'BLD-LIB').mode).toBe('open');
+    expect(zoneData(t, 'BLD-LIB')).toMatchObject({ mode: 'open', locked: false });
     expect(zoneData(t, 'BLD-DC').mode).toBe('closed');
     expect(ofType(t, 'device').map((n) => n.id)).toEqual(['device:lib-air-01']);
     // the zone that opened drew its device's edge, not its own
@@ -310,7 +314,8 @@ describe('grouping', () => {
 
   it('opens the zone of the selected device, and of a selected zone', () => {
     const byDevice = campus({ group: 'zone', selection: { type: 'device', id: 'lha-air-01' } });
-    expect(zoneData(byDevice, 'BLD-LHA').mode).toBe('open');
+    // open because it holds the selection, not because the viewer opened it: the chevron cannot close it
+    expect(zoneData(byDevice, 'BLD-LHA')).toMatchObject({ mode: 'open', locked: true });
     expect(deviceData(byDevice, 'lha-air-01').selected).toBe(true);
 
     const byZone = campus({ group: 'zone', selection: { type: 'zone', id: 'BLD-STU' } });

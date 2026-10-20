@@ -15,6 +15,14 @@ export const TOPOLOGY_WORDS: Record<TopologyState, string> = {
   stale: 'Paused or silent',
 };
 
+/** The tone of the icon that goes with each look (`toneIcons`): a state is its icon and its word as well as its edge. */
+export const TOPOLOGY_TONES: Record<TopologyState, 'ok' | 'warn' | 'bad' | 'unknown'> = {
+  healthy: 'ok',
+  anomaly: 'warn',
+  down: 'bad',
+  stale: 'unknown',
+};
+
 // The brief: "the worst state of a group is the worst of its devices (down, then anomaly, then paused or silent,
 // then healthy), so a problem is never hidden by grouping."
 const SEVERITY: Record<TopologyState, number> = { healthy: 0, stale: 1, anomaly: 2, down: 3 };

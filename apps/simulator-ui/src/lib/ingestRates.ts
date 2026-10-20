@@ -24,6 +24,14 @@ function total(
 }
 
 /**
+ * The readings ingest has stored since it started (`telemetry_readings_total{result="stored"}`), or `null` when the
+ * feed is stale or ingest has not exported the counter. Something downstream advanced when this grows between two reads.
+ */
+export function storedReadings(feed: MetricsFeed): number | null {
+  return feed.stale ? null : total(feed.samples, 'telemetry_readings_total', { result: 'stored' });
+}
+
+/**
  * Rates are the difference of two reads of cumulative counters, so they are an observation of the last second or so,
  * not an average since ingest started. Nothing is guessed: a feed that is stale, a first read, two reads at the same
  * moment, a counter that went backwards (ingest restarted) or a metric ingest has not exported yet gives `null` for

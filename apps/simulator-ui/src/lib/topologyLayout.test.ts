@@ -7,6 +7,7 @@ import {
   COUNTS_ZONE_H,
   DEVICE_PITCH,
   devicePosition,
+  edgeWidth,
   layoutZones,
   MORE_ROW,
   STAGE_BOXES,
@@ -118,5 +119,23 @@ describe('boundsOf', () => {
 
   it('is empty for nothing', () => {
     expect(boundsOf([])).toEqual({ x: 0, y: 0, w: 0, h: 0 });
+  });
+});
+
+describe('edgeWidth', () => {
+  it('is 2 for a device and grows with the devices behind a zone', () => {
+    expect(edgeWidth(1)).toBe(2);
+    expect(edgeWidth(2)).toBe(2.5);
+    expect(edgeWidth(8)).toBe(3.5);
+    expect(edgeWidth(10)).toBeGreaterThan(edgeWidth(8));
+  });
+
+  it('never passes 4, however many devices there are', () => {
+    expect(edgeWidth(16)).toBe(4);
+    expect(edgeWidth(1000)).toBe(4);
+  });
+
+  it('treats nothing behind an edge like one device', () => {
+    expect(edgeWidth(0)).toBe(2);
   });
 });

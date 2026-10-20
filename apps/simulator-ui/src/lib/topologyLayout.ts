@@ -40,6 +40,13 @@ export const STAGE_BOXES: Record<StageId, Box> = {
   commandCenter: { x: 990, y: 206, w: 150, h: 88 },
 };
 
+/**
+ * The width of an edge's core line in pixels: a device's edge is 2, a zone's grows with the devices behind it (the
+ * brief: "line width by device count") but never past 4, so a zone of sixty does not drown the graph.
+ */
+export const edgeWidth = (weight: number): number =>
+  2 + Math.min(4, Math.log2(Math.max(1, weight))) * 0.5;
+
 export type ZoneMode = 'closed' | 'counts' | 'open';
 
 /** What the layout needs to know about a zone to give it a place. */

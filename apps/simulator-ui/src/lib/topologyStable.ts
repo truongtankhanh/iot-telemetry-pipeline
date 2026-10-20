@@ -38,3 +38,17 @@ export function stabilize<T extends { id: string }>(
     result.length === previous.length && result.every((item, i) => item === previous[i]);
   return unchanged ? (previous as T[]) : result;
 }
+
+/**
+ * The memory `stabilize` needs between two calls, for a component that rebuilds its list on each render. `next` is
+ * idempotent: the same content twice gives the same objects twice, so a render that React runs twice (StrictMode) is
+ * harmless.
+ */
+export class Stable<T extends { id: string }> {
+  private last: T[] = [];
+
+  next(list: readonly T[]): T[] {
+    this.last = stabilize(this.last, list);
+    return this.last;
+  }
+}

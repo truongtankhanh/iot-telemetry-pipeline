@@ -51,13 +51,18 @@ describe('PulseBus', () => {
     expect(() => new PulseBus().emit('nobody', 1)).not.toThrow();
   });
 
-  it('does nothing after dispose', () => {
+  it('forgets its listeners on dispose, and can be used again', () => {
     const bus = new PulseBus();
-    const listener = vi.fn();
-    bus.subscribe(['a'], listener);
+    const old = vi.fn();
+    bus.subscribe(['a'], old);
     bus.dispose();
     bus.emit('a', 1);
-    expect(listener).not.toHaveBeenCalled();
+    expect(old).not.toHaveBeenCalled();
+
+    const fresh = vi.fn();
+    bus.subscribe(['a'], fresh);
+    bus.emit('a', 2);
+    expect(fresh).toHaveBeenCalledExactlyOnceWith('a', 2);
   });
 
   it('logs a listener that throws, and does not stop the others', () => {
