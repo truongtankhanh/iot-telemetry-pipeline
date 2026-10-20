@@ -114,7 +114,7 @@ sequenceDiagram
 
   S->>P: MQTT readings (via the broker)
   P->>DB: readings and rollups, rules evaluated
-  Note over P,DB: a breach that persists opens an alert;<br/>the alert and its outbox row are written together
+  Note over P,DB: a breach that persists opens an alert,<br/>and the alert and its outbox row are written together
   P->>K: client credentials, get a token
   P->>O: GET /zones (zone code to zone id)
   P->>O: POST /incidents (Idempotency-Key: telemetry-alert-id)
