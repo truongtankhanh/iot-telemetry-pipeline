@@ -30,6 +30,18 @@ describe('createStudioStore', () => {
     expect(state.publishRate).toBe(0);
   });
 
+  it('counts the modals that are open, never below zero', () => {
+    const store = createStudioStore();
+    expect(store.getState().modalCount).toBe(0);
+    store.getState().pushModal();
+    store.getState().pushModal();
+    store.getState().popModal();
+    expect(store.getState().modalCount).toBe(1);
+    store.getState().popModal();
+    store.getState().popModal();
+    expect(store.getState().modalCount).toBe(0);
+  });
+
   it('can start with the rail pinned', () => {
     expect(createStudioStore({ railPinned: true }).getState().railPinned).toBe(true);
   });

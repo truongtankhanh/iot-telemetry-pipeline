@@ -1,0 +1,189 @@
+/* The Fleet page: tabs row, KPIs, the sticky toolbar and the places for cards and the table. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* The link to the simulator is lost: what is shown is the last data, dimmed. */
+.page[data-stale='true'] .content {
+  opacity: 0.6;
+}
+
+.statebar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.kpi {
+  padding: 12px 16px;
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  border: 1px solid rgba(71, 215, 255, 0.12);
+  box-shadow: var(--shadow-1);
+  min-width: 0;
+}
+
+.kpi dt {
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.kpi dd {
+  margin: 0;
+}
+
+/* Only numerals of 24 px and up glow. */
+.kpiValue {
+  font-family: var(--font-ui);
+  font-size: var(--fs-numeral);
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: #e6fbff;
+  text-shadow:
+    0 0 8px rgba(71, 215, 255, 0.6),
+    0 0 20px rgba(71, 215, 255, 0.3);
+}
+
+.kpiUnit {
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-shadow: none;
+}
+
+.kpiNote {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+/* The toolbar sticks just below the header while the page scrolls under it. */
+.toolbar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  border: 1px solid rgba(71, 215, 255, 0.12);
+  box-shadow: var(--shadow-2);
+}
+
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  min-width: 240px;
+  flex: 1 1 240px;
+  max-width: 420px;
+  border-radius: var(--radius-2);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-0);
+  color: var(--text-secondary);
+}
+
+.search:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.select {
+  height: 34px;
+  padding: 0 8px;
+  border-radius: var(--radius-2);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.select:hover {
+  border-color: rgba(71, 215, 255, 0.6);
+  box-shadow: 0 0 8px rgba(71, 215, 255, 0.18);
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 1px;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.end {
+  margin-left: auto;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.notice {
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  border: 1px solid rgba(255, 194, 61, 0.45);
+  box-shadow: inset 2px 0 0 var(--warning);
+  background: var(--surface-0);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}

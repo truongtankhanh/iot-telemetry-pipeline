@@ -25,7 +25,10 @@ describe('buildPaletteItems', () => {
   it('lists every page, and says which are not built yet, with their ticket', () => {
     const pages = group(build(), 'pages');
     expect(pages.find((p) => p.target === '/')?.detail).toMatch(/Health of the simulated campus/);
-    expect(pages.find((p) => p.target === '/fleet')?.detail).toBe('Not built yet · SIM-05');
+    expect(pages.find((p) => p.target === '/fleet')?.detail).toMatch(
+      /^Every device, its live values/,
+    );
+    expect(pages.find((p) => p.target === '/alerts')?.detail).toBe('Not built yet · SIM-07');
     expect(pages.find((p) => p.target === '/lab/faults')?.label).toBe('Lab · Faults');
   });
 

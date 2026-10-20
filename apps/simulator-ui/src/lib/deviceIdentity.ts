@@ -46,6 +46,17 @@ const METRIC_ICONS: Record<MetricName, MetricIconName> = {
 export const metricIcon = (metric: string): MetricIconName =>
   Object.hasOwn(METRIC_ICONS, metric) ? METRIC_ICONS[metric as MetricName] : 'gauge';
 
+const METRIC_LABELS: Record<MetricName, string> = {
+  temperature_c: 'Temp',
+  humidity_pct: 'Humidity',
+  co2_ppm: 'CO₂',
+  power_kw: 'Power',
+};
+
+/** A short name for a tab or a tag (`Temp`, `CO₂`); the metric's own name for one the contract lacks. */
+export const metricLabel = (metric: string): string =>
+  Object.hasOwn(METRIC_LABELS, metric) ? METRIC_LABELS[metric as MetricName] : metric;
+
 /** The unit of a metric from the contract (`°C`, `%`, `ppm`, `kW`); empty for a metric the contract lacks. */
 export const metricUnit = (metric: string): string =>
   Object.hasOwn(METRICS, metric) ? METRICS[metric as MetricName].unit : '';

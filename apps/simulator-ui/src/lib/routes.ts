@@ -54,7 +54,7 @@ const page = (
 });
 
 /**
- * The pages of the brief. Only the Overview shell and Foundations exist in SIM-04; every other route
+ * The pages of the brief. Built so far: the Overview shell and Foundations (SIM-04) and the Fleet (SIM-05); every other route
  * opens the shared placeholder that names the ticket which builds it, so nothing in the navigation or
  * the palette is a dead link.
  */
@@ -77,6 +77,7 @@ const ROUTES: AppRoute[] = [
     'SIM-05',
     ['01', '02', '18'],
     'f',
+    { built: true },
   ),
   page(
     '/topology',

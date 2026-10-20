@@ -10,6 +10,7 @@ import {
   type FleetQuery,
   type FleetRow,
   groupByZone,
+  kindLabel,
   matchesSearch,
   pageSelection,
   paginate,
@@ -17,6 +18,8 @@ import {
   pruneSelection,
   serializeFleetQuery,
   setPageSelected,
+  SORT_KEYS,
+  SORT_LABELS,
   toggleSelected,
 } from './fleetQuery';
 
@@ -337,5 +340,19 @@ describe('selection', () => {
 
   it('drops what is no longer in the list', () => {
     expect([...pruneSelection(new Set(['a', 'gone']), ['a', 'b'])]).toEqual(['a']);
+  });
+});
+
+describe('kindLabel and SORT_LABELS', () => {
+  it('writes a kind for a person', () => {
+    expect(kindLabel('server_room')).toBe('Server room');
+    expect(kindLabel('indoor-air')).toBe('Indoor air');
+    expect(kindLabel('power_meter')).toBe('Power meter');
+    expect(kindLabel('')).toBe('');
+    expect(kindLabel('__')).toBe('__');
+  });
+
+  it('has a label for each way to sort', () => {
+    expect(Object.keys(SORT_LABELS).sort()).toEqual([...SORT_KEYS].sort());
   });
 });

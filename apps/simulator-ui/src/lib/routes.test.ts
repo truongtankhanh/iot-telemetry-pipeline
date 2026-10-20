@@ -26,8 +26,12 @@ describe('appRoutes', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('builds the Overview and Foundations only; every other page names the ticket that builds it', () => {
-    expect(routes.filter((r) => r.built).map((r) => r.path)).toEqual(['/', '/foundations']);
+  it('builds the Overview, the Fleet and Foundations only; every other page names the ticket that builds it', () => {
+    expect(routes.filter((r) => r.built).map((r) => r.path)).toEqual([
+      '/',
+      '/fleet',
+      '/foundations',
+    ]);
     for (const route of routes.filter((r) => !r.built)) {
       expect(route.ticket).toMatch(/^SIM-\d\d$/);
       expect(route.frames.length).toBeGreaterThan(0);

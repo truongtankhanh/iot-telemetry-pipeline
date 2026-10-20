@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { DeviceInfo } from '../api/types';
-import { deviceCode, kindIdentity, metricIcon, metricUnit } from './deviceIdentity';
+import { deviceCode, kindIdentity, metricIcon, metricLabel, metricUnit } from './deviceIdentity';
 
 const devices = fixture.devices;
 
@@ -89,5 +89,19 @@ describe('deviceCode', () => {
     expect(deviceCode(odd, [odd])).toBe('NORTH');
     const none: DeviceInfo = { id: 'pump-7', kind: 'x', zoneCode: '', metrics: [] };
     expect(deviceCode(none, [none])).toBe('PUM');
+  });
+});
+
+describe('metricLabel', () => {
+  it('is a short name for each metric of the contract', () => {
+    expect(metricLabel('temperature_c')).toBe('Temp');
+    expect(metricLabel('humidity_pct')).toBe('Humidity');
+    expect(metricLabel('co2_ppm')).toBe('CO₂');
+    expect(metricLabel('power_kw')).toBe('Power');
+  });
+
+  it("is the metric's own name for one the contract lacks, including names inherited from Object", () => {
+    expect(metricLabel('pressure_hpa')).toBe('pressure_hpa');
+    expect(metricLabel('constructor')).toBe('constructor');
   });
 });

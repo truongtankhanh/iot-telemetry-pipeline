@@ -13,6 +13,8 @@ export interface PagerProps {
   onPageSizeChange: (size: number) => void;
   /** What the rows are ("Rows", "Scenarios"): the range reads "Rows 26–50 of 312". */
   noun?: string;
+  /** The name of the page-size field ("Rows per page", "Cards per page"). */
+  sizeLabel?: string;
 }
 
 /**
@@ -28,6 +30,7 @@ export function Pager({
   onPageChange,
   onPageSizeChange,
   noun = 'Rows',
+  sizeLabel = 'Rows per page',
 }: PagerProps) {
   const count = pageCount(total, pageSize);
   const current = clampPage(page, count);
@@ -43,7 +46,7 @@ export function Pager({
         of <b>{total}</b>
       </span>
       <label className={styles.sizes}>
-        <span>Rows per page</span>
+        <span>{sizeLabel}</span>
         <select
           className={styles.select}
           value={pageSize}

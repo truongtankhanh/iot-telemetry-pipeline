@@ -27,6 +27,15 @@ export const STATUS_WORDS: Record<DeviceStatusKind, string> = {
   stopped: 'Stopped',
 };
 
+/** The tone of the pill that carries a state: a word and an icon go with it, so it is never colour alone. */
+export const STATUS_TONES = {
+  running: 'ok',
+  anomaly: 'warn',
+  silent: 'bad',
+  paused: 'unknown',
+  stopped: 'unknown',
+} as const satisfies Record<DeviceStatusKind, 'ok' | 'warn' | 'bad' | 'unknown'>;
+
 /** The order for "problems first": what needs attention, then what is not publishing, then what is well. */
 export const STATUS_ORDER: DeviceStatusKind[] = [
   'anomaly',

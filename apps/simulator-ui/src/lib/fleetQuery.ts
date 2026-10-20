@@ -31,6 +31,22 @@ export const SORT_KEYS: FleetSortKey[] = [
   'seen',
 ];
 
+export const SORT_LABELS: Record<FleetSortKey, string> = {
+  problems: 'Problems first',
+  device: 'Device id',
+  name: 'Name',
+  class: 'Class',
+  zone: 'Zone',
+  state: 'State',
+  seen: 'Last seen',
+};
+
+/** The kind of a device written for a person: `server_room` is "Server room". */
+export function kindLabel(kind: string): string {
+  const words = kind.replace(/[_-]+/g, ' ').trim();
+  return words === '' ? kind : words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export interface FleetQuery {
   /** Search text: matches the id, the name, the zone and the kind. */
   q: string;

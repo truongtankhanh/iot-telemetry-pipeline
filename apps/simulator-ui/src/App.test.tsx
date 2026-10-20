@@ -110,12 +110,12 @@ describe('navigation', () => {
     renderStudio();
     await userEvent.click(
       within(screen.getByRole('navigation', { name: 'Pages' })).getByRole('link', {
-        name: /Fleet/,
+        name: /Alerts/,
       }),
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Fleet' })).toBeInTheDocument();
-    expect(screen.getByText('Coming with SIM-05')).toBeInTheDocument();
-    expect(document.title).toBe('Fleet · Simulator Studio');
+    expect(screen.getByRole('heading', { level: 1, name: 'Alerts' })).toBeInTheDocument();
+    expect(screen.getByText('Coming with SIM-07')).toBeInTheDocument();
+    expect(document.title).toBe('Alerts · Simulator Studio');
   });
 
   it('moves focus to the page when the route changes, and marks the current page', async () => {
@@ -143,10 +143,15 @@ describe('navigation', () => {
     expect(within(nav).getByRole('link', { name: /Scenarios/ })).toBeInTheDocument();
   });
 
-  it('treats a path under a page as that page, and an unknown path as not found', () => {
-    const first = renderStudio({ path: '/fleet/dc-env-01' });
-    expect(screen.getByText('Coming with SIM-05')).toBeInTheDocument();
+  it('treats a path under a page that is not built as that page, one under a built page as the page, and an unknown path as not found', async () => {
+    const first = renderStudio({ path: '/alerts/7' });
+    expect(screen.getByText('Coming with SIM-07')).toBeInTheDocument();
     first.unmount();
+    const built = renderStudio({ path: '/fleet/dc-env-01' });
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Device fleet' }),
+    ).toBeInTheDocument();
+    built.unmount();
     renderStudio({ path: '/nowhere' });
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
   });
@@ -198,7 +203,9 @@ describe('the keyboard', () => {
   it('goes to a page with g then its letter', async () => {
     renderStudio();
     await userEvent.keyboard('gf');
-    expect(screen.getByRole('heading', { level: 1, name: 'Fleet' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Device fleet' }),
+    ).toBeInTheDocument();
     await userEvent.keyboard('go');
     expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
   });
@@ -237,7 +244,7 @@ describe('accessibility', () => {
     expect(await axeViolations(overview.container)).toEqual([]);
     overview.unmount();
 
-    const placeholder = renderStudio({ path: '/fleet' });
+    const placeholder = renderStudio({ path: '/alerts' });
     expect(await axeViolations(placeholder.container)).toEqual([]);
     placeholder.unmount();
 

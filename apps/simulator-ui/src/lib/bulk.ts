@@ -1,3 +1,16 @@
+/** A run on more devices than this asks first: "Stop all" on a hundred devices is not one click. */
+export const BULK_CONFIRM_ABOVE = 10;
+
+/** What a bulk action does to a device. */
+export type BulkAction = 'pause' | 'start' | 'stop';
+
+/** The words of each action, for the question before it, its progress and its result. */
+export const BULK_WORDS: Record<BulkAction, { verb: string; doing: string; done: string }> = {
+  pause: { verb: 'Pause', doing: 'Pausing', done: 'Paused' },
+  start: { verb: 'Start', doing: 'Starting', done: 'Started' },
+  stop: { verb: 'Stop', doing: 'Stopping', done: 'Stopped' },
+};
+
 /** What one item of a bulk run did. */
 export interface BulkResult {
   id: string;

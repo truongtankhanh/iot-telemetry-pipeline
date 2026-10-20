@@ -1,0 +1,55 @@
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.device {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.id {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+}
+
+.name {
+  display: block;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.reading {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.value {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  color: var(--text-secondary);
+}
+
+.metric {
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  color: var(--text-tertiary);
+}
+
+.none {
+  color: var(--text-tertiary);
+}

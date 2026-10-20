@@ -1,0 +1,175 @@
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.zone {
+  margin-bottom: 20px;
+}
+
+.zoneName {
+  margin: 0 0 10px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.zoneCount {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  font-weight: 500;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  min-width: 0;
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  border: 1px solid rgba(71, 215, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(120, 225, 255, 0.1),
+    var(--shadow-1);
+}
+
+/* The edge says the state, in a border style as well as a hue: a dashed edge is a device that is not publishing. */
+.card[data-state='anomaly'] {
+  border-color: rgba(255, 194, 61, 0.55);
+  box-shadow: var(--neon-warn);
+}
+
+.card[data-state='silent'] {
+  border-style: dashed;
+  border-color: rgba(255, 98, 128, 0.55);
+}
+
+.card[data-state='paused'],
+.card[data-state='stopped'] {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+/* The inspector is open on this card. */
+.card[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: var(--neon-accent);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.who {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.sub {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.reason {
+  margin: 0;
+  color: var(--warning);
+  font-weight: 500;
+}
+
+.readings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+.reading {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.reading svg {
+  align-self: center;
+}
+
+/* A numeral of 24 px and up may glow. */
+.value {
+  font-family: var(--font-ui);
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #e6fbff;
+  text-shadow:
+    0 0 8px rgba(71, 215, 255, 0.55),
+    0 0 18px rgba(71, 215, 255, 0.25);
+}
+
+.unit {
+  color: var(--text-secondary);
+}
+
+.metric {
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  color: var(--text-tertiary);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meta {
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.error {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-2);
+  border: 1px solid rgba(255, 98, 128, 0.45);
+  box-shadow: inset 2px 0 0 var(--danger);
+  background: var(--surface-0);
+}

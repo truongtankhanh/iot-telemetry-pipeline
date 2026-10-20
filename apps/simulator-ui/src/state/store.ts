@@ -30,6 +30,11 @@ export interface StudioState {
   /** Whether the icon rail is pinned open (a per-viewer preference, persisted by the app). */
   railPinned: boolean;
   paletteOpen: boolean;
+  /**
+   * How many modal sheets or dialogs are open (the inspector, the hold dialog). While there is one, the shell behind
+   * it is inert. A count and not a flag, so two that overlap for a moment do not release the shell early.
+   */
+  modalCount: number;
 
   applySnapshot(snapshot: Snapshot, at: number): void;
   setView(view: StateView, at: number): void;
@@ -38,6 +43,8 @@ export interface StudioState {
   setPublishRate(rate: number): void;
   setRailPinned(pinned: boolean): void;
   setPaletteOpen(open: boolean): void;
+  pushModal(): void;
+  popModal(): void;
 }
 
 export type StudioStore = StoreApi<StudioState>;
@@ -63,6 +70,7 @@ export function createStudioStore(initial: { railPinned?: boolean } = {}): Studi
     publishRate: 0,
     railPinned: initial.railPinned ?? false,
     paletteOpen: false,
+    modalCount: 0,
 
     applySnapshot: (snapshot, at) =>
       set((state) => {
@@ -90,5 +98,7 @@ export function createStudioStore(initial: { railPinned?: boolean } = {}): Studi
     setPublishRate: (publishRate) => set({ publishRate }),
     setRailPinned: (railPinned) => set({ railPinned }),
     setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+    pushModal: () => set((state) => ({ modalCount: state.modalCount + 1 })),
+    popModal: () => set((state) => ({ modalCount: Math.max(0, state.modalCount - 1) })),
   }));
 }

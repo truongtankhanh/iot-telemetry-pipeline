@@ -10,6 +10,9 @@
 
 .header {
   grid-column: 1 / -1;
+  /* The page scrolls under the header (the brief: "a fixed header"); Fleet's toolbar sticks just below it. */
+  position: sticky;
+  top: 0;
   z-index: 3;
   display: flex;
   align-items: center;
