@@ -13,16 +13,22 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/telemetry-contract/package.json ./packages/telemetry-contract/
 COPY apps/ingest/package.json ./apps/ingest/
 COPY apps/simulator/package.json ./apps/simulator/
+COPY apps/simulator-ui/package.json ./apps/simulator-ui/
 # The pnpm store is a cache mount: it is kept between builds and is not part of any layer.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile --store-dir /pnpm/store
 COPY turbo.json tsconfig.base.json ./
 COPY packages ./packages
 COPY apps ./apps
-RUN pnpm turbo run build --filter "@itp/simulator..."
+# The second filter builds Studio (and the contract it imports). A production build leaves out the internal
+# /foundations page; the packaged demo has neither its route nor its code.
+RUN pnpm turbo run build --filter "@itp/simulator..." --filter "@itp/simulator-ui..."
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm --filter @itp/simulator deploy --prod --legacy --store-dir /pnpm/store /out \
- && mkdir -p /out/registry && cp apps/ingest/config/devices.json /out/registry/
+ && mkdir -p /out/registry && cp apps/ingest/config/devices.json /out/registry/ \
+ && cp -r apps/simulator-ui/dist /out/ui
 
 FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+# The control server serves the built Studio from here (see STUDIO_DIR in apps/simulator/.env.example).
+ENV STUDIO_DIR=/app/ui
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 USER node

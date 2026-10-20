@@ -1,0 +1,406 @@
+/* The status language of frame 00: pill, chip, severity badge, node state and the data line. */
+
+/* ---- keyframes live here, with the rules that use them: CSS Modules rename them. ---- */
+@keyframes glowOk {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(61, 240, 174, 0.45),
+      0 0 6px rgba(61, 240, 174, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(61, 240, 174, 0.7),
+      0 0 16px rgba(61, 240, 174, 0.6);
+  }
+}
+
+@keyframes glowWarn {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 194, 61, 0.5),
+      0 0 8px rgba(255, 194, 61, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 194, 61, 0.9),
+      0 0 20px rgba(255, 194, 61, 0.7);
+  }
+}
+
+@keyframes glowSelected {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(149, 155, 255, 0.5),
+      0 0 8px rgba(149, 155, 255, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(149, 155, 255, 0.85),
+      0 0 20px rgba(149, 155, 255, 0.65);
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.45;
+  }
+  12% {
+    opacity: 1;
+  }
+  46% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+  53% {
+    opacity: 0.9;
+  }
+  57% {
+    opacity: 0.5;
+  }
+  60% {
+    opacity: 1;
+  }
+}
+
+@keyframes haloBreath {
+  0%,
+  100% {
+    stroke-opacity: 0.2;
+  }
+  50% {
+    stroke-opacity: 0.55;
+  }
+}
+
+/* ---- pill: a status in the header and wherever a dependency is shown ---- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--edge-flow);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.pill[data-tone='ok'] {
+  border-color: rgba(61, 240, 174, 0.4);
+  box-shadow: 0 0 10px rgba(61, 240, 174, 0.16);
+}
+
+.pill[data-tone='warn'] {
+  border-color: rgba(255, 194, 61, 0.45);
+  box-shadow: 0 0 10px rgba(255, 194, 61, 0.2);
+}
+
+.pill[data-tone='bad'] {
+  border-color: rgba(255, 98, 128, 0.45);
+  box-shadow: 0 0 10px rgba(255, 98, 128, 0.2);
+}
+
+/* Not known: a dashed border says so without colour. */
+.pill[data-tone='unknown'] {
+  border-style: dashed;
+  color: var(--text-secondary);
+}
+
+/* Old data: dashed and without light. The words stay readable (no opacity: it would drop their contrast). */
+.pill[data-stale='true'] {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.pill[data-stale='true'] .pillIcon {
+  filter: grayscale(0.7);
+}
+
+.pill[data-stale='true'] .detail {
+  color: var(--text-secondary);
+}
+
+.pillIcon {
+  flex: none;
+  border-radius: 50%;
+}
+
+.pill[data-tone='ok'] .pillIcon {
+  color: var(--success);
+}
+
+.pill[data-tone='warn'] .pillIcon {
+  color: var(--warning);
+}
+
+.pill[data-tone='bad'] .pillIcon {
+  color: var(--danger);
+}
+
+.pill[data-tone='unknown'] .pillIcon {
+  color: var(--text-tertiary);
+}
+
+.pillIcon[data-animated='true'][data-tone='ok'] {
+  animation: glowOk 2.6s ease-in-out infinite;
+}
+
+.pillIcon[data-animated='true'][data-tone='warn'] {
+  animation: glowWarn 1.2s ease-in-out infinite;
+}
+
+.pillIcon[data-animated='true'][data-tone='bad'] {
+  animation: flicker 2s steps(1, end) infinite;
+}
+
+.detail {
+  font-size: var(--fs-min);
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+/* ---- chip: a small label with a state, on a 12 % tint ---- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-1);
+  background: var(--surface-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.chip[data-tone='accent'] {
+  background: var(--tint-accent);
+  color: var(--accent);
+  box-shadow:
+    inset 0 0 0 1px rgba(149, 155, 255, 0.4),
+    0 0 8px rgba(149, 155, 255, 0.2);
+}
+
+.chip[data-tone='ok'] {
+  background: var(--tint-ok);
+  color: var(--success);
+  box-shadow:
+    inset 0 0 0 1px rgba(61, 240, 174, 0.4),
+    0 0 8px rgba(61, 240, 174, 0.2);
+}
+
+.chip[data-tone='warn'] {
+  background: var(--tint-warn);
+  color: var(--warning);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 194, 61, 0.45),
+    0 0 8px rgba(255, 194, 61, 0.22);
+}
+
+.chip[data-tone='bad'] {
+  background: var(--tint-bad);
+  color: var(--danger);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 98, 128, 0.45),
+    0 0 8px rgba(255, 98, 128, 0.22);
+}
+
+/* ---- severity badge: the label stays primary text, the hue is on the icon and the edge ---- */
+.severity {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px 0 6px;
+  border-radius: var(--radius-1);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.severity[data-severity='critical'] {
+  box-shadow:
+    inset 0 0 0 1px var(--sev-critical),
+    0 0 8px -2px var(--sev-critical);
+}
+
+.severity[data-severity='high'] {
+  box-shadow:
+    inset 0 0 0 1px var(--sev-high),
+    0 0 8px -2px var(--sev-high);
+}
+
+.severity[data-severity='medium'] {
+  box-shadow:
+    inset 0 0 0 1px var(--sev-medium),
+    0 0 8px -2px var(--sev-medium);
+}
+
+.severity[data-severity='low'] {
+  box-shadow:
+    inset 0 0 0 1px var(--sev-low),
+    0 0 8px -2px var(--sev-low);
+}
+
+.severity[data-severity='critical'] .severityIcon {
+  color: var(--sev-critical);
+}
+
+.severity[data-severity='high'] .severityIcon {
+  color: var(--sev-high);
+}
+
+.severity[data-severity='medium'] .severityIcon {
+  color: var(--sev-medium);
+}
+
+.severity[data-severity='low'] .severityIcon {
+  color: var(--sev-low);
+}
+
+/* ---- node state: the edge light is the state, in motion; border style, icon and word say it too ---- */
+.node {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 156px;
+  padding: 8px 12px;
+  border-radius: var(--radius-3);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.nodeText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nodeState {
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+}
+
+.node[data-state='healthy'] {
+  border-color: rgba(61, 240, 174, 0.5);
+  box-shadow: 0 0 10px rgba(61, 240, 174, 0.25);
+}
+
+.node[data-state='anomaly'] {
+  border-color: rgba(255, 194, 61, 0.55);
+  box-shadow: 0 0 12px rgba(255, 194, 61, 0.35);
+}
+
+.node[data-state='down'] {
+  border-style: dashed;
+  border-color: rgba(255, 98, 128, 0.55);
+  box-shadow: 0 0 12px rgba(255, 98, 128, 0.35);
+}
+
+/* Paused and silent stay dark: no light at all. */
+.node[data-state='paused'] {
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.node[data-state='selected'] {
+  border-color: var(--accent-line);
+  box-shadow: var(--neon-accent);
+}
+
+.node[data-state='healthy'] .nodeIcon {
+  color: var(--success);
+}
+
+.node[data-state='anomaly'] .nodeIcon {
+  color: var(--warning);
+}
+
+.node[data-state='down'] .nodeIcon {
+  color: var(--danger);
+}
+
+.node[data-state='selected'] .nodeIcon {
+  color: var(--accent);
+}
+
+.node[data-animated='true'][data-state='healthy'] {
+  animation: glowOk 3.2s ease-in-out infinite;
+}
+
+.node[data-animated='true'][data-state='anomaly'] {
+  animation: glowWarn 1.3s ease-in-out infinite;
+}
+
+.node[data-animated='true'][data-state='down'] {
+  animation: flicker 2.4s steps(1, end) infinite;
+}
+
+.node[data-animated='true'][data-state='selected'] {
+  animation: glowSelected 2.4s ease-in-out infinite;
+}
+
+/* ---- data line: light means energy is moving; a line that carries nothing is a dim dashed wire ---- */
+.line {
+  display: block;
+  overflow: visible;
+}
+
+.line [data-layer] {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.line[data-flowing='true'] [data-layer='halo'] {
+  stroke: var(--flow);
+  stroke-width: 6;
+  stroke-opacity: 0.2;
+}
+
+.line[data-flowing='true'] [data-layer='glow'] {
+  stroke: var(--flow);
+  stroke-width: 3;
+  stroke-opacity: 0.5;
+}
+
+.line[data-flowing='true'] [data-layer='core'] {
+  stroke: var(--flow-core);
+  stroke-width: 1.4;
+}
+
+.line[data-flowing='false'] [data-layer] {
+  stroke: var(--border-strong);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 4;
+}
+
+.line[data-flowing='false'] [data-layer='halo'],
+.line[data-flowing='false'] [data-layer='glow'] {
+  display: none;
+}
+
+.line[data-glowing='true'] [data-layer='halo'] {
+  animation: haloBreath 2.4s ease-in-out infinite;
+}

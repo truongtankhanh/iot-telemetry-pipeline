@@ -1,5 +1,6 @@
 import { METRIC_NAMES, type MetricName } from '@itp/telemetry-contract';
 import { STATUS_CODES } from 'node:http';
+import type { BrokerState } from './broker-link.ts';
 import type { AlertsFeed, IngestState, MetricsFeed } from './ingest-poller.ts';
 import type { Engine, EngineSnapshot } from './engine.ts';
 import { type ObservationDraft, type ObservationStore, PAGE_MAX } from './observation-store.ts';
@@ -49,6 +50,8 @@ export interface RoutesContext {
     metrics(): MetricsFeed;
   };
   config: { ingestUrl: string; consoleUrl: string | null };
+  /** The simulator's own connection to the MQTT broker. */
+  broker: { state(): BrokerState };
   /** Stores an observation made by a command (a scenario run) and tells the stream about it. */
   record(draft: ObservationDraft): void;
 }
@@ -59,6 +62,8 @@ export interface StateView {
   devices: DeviceSpec[];
   scenarios: string[];
   ingest: IngestState;
+  /** Whether this simulator is connected to the broker (ingest's own view is `ingest.broker`). */
+  broker: BrokerState;
   alerts: AlertsFeed;
   metrics: MetricsFeed;
   config: { ingestUrl: string; consoleUrl: string | null; intervalMs: number; simulated: boolean };
@@ -73,6 +78,7 @@ export function buildStateView(context: RoutesContext): StateView {
     devices: context.devices,
     scenarios: Object.keys(context.scenarios),
     ingest: context.ingest.state(),
+    broker: context.broker.state(),
     alerts: context.ingest.alerts(),
     metrics: context.ingest.metrics(),
     config: {

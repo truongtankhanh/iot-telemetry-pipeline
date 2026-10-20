@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ControlConfigError,
+  DEFAULT_STUDIO_DIR,
   type ControlFlags,
   isLoopbackHost,
   resolveControlConfig,
@@ -17,6 +18,7 @@ describe('resolveControlConfig defaults and sources', () => {
       port: 3200,
       ingestUrl: 'http://localhost:3100',
       consoleUrl: null,
+      studioDir: DEFAULT_STUDIO_DIR,
       allowNonLoopback: false,
     });
   });
@@ -161,5 +163,30 @@ describe('resolveControlConfig validation', () => {
 
   it('rejects a console URL that is not http or https', () => {
     assert.throws(() => resolve({ OCC_CONSOLE_URL: 'javascript:alert(1)' }), /OCC_CONSOLE_URL/);
+  });
+});
+
+describe('resolveControlConfig studio directory', () => {
+  it('defaults to the build of apps/simulator-ui', () => {
+    assert.ok(DEFAULT_STUDIO_DIR.endsWith('/apps/simulator-ui/dist'), DEFAULT_STUDIO_DIR);
+    assert.equal(resolve().studioDir, DEFAULT_STUDIO_DIR);
+  });
+
+  it('reads STUDIO_DIR and lets --studio-dir beat it', () => {
+    assert.equal(resolve({ STUDIO_DIR: '/app/ui' }).studioDir, '/app/ui');
+    assert.equal(
+      resolve({ STUDIO_DIR: '/app/ui' }, { studioDir: '/srv/studio' }).studioDir,
+      '/srv/studio',
+    );
+  });
+
+  it('makes a relative path absolute, so the server does not depend on where it was started', () => {
+    const dir = resolve({ STUDIO_DIR: 'build/ui' }).studioDir;
+    assert.ok(dir.startsWith('/'), dir);
+    assert.ok(dir.endsWith('/build/ui'), dir);
+  });
+
+  it('treats a blank value as not set', () => {
+    assert.equal(resolve({ STUDIO_DIR: '  ' }, { studioDir: '' }).studioDir, DEFAULT_STUDIO_DIR);
   });
 });

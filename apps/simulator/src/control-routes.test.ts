@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
+import { BrokerLink } from './broker-link.ts';
 import { systemClock } from './clock.ts';
 import {
   buildStateView,
@@ -37,6 +39,7 @@ async function setup(options: { started?: boolean; wallClock?: boolean } = {}) {
   const { engine, publisher } = setupEngine(wallClock ? { clock: systemClock } : {});
   if (started && !wallClock) await engine.start();
   const store = new ObservationStore();
+  const broker = new BrokerLink('mqtt://u:p@localhost:1883', true);
   const recorded: ObservationDraft[] = [];
   const context: RoutesContext = {
     engine,
@@ -45,6 +48,7 @@ async function setup(options: { started?: boolean; wallClock?: boolean } = {}) {
     store,
     ingest: INGEST,
     config: { ingestUrl: 'http://localhost:3100', consoleUrl: null },
+    broker,
     record: (draft) => recorded.push(draft),
   };
   const handle = createRoutes(context);
@@ -52,7 +56,7 @@ async function setup(options: { started?: boolean; wallClock?: boolean } = {}) {
     const url = new URL(path, 'http://localhost');
     return handle({ method, path: url.pathname, query: url.searchParams, body });
   };
-  return { engine, publisher, store, recorded, context, call };
+  return { engine, publisher, store, broker, recorded, context, call };
 }
 
 const view = (response: RouteResponse) => response.body as StateView;
@@ -94,6 +98,16 @@ describe('GET /api/state', () => {
       simulated: true,
     });
     assert.equal(state.observationCursor, 0);
+  });
+
+  it("reports the simulator's own broker connection, without credentials, and follows it", async () => {
+    const { call, broker } = await setup();
+    const connected = view(await call('GET', '/api/state')).broker;
+    assert.deepEqual(connected, { url: 'mqtt://localhost:1883', port: 1883, connected: true });
+
+    broker.setConnected(false);
+    assert.equal(view(await call('GET', '/api/state')).broker.connected, false);
+    assert.ok(!JSON.stringify(view(await call('GET', '/api/state'))).includes('u:p'));
   });
 
   it('is what buildStateView builds, which the stream sends as its first message', async () => {
@@ -533,5 +547,40 @@ describe('routing and errors', () => {
       body: undefined,
     });
     assertEnvelope(response, 500, /^Internal error$/);
+  });
+});
+
+describe('the state view and the fixture of the UI', () => {
+  // apps/simulator-ui types the state it reads against this file (a real GET /api/state body); if the
+  // simulator changes the keys of the state view, this fails until the file and the UI's types follow.
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../../simulator-ui/src/api/fixtures/state-view.json', import.meta.url),
+      'utf8',
+    ),
+  ) as Record<string, unknown>;
+  const keys = (value: unknown) => Object.keys(value as object).sort();
+
+  it('has the same keys, section by section', async () => {
+    const { context } = await setup();
+    const actual = buildStateView(context) as unknown as Record<string, unknown>;
+
+    assert.deepEqual(keys(actual), keys(fixture), 'the state view');
+    for (const section of ['engine', 'broker', 'ingest', 'alerts', 'metrics', 'config']) {
+      assert.deepEqual(keys(actual[section]), keys(fixture[section]), section);
+    }
+    const first = (view: Record<string, unknown>, section: string) =>
+      (view[section] as { devices: unknown[] }).devices[0];
+    assert.deepEqual(
+      keys(first(actual, 'engine')),
+      keys(first(fixture, 'engine')),
+      'engine.devices[0]',
+    );
+  });
+
+  it('describes the devices with the fields of the registry (the name is optional here)', async () => {
+    const { context } = await setup();
+    const fromFixture = keys((fixture.devices as unknown[])[0]).filter((key) => key !== 'name');
+    assert.deepEqual(keys(buildStateView(context).devices[0]), fromFixture);
   });
 });

@@ -1,5 +1,6 @@
 import { connectAsync } from 'mqtt';
 import { parseArgs } from 'node:util';
+import { BrokerLink } from './broker-link.ts';
 import { systemClock } from './clock.ts';
 import { ControlConfigError, isLoopbackHost, resolveControlConfig } from './control-config.ts';
 import { ControlServer } from './control-server.ts';
@@ -25,6 +26,8 @@ Control server (HTTP commands and an event stream; no authentication):
   --control-port <port> listen port (default CONTROL_PORT, else 3200)
   --ingest-url <url>    ingest to read alerts, readiness and metrics from
                         (default INGEST_URL, else http://localhost:3100)
+  --studio-dir <path>   built Studio UI to serve at / (default STUDIO_DIR, else
+                        ../simulator-ui/dist; run pnpm --filter @itp/simulator-ui build)
   --no-control          run without the control server, as a plain publisher
 `;
 
@@ -42,6 +45,7 @@ const { values } = parseArgs({
     'control-host': { type: 'string' },
     'control-port': { type: 'string' },
     'ingest-url': { type: 'string' },
+    'studio-dir': { type: 'string' },
     'no-control': { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
@@ -69,6 +73,7 @@ function resolveControl() {
         controlHost: values['control-host'],
         controlPort: values['control-port'],
         ingestUrl: values['ingest-url'],
+        studioDir: values['studio-dir'],
       },
     });
   } catch (error) {
@@ -83,6 +88,12 @@ const client = await connectAsync(values.broker, {
   protocolVersion: 5,
   clientId: `simulator-${process.pid}`,
 });
+// What Studio shows of this connection: the control server reports it and announces a change.
+const brokerLink = new BrokerLink(values.broker, client.connected);
+client.on('connect', () => brokerLink.setConnected(true));
+client.on('close', () => brokerLink.setConnected(false));
+client.on('offline', () => brokerLink.setConnected(false));
+client.on('end', () => brokerLink.setConnected(false));
 const engine = new Engine({
   devices,
   publisher: { publish: (topic, payload, options) => client.publishAsync(topic, payload, options) },
@@ -106,12 +117,19 @@ if (control) {
     devices,
     scenarios: SCENARIOS,
     poller: new IngestPoller({ baseUrl: control.ingestUrl, clock: systemClock }),
+    broker: brokerLink,
+    studioDir: control.studioDir,
     config: control,
   });
   try {
-    const { address, port } = await controlServer.listen();
+    const { address, port, studio } = await controlServer.listen();
     const host = address.includes(':') ? `[${address}]` : address;
     console.log(`Control server on http://${host}:${port}, reading ingest at ${control.ingestUrl}`);
+    console.log(
+      studio
+        ? `Studio UI: http://${host}:${port}/`
+        : 'Studio UI: not built (run pnpm --filter @itp/simulator-ui build)',
+    );
     if (!isLoopbackHost(control.host)) {
       console.log(
         `  warning: the control API has no authentication and listens on ${control.host}`,

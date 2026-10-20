@@ -32,6 +32,7 @@ pnpm --filter @itp/simulator start -- --scenario server-room-overheat
 | `--control-host <addr>` | Control server address (default `CONTROL_HOST`, else `127.0.0.1`); see [Control server](#control-server) |
 | `--control-port <port>` | Control server port (default `CONTROL_PORT`, else `3200`)                                                |
 | `--ingest-url <url>`    | Ingest the control server reads (default `INGEST_URL`, else `http://localhost:3100`)                     |
+| `--studio-dir <path>`   | Directory with the built Studio UI to serve at `/` (default `STUDIO_DIR`, else `apps/simulator-ui/dist`) |
 | `--no-control`          | Run without the control server, as a plain publisher                                                     |
 
 `server-room-overheat` opens the "Server room temperature high" alert about 25 s in and clears it
@@ -85,6 +86,18 @@ change), `published` (a message the broker accepted), `tick-error`, `ingest` (th
 changed), `alerts` (the alerts as Studio saw them), `metrics` (a read of `/metrics`) and
 `observation` (an entry of the observation store).
 
+**Studio's files.** The same server serves the built UI of Simulator Studio (`apps/simulator-ui`; the package arrives with the next
+parts of SIM-04): `GET` and `HEAD` for anything outside `/api/`. A path with a file extension is a file (`404` when it is not one, never the app's page);
+any other path is a route of the single-page app and gets `index.html`, so a reload on `/fleet` works. Files under
+`/assets/` are named by content hash and cached for good; `index.html` is revalidated. HTML carries a
+Content-Security-Policy (everything from this origin, nothing inline, no framing), and nothing outside the directory
+can be read (`..` in any spelling, dotfiles, a symlink that leaves it). If the directory is not built the API works
+as before, the start-up output says `Studio UI: not built`, and `GET /` answers with how to build it.
+
+**The broker.** `GET /api/state` has `broker`: the simulator's own connection to the MQTT broker as
+`{ url, port, connected }`, with the credentials, path and query of `--broker` / `MQTT_URL` left out. A change is
+announced on the stream as a `broker` event.
+
 **What it reads from ingest**, about once a second, each request with an 800 ms timeout:
 `GET /api/ready`, `GET /api/alerts?limit=100` and `GET /metrics` (eight `telemetry_*` and `alert*`
 series, listed in `src/prometheus-text.ts`). `/api/ready` decides the state: `ready`, `not-ready`
@@ -125,10 +138,12 @@ the file.
 | `INGEST_URL`                 | `http://localhost:3100`                                 | `start`          |
 | `OCC_CONSOLE_URL`            | empty (no incident link)                                | `start`          |
 | `CONTROL_ALLOW_NON_LOOPBACK` | unset; only the exact value `true` allows               | `start`          |
+| `STUDIO_DIR`                 | `apps/simulator-ui/dist`                                | `start`          |
 
 `OCC_CONSOLE_URL` is the base URL of the command center console; the control server carries it to
 the UI, which builds the incident link from it (the plain id is shown without it). An empty value
-in the file counts as not set.
+in the file counts as not set. `STUDIO_DIR` is the directory of the built UI; a relative path is taken from where
+the simulator was started, and a directory that is not built is not an error (see above).
 
 If you moved a Compose port in the root `.env`, use the same port here.
 
@@ -162,6 +177,8 @@ src/
   alert-observer.ts  turns those reads into the times Studio first saw things happen
   observation-store.ts  the last 5,000 observations of the session, and a ring buffer
   prometheus-text.ts parses the /metrics text and keeps the series Studio forwards
+  static-files.ts    resolves a request to a file of the built UI: routes, assets, cache and policy headers
+  broker-link.ts     whether the simulator is connected to the MQTT broker, as the control server reports it
   test-support.ts    fakes shared by the control server's tests (not a test itself)
   *.test.ts          next to the code they test
 ```

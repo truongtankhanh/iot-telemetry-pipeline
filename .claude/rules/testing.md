@@ -3,6 +3,7 @@ paths:
   - '**/*.spec.ts'
   - '**/*.e2e-spec.ts'
   - '**/*.test.ts'
+  - '**/*.test.tsx'
   - '**/*.test.mjs'
   - 'apps/ingest/test/**'
 ---
@@ -17,9 +18,10 @@ paths:
 | `apps/ingest/test`            | Jest, in band          | `*.e2e-spec.ts`, helpers in `test/support/` |
 | `packages/telemetry-contract` | Vitest                 | `*.test.ts`                                 |
 | `apps/simulator`              | `node --test`          | `*.test.ts`                                 |
+| `apps/simulator-ui`           | Vitest (jsdom)         | `*.test.ts(x)` next to the code, `scripts/` |
 | `scripts/`                    | `node --test`          | `*.test.mjs`                                |
 
-Three runners are kept on purpose. Jest needs `NODE_OPTIONS=--experimental-vm-modules`; use the package scripts.
+Three runners are kept on purpose (Studio uses the contract's Vitest, with its own jsdom config and setup file). Jest needs `NODE_OPTIONS=--experimental-vm-modules`; use the package scripts.
 
 ## Rules
 

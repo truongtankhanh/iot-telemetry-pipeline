@@ -161,3 +161,33 @@ the way, so that SIM-04 onward does not have to infer it:
 - **Ingest metric names are copied, not shared.** The contract package does not export them; the list is `FORWARDED_METRICS` in
   [prometheus-text.ts](../../apps/simulator/src/prometheus-text.ts), noted beside the metric table in
   [operations.md](../operations.md#metrics). Nothing checks it against ingest.
+
+## Amendment, 2026-10-20: Studio shell as built (SIM-04)
+
+The package `apps/simulator-ui` and the shell around the pages are in place (header, navigation, command palette, the Overview's
+connection card, the internal Foundations page); every other page opens a placeholder that names the ticket that builds it. What was
+decided on the way, so that SIM-05 onward does not have to infer it:
+
+- **The control server serves the build** ([static-files.ts](../../apps/simulator/src/static-files.ts)). `GET /` and any path that is not `/api` and not a file answer with `index.html`; files under
+  `/assets/` carry a content hash and are cached for good. A strict `Content-Security-Policy` is sent on the static files. The directory
+  is `STUDIO_DIR` (default `apps/simulator-ui/dist`, `/app/ui` in the image). A directory that is not built is not an error: the API
+  works, `start` prints a hint, and no script (`bench`, `test`, `build` of the simulator) needs the UI built.
+- **One origin, so no CORS.** In development Vite proxies `/api` (the event stream included) to the simulator; in the demo the simulator
+  serves both. The control API still sends no CORS header.
+- **`GET /api/state` reports the broker** (`broker: { url, port, connected }`, fed by the MQTT client) and the stream has a `broker`
+  event. The header pills need it; the UI keeps no second source. `src/api/fixtures/state-view.json` is the shape the UI is written
+  against, and a test in `apps/simulator` fails if the server's `StateView` and that fixture drift apart.
+- **The Command Center pill is inferred, not probed.** Studio does not call the command center. Ingest reports `alertSink` (`none` or
+  `ops-command-center`) on `/api/ready`, and an alert whose delivery failed says the sink is not taking alerts; the pill shows "not
+  configured", "delivery failing" or nothing to add. While ingest does not answer, the last sink it reported is shown dimmed.
+- **State management stays small.** One vanilla Zustand store per window, fed by the event stream; `snapshot` replaces the view, the
+  slice events replace their slice, and a `state` event (an operator changed something) triggers one debounced `GET /api/state` instead
+  of a second copy of the engine's rules in the browser. `published` only feeds a rate. React Router is used as plain `<Routes>`: nothing
+  is fetched per route, because the stream is the data. No query library.
+- **Foundations is for people who build Studio.** `/foundations` and its code exist in development and tests and are left out of a
+  production build unless `VITE_STUDIO_FOUNDATIONS=true` is set at build time (a literal `define`, so the bundler drops the lazy import).
+- **Compose lifts the loopback guard inside the container only.** The `demo` simulator listens on `0.0.0.0` with
+  `CONTROL_ALLOW_NON_LOOPBACK=true`, and the host side of the port is `127.0.0.1:${STUDIO_HOST_PORT:-3200}`. This is the case the SIM-03
+  amendment announced; the demo posture (no authentication) is unchanged.
+- **Palette actions are listed, not run.** Pause, resume and the scenario runs appear in search with "Available from the Overview
+  (SIM-09)" and do nothing until that ticket gives them a place to confirm.

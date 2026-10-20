@@ -1,0 +1,192 @@
+/* Tables and the pager. A row lights up under the pointer; the page buttons are lit when current. */
+.wrap {
+  background: var(--surface-1);
+  border: 1px solid rgba(71, 215, 255, 0.12);
+  border-radius: var(--radius-3);
+  box-shadow:
+    inset 0 1px 0 rgba(120, 225, 255, 0.1),
+    var(--shadow-1);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+}
+
+.table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  vertical-align: middle;
+  transition: background 0.12s;
+}
+
+.table th[data-align='end'],
+.table td[data-align='end'] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A row that opens something shows it: a pointer, and a light under it. Hover never changes its height. */
+.row[data-clickable='true'] {
+  cursor: pointer;
+}
+
+.row:hover td,
+.row:focus-within td,
+.row[data-demo='hover'] td {
+  background: rgba(71, 215, 255, 0.09);
+  color: var(--text-primary);
+}
+
+.row:hover td:first-child,
+.row:focus-within td:first-child,
+.row[data-demo='hover'] td:first-child {
+  box-shadow: inset 2px 0 0 var(--flow);
+}
+
+/* Selected keeps the indigo tint and an indigo bar, and does not change on hover. */
+.row[aria-current='true'] td,
+.row[aria-current='true']:hover td {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.row[aria-current='true'] td:first-child,
+.row[aria-current='true']:hover td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: -2px;
+}
+
+/* A quiet action appears on hover and on keyboard focus. */
+.rowAction {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.row:hover .rowAction,
+.row:focus-within .rowAction,
+.row[data-demo='hover'] .rowAction {
+  opacity: 1;
+}
+
+.empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* ---- pager ---- */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(71, 215, 255, 0.14);
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.range {
+  font-variant-numeric: tabular-nums;
+}
+
+.range b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.sizes {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.select {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius-2);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.select:hover {
+  border-color: rgba(71, 215, 255, 0.6);
+  box-shadow: 0 0 8px rgba(71, 215, 255, 0.18);
+}
+
+.pages {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.page {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius-2);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.page:hover:not(:disabled):not([aria-current='page']),
+.page[data-demo='hover'] {
+  background: rgba(71, 215, 255, 0.1);
+  border-color: rgba(71, 215, 255, 0.45);
+  color: var(--text-primary);
+  box-shadow: 0 0 8px rgba(71, 215, 255, 0.25);
+}
+
+/* The current page is lit in indigo. */
+.page[aria-current='page'] {
+  background: rgba(149, 155, 255, 0.2);
+  border-color: var(--accent-line);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: var(--neon-accent);
+}
+
+.page:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.gap {
+  color: var(--text-tertiary);
+  padding: 0 2px;
+}

@@ -1,5 +1,7 @@
+import { createReadStream } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import type { BrokerLink } from './broker-link.ts';
 import type { ControlConfig } from './control-config.ts';
 import {
   buildStateView,
@@ -14,6 +16,7 @@ import { EventStream, type EventStreamOptions } from './event-stream.ts';
 import type { IngestPoller } from './ingest-poller.ts';
 import { type ObservationDraft, ObservationStore, RingBuffer } from './observation-store.ts';
 import type { DeviceSpec } from './signals.ts';
+import { resolveStatic, studioIsBuilt } from './static-files.ts';
 
 /** Largest request body accepted; the biggest legitimate one is an anomaly, a few hundred bytes. */
 export const MAX_BODY_BYTES = 16 * 1024;
@@ -28,6 +31,13 @@ export interface ControlServerOptions {
   /** Owned by the server: it starts it when it listens and stops it when it closes. */
   poller: IngestPoller;
   config: Pick<ControlConfig, 'host' | 'port' | 'ingestUrl' | 'consoleUrl'>;
+  /** The simulator's own connection to the MQTT broker, reported in the state and on the stream. */
+  broker: BrokerLink;
+  /**
+   * The directory with the built Studio UI. Served for `GET` and `HEAD` outside `/api/`; without it
+   * (or with a directory that is not built) the API works and every other path is a `404`.
+   */
+  studioDir?: string;
   store?: ObservationStore;
   /** Wall clock for the time of an observation. Not the engine's clock, which may be simulated. */
   now?: () => number;
@@ -100,6 +110,7 @@ export class ControlServer {
       store: this.store,
       ingest: options.poller,
       config: { ingestUrl: options.config.ingestUrl, consoleUrl: options.config.consoleUrl },
+      broker: options.broker,
       // A command that has done its work must not fail because the timeline could not note it.
       record: this.safely('record', (draft: ObservationDraft) => this.observe(draft)),
     };
@@ -109,9 +120,10 @@ export class ControlServer {
 
   /**
    * Binds the address, starts forwarding the engine's events and starts polling ingest. Rejects with
-   * a message that names the settings to change when the address cannot be used.
+   * a message that names the settings to change when the address cannot be used. `studio` says
+   * whether the UI directory holds a build, so the caller can tell the user.
    */
-  async listen(): Promise<AddressInfo> {
+  async listen(): Promise<AddressInfo & { studio: boolean }> {
     const { host, port } = this.options.config;
     const detach = this.attach();
     this.detach = detach;
@@ -134,7 +146,11 @@ export class ControlServer {
     }
     this.server.on('error', (error) => this.log(`control server: ${String(error)}`));
     void this.options.poller.start();
-    return this.server.address() as AddressInfo;
+    const { studioDir } = this.options;
+    return {
+      ...(this.server.address() as AddressInfo),
+      studio: studioDir !== undefined && studioIsBuilt(studioDir),
+    };
   }
 
   /** Stops polling and forwarding, ends the streams and closes the listener. */
@@ -172,7 +188,7 @@ export class ControlServer {
 
   /** Puts the listeners on the engine and the poller; returns the function that takes them off. */
   private attach(): () => void {
-    const { engine, poller } = this.options;
+    const { engine, poller, broker } = this.options;
 
     const onState = this.safely('state', (change: StateChange) => {
       this.stream.send('state', change);
@@ -196,6 +212,8 @@ export class ControlServer {
     const onObservation = this.safely('observation', (draft: ObservationDraft, at: string) =>
       this.observe(draft, at),
     );
+    const onBroker = this.safely('broker', (state) => this.stream.send('broker', state));
+    broker.on('change', onBroker);
     poller.on('ingest', onIngest);
     poller.on('alerts', onAlerts);
     poller.on('metrics', onMetrics);
@@ -209,6 +227,7 @@ export class ControlServer {
       poller.off('alerts', onAlerts);
       poller.off('metrics', onMetrics);
       poller.off('observation', onObservation);
+      broker.off('change', onBroker);
     };
   }
 
@@ -240,6 +259,12 @@ export class ControlServer {
     const method = req.method ?? 'GET';
 
     if (method === 'GET' && url.pathname === '/api/stream') return this.openStream(res);
+
+    const { studioDir } = this.options;
+    const isApi = url.pathname === '/api' || url.pathname.startsWith('/api/');
+    if (studioDir !== undefined && !isApi && (method === 'GET' || method === 'HEAD')) {
+      return this.serveStudio(res, method, studioDir, url.pathname);
+    }
 
     let body: unknown;
     if (method === 'POST' || method === 'PUT' || method === 'DELETE') {
@@ -303,6 +328,24 @@ export class ControlServer {
         }
       });
     });
+  }
+
+  /** The built UI: a file, the app's `index.html` for one of its routes, or a `404`. */
+  private serveStudio(
+    res: ServerResponse,
+    method: string,
+    studioDir: string,
+    pathname: string,
+  ): void {
+    const result = resolveStatic(studioDir, pathname);
+    res.writeHead(result.status, result.headers);
+    if (method === 'HEAD' || result.file === undefined) {
+      res.end(method === 'HEAD' ? undefined : result.body);
+      return;
+    }
+    createReadStream(result.file)
+      .on('error', () => res.destroy())
+      .pipe(res);
   }
 
   private openStream(res: ServerResponse): void {

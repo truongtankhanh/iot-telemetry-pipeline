@@ -1,0 +1,230 @@
+{
+  "engine": {
+    "running": true,
+    "simulated": true,
+    "nowMs": 1792487680000,
+    "elapsedS": 10,
+    "intervalMs": 2000,
+    "published": 36,
+    "devices": [
+      {
+        "id": "dc-env-01",
+        "state": "running",
+        "intervalMs": 2000,
+        "seq": 6,
+        "holds": {}
+      },
+      {
+        "id": "dc-env-02",
+        "state": "running",
+        "intervalMs": 2000,
+        "seq": 6,
+        "holds": {}
+      },
+      {
+        "id": "lib-air-01",
+        "state": "running",
+        "intervalMs": 2000,
+        "seq": 6,
+        "holds": {}
+      },
+      {
+        "id": "lha-air-01",
+        "state": "running",
+        "intervalMs": 2000,
+        "seq": 6,
+        "holds": {
+          "co2_ppm": 1450
+        }
+      },
+      {
+        "id": "stu-air-01",
+        "state": "running",
+        "intervalMs": 2000,
+        "seq": 6,
+        "holds": {}
+      },
+      {
+        "id": "hub-power-01",
+        "state": "paused",
+        "intervalMs": 2000,
+        "seq": 6,
+        "holds": {}
+      }
+    ],
+    "anomalies": [
+      {
+        "id": "a1",
+        "anomaly": {
+          "deviceId": "dc-env-01",
+          "metric": "temperature_c",
+          "value": 29.2,
+          "startAt": 5,
+          "duration": 60
+        }
+      }
+    ]
+  },
+  "devices": [
+    {
+      "id": "dc-env-01",
+      "kind": "server_room",
+      "zoneCode": "BLD-DC",
+      "name": "Data center — row A",
+      "metrics": ["temperature_c", "humidity_pct"]
+    },
+    {
+      "id": "dc-env-02",
+      "kind": "server_room",
+      "zoneCode": "BLD-DC",
+      "name": "Data center — row B",
+      "metrics": ["temperature_c", "humidity_pct"]
+    },
+    {
+      "id": "lib-air-01",
+      "kind": "indoor_air",
+      "zoneCode": "BLD-LIB",
+      "name": "Library reading room",
+      "metrics": ["co2_ppm", "temperature_c", "humidity_pct"]
+    },
+    {
+      "id": "lha-air-01",
+      "kind": "indoor_air",
+      "zoneCode": "BLD-LHA",
+      "name": "Lecture Hall A",
+      "metrics": ["co2_ppm", "temperature_c"]
+    },
+    {
+      "id": "stu-air-01",
+      "kind": "indoor_air",
+      "zoneCode": "BLD-STU",
+      "name": "Student Center hall",
+      "metrics": ["co2_ppm", "temperature_c"]
+    },
+    {
+      "id": "hub-power-01",
+      "kind": "power_meter",
+      "zoneCode": "BLD-HUB",
+      "name": "Innovation Hub main feed",
+      "metrics": ["power_kw"]
+    }
+  ],
+  "scenarios": ["server-room-overheat", "crowded-lecture"],
+  "ingest": {
+    "status": "ready",
+    "database": "up",
+    "broker": "up",
+    "alertSink": "ops-command-center",
+    "detail": null,
+    "since": "2026-10-20T09:14:30.000Z",
+    "lastCheckedAt": "2026-10-20T09:14:31.000Z"
+  },
+  "broker": {
+    "url": "mqtt://localhost:1883",
+    "port": 1883,
+    "connected": true
+  },
+  "alerts": {
+    "alerts": [
+      {
+        "id": "7",
+        "deviceId": "dc-env-01",
+        "ruleId": "server-room-hot",
+        "metric": "temperature_c",
+        "severity": "high",
+        "title": "Server room temperature high",
+        "status": "open",
+        "openedAt": "2026-10-20T09:14:35.000Z",
+        "openedValue": 29.3,
+        "clearedAt": null,
+        "clearedValue": null,
+        "externalRef": "c3a1d0f2-5b7e-4c1a-9a43-2f6e0d9b8a11",
+        "deliveryStatus": "delivered",
+        "deliveryAttempts": 1,
+        "deliveryError": null,
+        "preexisting": false,
+        "observed": {
+          "openedAt": "2026-10-20T09:14:31.000Z",
+          "clearedAt": null,
+          "delivered": {
+            "opened": "2026-10-20T09:14:31.000Z",
+            "cleared": null
+          },
+          "incident": "2026-10-20T09:14:31.000Z"
+        }
+      }
+    ],
+    "lastOkAt": "2026-10-20T09:14:31.000Z",
+    "stale": false
+  },
+  "metrics": {
+    "samples": [
+      {
+        "name": "telemetry_messages_total",
+        "labels": {
+          "result": "accepted"
+        },
+        "value": 1520
+      },
+      {
+        "name": "telemetry_messages_total",
+        "labels": {
+          "result": "rejected"
+        },
+        "value": 3
+      },
+      {
+        "name": "telemetry_rejections_total",
+        "labels": {
+          "reason": "future"
+        },
+        "value": 3
+      },
+      {
+        "name": "telemetry_readings_total",
+        "labels": {
+          "result": "stored"
+        },
+        "value": 3040
+      },
+      {
+        "name": "telemetry_sequence_gaps_total",
+        "labels": {},
+        "value": 0
+      },
+      {
+        "name": "telemetry_ingest_lag_seconds_sum",
+        "labels": {},
+        "value": 41.25
+      },
+      {
+        "name": "telemetry_ingest_lag_seconds_count",
+        "labels": {},
+        "value": 1520
+      },
+      {
+        "name": "alerts_transitions_total",
+        "labels": {
+          "transition": "opened"
+        },
+        "value": 1
+      },
+      {
+        "name": "alert_deliveries_total",
+        "labels": {
+          "result": "delivered"
+        },
+        "value": 1
+      }
+    ],
+    "lastOkAt": "2026-10-20T09:14:31.000Z",
+    "stale": false
+  },
+  "config": {
+    "ingestUrl": "http://localhost:3100",
+    "consoleUrl": null,
+    "intervalMs": 2000,
+    "simulated": true
+  },
+  "observationCursor": 0
+}
