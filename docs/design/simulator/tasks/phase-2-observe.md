@@ -6,6 +6,7 @@ change it.
 ## SIM-05: Device fleet and inspector
 
 - **Depends on:** SIM-04
+- **Status:** Not started
 - **Frames:** 01, 02, 18
 
 ### Scope
@@ -100,6 +101,7 @@ feat(simulator-ui): add the device fleet, table at scale and inspector
 ## SIM-06: Topology
 
 - **Depends on:** SIM-04
+- **Status:** Not started
 - **Frames:** 04, 10
 
 ### Scope
@@ -196,6 +198,7 @@ Record React Flow's licence and bundle cost in the pull request.
 ## SIM-07: Alerts
 
 - **Depends on:** SIM-04
+- **Status:** Not started
 - **Frames:** 13
 
 ### Scope

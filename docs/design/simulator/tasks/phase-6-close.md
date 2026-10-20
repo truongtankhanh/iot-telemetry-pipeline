@@ -5,6 +5,7 @@ Part of the [implementation order](../implementation-order.md).
 ## SIM-22: Docs and accessibility pass
 
 - **Depends on:** SIM-15, SIM-21
+- **Status:** Not started
 - **Frames:** all
 
 ### Scope

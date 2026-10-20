@@ -5,6 +5,7 @@ Part of the [implementation order](../implementation-order.md).
 ## SIM-13: Event stream
 
 - **Depends on:** SIM-04
+- **Status:** Not started
 - **Frames:** 06
 
 ### Scope
@@ -89,6 +90,7 @@ feat(simulator-ui): add the event stream with republish
 ## SIM-14: Guided demo and presenter mode
 
 - **Depends on:** SIM-08, SIM-09
+- **Status:** Not started
 - **Frames:** 08
 
 ### Scope
@@ -167,6 +169,7 @@ feat(simulator-ui): add the guided demo and presenter mode
 ## SIM-15: Analytics and the benchmark
 
 - **Depends on:** SIM-03
+- **Status:** Not started
 - **Frames:** 09
 
 ### Scope

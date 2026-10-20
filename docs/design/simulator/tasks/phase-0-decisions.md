@@ -6,6 +6,7 @@ Part of the [implementation order](../implementation-order.md).
 
 - **Depends on:** SIM-01 (the [brief](../brief.md) and the [mockups](../mockups/))
 - **Type:** Decision
+- **Status:** Done 2026-10-19 (merged with the design in PR #46, 2026-10-20)
 
 ### Scope
 

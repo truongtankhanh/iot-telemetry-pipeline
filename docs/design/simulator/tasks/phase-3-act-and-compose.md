@@ -6,6 +6,7 @@ alone.
 ## SIM-08: Scenarios
 
 - **Depends on:** SIM-05
+- **Status:** Not started
 - **Frames:** 03
 
 ### Scope
@@ -100,6 +101,7 @@ feat(simulator-ui): add the scenario library with expected alerts and paging
 ## SIM-09: Overview
 
 - **Depends on:** SIM-06, SIM-07, SIM-08
+- **Status:** Not started
 - **Frames:** 11
 
 ### Scope
@@ -188,6 +190,7 @@ feat(simulator-ui): add the Overview with live topology, alerts, controls and ev
 ## SIM-10: Simulation lab workspace
 
 - **Depends on:** SIM-06, SIM-08
+- **Status:** Not started
 - **Frames:** 12, 19
 
 ### Scope
@@ -284,6 +287,7 @@ feat(simulator-ui): add the Simulation lab workspace with scale handling
 ## SIM-11: Timeline editor and custom scenarios
 
 - **Depends on:** SIM-08
+- **Status:** Not started
 - **Frames:** 05
 
 ### Scope
@@ -375,6 +379,7 @@ feat(simulator-ui): add the timeline editor and custom scenarios
 ## SIM-12: Fault injection
 
 - **Depends on:** SIM-02, SIM-10
+- **Status:** Not started
 - **Frames:** 07
 
 ### Scope
