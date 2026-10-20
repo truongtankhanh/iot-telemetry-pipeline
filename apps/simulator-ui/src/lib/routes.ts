@@ -178,10 +178,9 @@ const ROUTES: AppRoute[] = [
 /**
  * `/foundations` is for the people who build Studio: it exists in development and in tests, and is left
  * out of a production build unless `VITE_STUDIO_FOUNDATIONS=true` is set at build time, so the packaged
- * demo has neither the route nor its code.
+ * demo has neither the route nor its code. (`__FOUNDATIONS__` is a constant `vite.config.ts` defines.)
  */
-export const FOUNDATIONS_ENABLED =
-  !import.meta.env.PROD || import.meta.env.VITE_STUDIO_FOUNDATIONS === 'true';
+export const FOUNDATIONS_ENABLED: boolean = __FOUNDATIONS__;
 
 export function appRoutes(options: { foundations?: boolean } = {}): AppRoute[] {
   const foundations = options.foundations ?? FOUNDATIONS_ENABLED;

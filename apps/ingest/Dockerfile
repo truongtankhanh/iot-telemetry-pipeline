@@ -13,6 +13,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/telemetry-contract/package.json ./packages/telemetry-contract/
 COPY apps/ingest/package.json ./apps/ingest/
 COPY apps/simulator/package.json ./apps/simulator/
+COPY apps/simulator-ui/package.json ./apps/simulator-ui/
 # The pnpm store is a cache mount: it is kept between builds and is not part of any layer.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile --store-dir /pnpm/store
 COPY turbo.json tsconfig.base.json ./

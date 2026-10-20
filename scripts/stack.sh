@@ -3,7 +3,8 @@
 #
 #   scripts/stack.sh up        start them (waits until ready) and make sure `telemetry_test` exists
 #   scripts/stack.sh demo      the whole demo in containers: also builds and starts the ingest
-#                              service and a simulator (foreground; Ctrl+C stops it)
+#                              service and a simulator (foreground; Ctrl+C stops it); Simulator
+#                              Studio is then at http://localhost:$STUDIO_HOST_PORT (3200)
 #   scripts/stack.sh demo-down stop and remove only the demo's ingest and simulator containers;
 #                              PostgreSQL and Mosquitto keep running
 #   scripts/stack.sh observe   start Prometheus and Grafana (profile `observe`, detached) on the shipped
@@ -14,8 +15,8 @@
 #                              included; the database volume is kept
 #   scripts/stack.sh restart   down, then up
 #
-# Host ports come from POSTGRES_HOST_PORT / MQTT_HOST_PORT (and, for `observe`, PROMETHEUS_HOST_PORT /
-# GRAFANA_HOST_PORT) in `.env` (see .env.example).
+# Host ports come from POSTGRES_HOST_PORT / MQTT_HOST_PORT / STUDIO_HOST_PORT (and, for `observe`,
+# PROMETHEUS_HOST_PORT / GRAFANA_HOST_PORT) in `.env` (see .env.example).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -32,6 +33,13 @@ up() {
 }
 
 demo() {
+  # `up` stays in the foreground and prints container logs, so say where Studio is before it starts.
+  # The port is the one Compose will publish: STUDIO_HOST_PORT from the environment or the root `.env`.
+  local port="${STUDIO_HOST_PORT:-}"
+  if [ -z "$port" ] && [ -f .env ]; then
+    port="$(sed -n 's/^STUDIO_HOST_PORT=//p' .env | tail -n 1)"
+  fi
+  echo "Simulator Studio will be at http://localhost:${port:-3200} once the simulator is up"
   docker compose --profile demo up --build
 }
 

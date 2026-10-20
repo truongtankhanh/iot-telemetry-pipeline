@@ -4,7 +4,7 @@
 # With demo traffic:  docker compose --profile demo up --build
 # Delivering alerts to ops-command-center needs its Keycloak token: see the README.
 # Host ports can be moved in the root `.env` (copy .env.example): POSTGRES_HOST_PORT (5433),
-# MQTT_HOST_PORT (1883). Start/stop only PostgreSQL and Mosquitto with `pnpm docker:up|down|restart`.
+# MQTT_HOST_PORT (1883), STUDIO_HOST_PORT (3200, Simulator Studio of the demo). Start/stop only PostgreSQL and Mosquitto with `pnpm docker:up|down|restart`.
 # Prometheus and Grafana on the shipped rules and dashboard (demo only): `pnpm docker:observe`, or add
 # `--profile observe`; their ports are PROMETHEUS_HOST_PORT (9090) and GRAFANA_HOST_PORT (3000).
 name: iot-telemetry-pipeline
@@ -67,6 +67,15 @@ services:
       context: .
       dockerfile: apps/simulator/Dockerfile
     command: ['--broker', 'mqtt://mosquitto:1883', '--scenario', 'server-room-overheat']
+    environment:
+      # Simulator Studio and its control API, which has no authentication. Inside the container the server must
+      # listen on every interface for the published port to reach it, so the non-loopback guard is lifted
+      # here (CONTROL_ALLOW_NON_LOOPBACK); what keeps it private is the port below, published on 127.0.0.1 only.
+      CONTROL_HOST: 0.0.0.0
+      CONTROL_ALLOW_NON_LOOPBACK: 'true'
+      INGEST_URL: http://ingest:3100
+    ports:
+      - '127.0.0.1:${STUDIO_HOST_PORT:-3200}:3200'
     depends_on:
       ingest:
         condition: service_healthy

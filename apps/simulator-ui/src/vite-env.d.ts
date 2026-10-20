@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
-interface ImportMetaEnv {
-  /** `true` keeps the internal /foundations page in a production build (it is left out otherwise). */
-  readonly VITE_STUDIO_FOUNDATIONS?: string;
-}
+/**
+ * Set by `vite.config.ts` at build time: true in development and tests, and in a production build only
+ * with `VITE_STUDIO_FOUNDATIONS=true`. Gates the internal /foundations page and its code.
+ */
+declare const __FOUNDATIONS__: boolean;

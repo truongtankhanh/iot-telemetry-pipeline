@@ -27,6 +27,10 @@ if (typeof window !== 'undefined') {
     });
   }
 
+  // Nor does it draw: axe asks a canvas for a context while it checks icons, and jsdom answers with a "Not
+  // implemented" warning. `null` is the answer of a browser that cannot create a context.
+  HTMLCanvasElement.prototype.getContext = () => null;
+
   // Nor does it scroll: the palette keeps the active result in view.
   if (typeof Element.prototype.scrollIntoView !== 'function') {
     Element.prototype.scrollIntoView = () => {};

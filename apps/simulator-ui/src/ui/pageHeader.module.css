@@ -1,0 +1,37 @@
+.header {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: var(--font-ui);
+  font-size: var(--fs-page-title);
+  font-weight: 600;
+  line-height: 1.15;
+  background: linear-gradient(90deg, #e6fbff, #b9beff);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  /* The title is the one place the page glows, at 24 px and up; a body line never does. */
+  filter: drop-shadow(0 0 8px rgba(149, 155, 255, 0.45));
+}
+
+.description {
+  margin-top: 2px;
+  color: var(--text-secondary);
+}
+
+.end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (min-width: 1600px) {
+  .title {
+    font-size: 26px;
+  }
+}

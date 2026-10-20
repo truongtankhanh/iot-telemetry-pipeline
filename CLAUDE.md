@@ -20,6 +20,7 @@ documented. Do not harden or "fix" these as a side effect of another change: the
 | Service  | `apps/ingest`: NestJS 12, `pg` (plain SQL, no ORM), `mqtt`, `prom-client`, Jest 30                |
 | Contract | `packages/telemetry-contract` (`@itp/telemetry-contract`): topic and payload parser, tsup, Vitest |
 | Load     | `apps/simulator`: synthetic devices and the benchmark, runs `.ts` directly, `node --test`         |
+| Studio   | `apps/simulator-ui`: React 19, Vite, Zustand, CSS Modules, Vitest (jsdom); built to static files  |
 | Ops      | Docker Compose, Kubernetes (kustomize), GitHub Actions, Prometheus rules and a Grafana dashboard  |
 
 ## Directory map
@@ -30,6 +31,9 @@ documented. Do not harden or "fix" these as a side effect of another change: the
   `migrations/*.sql`), `config/` (`env.validation.ts`), `logging/`, `openapi/`.
 - `apps/ingest/config/` `devices.json` and `rules.json`, read at boot. `apps/ingest/test/` the e2e suite
   and its helpers; `test/contract/` holds snapshots of the other repositories.
+- `apps/simulator/src/` the engine, the control server (`control-*.ts`, which also serves the built Studio) and the
+  benchmark. `apps/simulator-ui/` Simulator Studio: `src/` (`shell/`, `palette/`, `pages/`, `state/`, `ui/`, `lib/`,
+  `styles/tokens.css`), `scripts/` (contrast and text-size checks run by `lint`).
 - `packages/telemetry-contract/src/index.ts` the one definition of topics, payloads and metric names.
 - `deploy/` `mosquitto/`, `k8s/` (base and overlays), `observability/` (Prometheus rules, Grafana
   dashboard), `bench/` (benchmark and gap-check scripts).
@@ -45,9 +49,10 @@ Run from the repository root.
 | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `pnpm install`                                       | Install (CI uses `--frozen-lockfile`)                                                  |
 | `pnpm build` / `lint` / `typecheck` / `format:check` | Whole repository; Turborepo builds the contract first                                  |
-| `pnpm test`                                          | Unit tests: Jest (ingest), Vitest (contract), `node --test` (simulator)                |
+| `pnpm test`                                          | Unit tests: Jest (ingest), Vitest (contract, Studio), `node --test` (simulator)        |
 | `pnpm test:coverage`                                 | Ingest unit tests with coverage; fails below the floor in `apps/ingest/jest.config.ts` |
 | `pnpm e2e:ingest`                                    | Starts PostgreSQL and Mosquitto, runs the e2e suite on `telemetry_test`                |
+| `pnpm --filter @itp/simulator-ui dev`                | Studio dev server; proxies `/api` to a simulator on `:3200`                            |
 | `pnpm docs:links`                                    | Checks relative links and anchors in the tracked Markdown files                        |
 | `pnpm docs:openapi`                                  | Regenerates `docs/openapi.json` from the built controllers                             |
 | `pnpm docker:up` / `docker:demo` / `docker:observe`  | Compose stack; the demo with a simulator; Prometheus and Grafana                       |
@@ -69,7 +74,8 @@ when running a bare `jest`, `eslint` or `tsc` there.
   there, in `docs/configuration.md` and in the app's `.env.example`, together.
 - Metric names and labels are an interface (platform-aws, the shipped alert rules and the dashboard read
   them): do not rename one without updating `deploy/observability/` and the parity test.
-- Three test runners are used on purpose, one per package; do not unify them.
+- Three test runners are used on purpose (Jest for ingest, Vitest for the contract and Studio, `node --test` for the
+  simulator); do not unify them.
 - Workflows: `permissions: contents: read`, `timeout-minutes` on every job, actions pinned to a commit SHA.
 
 ## Watch out for
