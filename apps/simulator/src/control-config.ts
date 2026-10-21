@@ -134,3 +134,35 @@ export function resolveControlConfig(input: {
     allowNonLoopback,
   };
 }
+
+/**
+ * Whether the engine runs on the simulated clock: one tick at start, then a tick only when `POST
+ * /api/step` moves the clock. `SIMULATED_CLOCK` turns it on when it is exactly `true` (anything else,
+ * a blank line included, is off, as `CONTROL_ALLOW_NON_LOOPBACK` is) and `--simulated-clock` turns it on
+ * too. Neither turns it off: to go back to the wall clock, unset the variable.
+ *
+ * It is not a field of `ControlConfig` because it belongs to the engine, and `--no-control` has no
+ * `ControlConfig` at all. The control server is the only thing that can step the clock, so asking for the
+ * simulated clock without it would leave a process that publishes once and then never again: that is refused.
+ */
+export function resolveSimulatedClock(input: {
+  env: Record<string, string | undefined>;
+  flag?: boolean | undefined;
+  /** False when `--no-control` turned the control server off. */
+  controlEnabled: boolean;
+}): boolean {
+  const { env, flag = false, controlEnabled } = input;
+  const where = flag
+    ? '--simulated-clock'
+    : env.SIMULATED_CLOCK === 'true'
+      ? 'SIMULATED_CLOCK'
+      : null;
+  if (where === null) return false;
+  if (!controlEnabled) {
+    throw new ControlConfigError(
+      `${where} runs the engine on the simulated clock, which only the control server can step, and --no-control turns the control server off. ` +
+        'Drop one of them.',
+    );
+  }
+  return true;
+}

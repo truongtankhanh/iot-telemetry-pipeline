@@ -21,21 +21,22 @@ Start the ingest service ([its README](../ingest/README.md)), then:
 pnpm --filter @itp/simulator start --scenario server-room-overheat
 ```
 
-| Option                   | Meaning                                                                                                                |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `--broker <url>`         | MQTT broker (default `MQTT_URL`, else `mqtt://localhost:1883`)                                                         |
-| `--registry <path>`      | `devices.json` to simulate (default the ingest service's)                                                              |
-| `--interval <ms>`        | Publish interval per device (default 2000); above 0                                                                    |
-| `--anomaly <spec>`       | `device:metric:value:startAt:duration`, repeatable, e.g. `dc-env-01:temperature_c:29.5:20:60`                          |
-| `--scenario <name>`      | Play a scenario from the start: the built-ins `server-room-overheat`, `crowded-lecture`, or a custom one of the folder |
-| `--duration <s>`         | Stop after this many seconds (default: until Ctrl+C)                                                                   |
-| `--control-host <addr>`  | Control server address (default `CONTROL_HOST`, else `127.0.0.1`); see [Control server](#control-server)               |
-| `--control-port <port>`  | Control server port (default `CONTROL_PORT`, else `3200`)                                                              |
-| `--ingest-url <url>`     | Ingest the control server reads (default `INGEST_URL`, else `http://localhost:3100`)                                   |
-| `--studio-dir <path>`    | Directory with the built Studio UI to serve at `/` (default `STUDIO_DIR`, else `apps/simulator-ui/dist`)               |
-| `--rules <path>`         | `rules.json` that Studio draws the raise and clear lines from (default `RULES_FILE`, else the ingest service's)        |
-| `--scenarios-dir <path>` | Folder of custom scenario files, read once at start (default `SCENARIOS_DIR`, else `apps/simulator/scenarios`)         |
-| `--no-control`           | Run without the control server, as a plain publisher                                                                   |
+| Option                   | Meaning                                                                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--broker <url>`         | MQTT broker (default `MQTT_URL`, else `mqtt://localhost:1883`)                                                                                        |
+| `--registry <path>`      | `devices.json` to simulate (default the ingest service's)                                                                                             |
+| `--interval <ms>`        | Publish interval per device (default 2000); above 0                                                                                                   |
+| `--anomaly <spec>`       | `device:metric:value:startAt:duration`, repeatable, e.g. `dc-env-01:temperature_c:29.5:20:60`                                                         |
+| `--scenario <name>`      | Play a scenario from the start: the built-ins `server-room-overheat`, `crowded-lecture`, or a custom one of the folder                                |
+| `--duration <s>`         | Stop after this many seconds (default: until Ctrl+C)                                                                                                  |
+| `--control-host <addr>`  | Control server address (default `CONTROL_HOST`, else `127.0.0.1`); see [Control server](#control-server)                                              |
+| `--control-port <port>`  | Control server port (default `CONTROL_PORT`, else `3200`)                                                                                             |
+| `--ingest-url <url>`     | Ingest the control server reads (default `INGEST_URL`, else `http://localhost:3100`)                                                                  |
+| `--studio-dir <path>`    | Directory with the built Studio UI to serve at `/` (default `STUDIO_DIR`, else `apps/simulator-ui/dist`)                                              |
+| `--rules <path>`         | `rules.json` that Studio draws the raise and clear lines from (default `RULES_FILE`, else the ingest service's)                                       |
+| `--scenarios-dir <path>` | Folder of custom scenario files, read once at start (default `SCENARIOS_DIR`, else `apps/simulator/scenarios`)                                        |
+| `--no-control`           | Run without the control server, as a plain publisher                                                                                                  |
+| `--simulated-clock`      | Run on the simulated clock: one tick at start, then only when Studio steps it (same as `SIMULATED_CLOCK=true`); see [Control server](#control-server) |
 
 `server-room-overheat` opens the "Server room temperature high" alert about 25 s in and clears it
 about a minute later.
@@ -83,7 +84,26 @@ the state, as `GET /api/state` returns it.
 | `POST /api/scenarios/:name/stop`                 | Stop the run: remove its anomalies; `409` when it is not running                                                                                                          |
 | `POST /api/scenarios/import`                     | The body is a scenario document; validated like a file and kept for this session only (`201`; `400` with the reason; `409` for a taken name)                              |
 | `POST /api/reset`                                | Clear anomalies and held values, restart the anomaly clock                                                                                                                |
-| `POST /api/step`                                 | One publish interval on the simulated clock; `409` on the wall clock, which is what `start` uses                                                                          |
+| `POST /api/step`                                 | One publish interval on the simulated clock; `409` on the wall clock, the default (start with `--simulated-clock` to step)                                                |
+
+**Running on the simulated clock.** By default the engine runs on the wall clock and publishes by itself, so `POST /api/step` answers `409`. To step it by hand,
+start with `--simulated-clock` (or `SIMULATED_CLOCK=true`, exactly that value, in `.env` or the environment):
+
+```bash
+pnpm --filter @itp/simulator start --simulated-clock
+curl -s -X POST localhost:3200/api/step                  # one publish interval; the tick that falls due is sent
+curl -s -X POST localhost:3200/api/reset                 # clear anomalies and held values, restart the anomaly clock
+```
+
+- One tick is sent at start. After that **nothing is published until a step**: the message rate is 0 by design, and a
+  scenario's time, the daily curve of the signals and every `ts` follow the simulated clock, which starts at the wall time of
+  the process start.
+- **Stepping far ahead of real time is not guarded.** Each step moves `ts` one interval ahead; ingest rejects a `ts` more
+  than 5 minutes ahead of its own clock (`future`, see [the contract](../../docs/telemetry-contract.md)), which shows in
+  `telemetry_rejections_total`. 150 steps of 2 s is 5 minutes.
+- An alert raised this way has no `cause` (its time is not wall time), and observation times stay wall time.
+- It needs the control server, the only way to step: with `--no-control` the flag is refused at start. The flag only turns the
+  mode on; to go back to the wall clock unset `SIMULATED_CLOCK`. `bench`, the image and the Compose `demo` profile keep the wall clock.
 
 **The stream.** Every message is `event: <name>` and `data: <json>`. The first one is `snapshot`
 (the state, plus `publishLog`: the last 200 published messages), so a page opened mid-demo is not
@@ -216,6 +236,7 @@ the file.
 | `STUDIO_DIR`                 | `apps/simulator-ui/dist`                                 | `start`          |
 | `RULES_FILE`                 | `apps/ingest/config/rules.json`                          | `start`          |
 | `SCENARIOS_DIR`              | `apps/simulator/scenarios` (absent: no custom scenarios) | `start`          |
+| `SIMULATED_CLOCK`            | unset; only the exact value `true` turns it on           | `start`          |
 
 `OCC_CONSOLE_URL` is the base URL of the command center console; the control server carries it to
 the UI, which builds the incident link from it (the plain id is shown without it). An empty value

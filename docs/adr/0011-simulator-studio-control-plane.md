@@ -421,3 +421,27 @@ halves. What was decided on the way:
   compare against it.
 - **Not built here:** the Fleet's running-scenario strip and the **Follow** menu (no page to take the person to yet), and **Edit**, **Duplicate** and
   **New scenario** (the editor, SIM-11). The palette's `run <name>` actions stay listed and disabled until SIM-09. No dependency was added.
+
+## Amendment, 2026-10-21: the simulated clock in a running process (SIM-09, simulator half)
+
+The SIM-03 clause "Step is not reachable in a real process yet" is met. `start` runs the engine on a `ManualClock` when it is given
+`--simulated-clock` or `SIMULATED_CLOCK=true` (the exact value, as `CONTROL_ALLOW_NON_LOOPBACK`); the option only turns it on, so going back
+to the wall clock is unsetting the variable. The mechanism was already there (SIM-02): `Engine` takes `clock`, `POST /api/step` and
+`POST /api/reset` and `config.simulated` exist, and no route, no state key and no fixture changed. The SIM-03 clause stays as written; this
+section supersedes it.
+
+- **The clock starts at the wall time of the process start** (`new ManualClock(Date.now())`), so the first `ts` is inside ingest's window.
+  The anomaly clock, a scenario's time, the daily curve and every `ts` follow it. What records when Studio _saw_ something (the observation
+  times, a run's `startedAt`, the ingest poller) stays on the wall clock, as designed in SIM-03.
+- **Nothing publishes between steps.** One tick is sent at start; after that the message rate is 0 by design. The banner says so.
+- **It is opt-in and absent from Compose and the image,** so a demo that is left running still publishes by itself; `bench` never reads it.
+- **`--no-control` with the mode is refused at start,** before the process connects or publishes: the control server is the only way to
+  step, so the process would publish once and then never again. The setting is resolved by `resolveSimulatedClock` in
+  [control-config.ts](../../apps/simulator/src/control-config.ts) and is not a field of `ControlConfig`, which belongs to the control
+  server and does not exist under `--no-control`.
+- **Stepping ahead of real time is not guarded.** Ingest rejects a `ts` more than 5 minutes ahead of its own clock (`future`), and
+  `telemetry_rejections_total` shows it; a guard in the simulator would be a second copy of ingest's rule.
+- **No engine pause was added.** Pause in Studio pauses the devices through the existing routes, and the scenario's clock keeps counting
+  on the wall clock; a pausable clock is a different change to `engine.ts` and `clock.ts`.
+- **For the Studio half:** a stepped process makes `deviceStatus`'s _silent_ meaningless (it compares the browser's wall clock with the
+  message `ts`, which stands still between steps), so the Overview must not call a device silent on a simulated engine.
