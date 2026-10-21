@@ -353,3 +353,39 @@ halves. What was decided on the way:
   and was not checked here; a deep link needs that route. The id is shown beside the link with a copy button.
 - **Small shared pieces moved or were added:** `DeliveryChip` and `severityOf` left the Topology's `AlertsCard`; `SelectField`
   and `CursorPager` are new in `ui/`; `CopyButton` can carry visible words. No dependency was added.
+
+## Amendment, 2026-10-21: Scenarios as built (SIM-08, simulator half)
+
+- **A scenario is one plain JSON document wherever it comes from** (`{ name, description?, anomalies[] }`, the engine's `Anomaly` with
+  times in seconds from the scenario start). The built-ins are typed objects in `scenarios.ts`, custom ones are `*.json` files in
+  `SCENARIOS_DIR` read once at start, imports are kept in memory for the session. One validator (`scenario-document.ts`) serves all three:
+  it refuses an unknown field, a device the registry in use lacks, a value outside the range of the telemetry contract, and two
+  anomalies that play at once on one device and metric, with the field and the range in the reason. A built-in that does not fit a
+  registry is rejected like a file, not played.
+- **Custom scenarios are read-only files; an import writes nothing.** The order document said "read-only here" and left the storage to
+  SIM-11 (brief, open question 3); an import validated like a file and kept for the session meets the acceptance criterion without a
+  first write route on an unauthenticated server. SIM-11 can move the storage without changing the document.
+- **Runs are derived, not stored.** `ScenarioRuns` keeps the ids of the anomalies a run added and the anomaly-clock time at which it ends;
+  a run is active while the clock is before that end and one of its anomalies is still in the engine, so time, a stop, a reset and a
+  `DELETE` all end it without telling anyone. `StateView.runs` lists the active ones (additive; the fixture and the UI types follow).
+  `scenario-run` keeps its fields and gains `runId`, `startedDevices`, `replaced`; `scenario-stop` is new. The cause of an alert (SIM-07)
+  is unchanged.
+- **A scenario never plays over another anomaly.** The engine plays the first anomaly that matches a device and metric, so a second one
+  on the same signal was silently ignored; stacking was a defect, not a feature. A run is now refused with `409` and the conflicts
+  (device, anomaly, run) unless it is asked to replace, and the check looks at every anomaly that is active or still to come, whoever
+  added it: the Compose `demo` boots with `--scenario server-room-overheat`, which no run owns. Replacing stops the whole conflicting run
+  and removes a loose anomaly alone. Adds happen first and roll back on an engine refusal, so a failed replace changes nothing.
+- **A run starts the devices it needs,** stopped or paused, inside the same all-or-nothing step, and a stop leaves them running. The library
+  read lists them beforehand (`needsStart`).
+- **Expected alerts are a best case, in seconds from the scenario start, to within one publish interval.** They are worked out on the tick
+  grid with the noise-free signal and ingest's rule semantics (`for` consecutive strict breaches to open; one reading back past the clear
+  line to clear; `opened_at` is the reading's own time). A device already running publishes on the engine's grid, which is not aligned
+  with the click, so the real alert can be up to one interval later; a device the run starts is aligned with it (its first tick is one
+  interval after the click). The clear is `uncertain` when the baseline is within the noise of the clear line: with `indoor-co2` clearing
+  at 1000 ppm and the CO₂ baseline peaking at exactly 1000 at 13:00 campus time, a clear can take several ticks, or not come until the
+  hall empties; `power-over-contract` is close to the same. Left alone here (calibration of `rules.json` and the profiles is not this
+  ticket). One alert is expected per anomaly and rule; an alert already open when the run starts is not known.
+- **No guess without the rules.** If `rules.json` could not be read, `expected` is `{ available: false, reason }`. A walk longer than
+  20,000 ticks (a very short interval on a long scenario) is refused the same way.
+- **Nothing in ingest, the contract or the metrics changed;** no dependency was added. The folder is outside `src/`, so the image has no
+  custom scenarios unless a volume is mounted on `SCENARIOS_DIR`.

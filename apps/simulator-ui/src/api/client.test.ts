@@ -12,6 +12,7 @@ import {
   startDevice,
   stopDevice,
 } from './client';
+import type { ScenarioRunView } from './types';
 
 // A real `GET /api/state` body (see types.ts for how both sides are kept in step).
 const view = fixture;
@@ -59,6 +60,7 @@ describe('the types and the fixture', () => {
       'observationCursor',
       'profiles',
       'rules',
+      'runs',
       'scenarios',
     ]);
     expect(keys(view.engine)).toEqual([
@@ -133,6 +135,28 @@ describe('the types and the fixture', () => {
       'baseline',
       'dailySwing',
       'noise',
+    ]);
+  });
+
+  it('declare the keys of a run, which the simulator pins from its side in scenario-runs.test.ts', () => {
+    const run: ScenarioRunView = {
+      id: 'r1',
+      scenario: 'server-room-overheat',
+      startedAt: '2026-10-21T08:00:00.000Z',
+      offsetS: 10,
+      endsAtS: 90,
+      anomalyIds: ['a1'],
+      startedDevices: [],
+    };
+    expect(view.runs).toEqual([]);
+    expect(keys(run)).toEqual([
+      'anomalyIds',
+      'endsAtS',
+      'id',
+      'offsetS',
+      'scenario',
+      'startedAt',
+      'startedDevices',
     ]);
   });
 });

@@ -43,6 +43,7 @@ export type ObservationKind =
   | 'engine-state'
   | 'tick-error'
   | 'scenario-run'
+  | 'scenario-stop'
   | 'alert-opened'
   | 'alert-cleared'
   | 'delivery'

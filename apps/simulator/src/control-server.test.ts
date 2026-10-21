@@ -10,13 +10,27 @@ import { ManualClock } from './clock.ts';
 import { ControlServer, type ControlServerOptions } from './control-server.ts';
 import { IngestPoller } from './ingest-poller.ts';
 import { ObservationStore } from './observation-store.ts';
+import { ScenarioLibrary } from './scenario-library.ts';
 import { DEVICES, FakeIngest, setupEngine, T0 } from './test-support.ts';
 
 /** The tests here talk to a real server on a loopback port the system picks (port 0). */
 
 type Json = Record<string, unknown>;
 
-const SCENARIOS = { overheat: ['dc-env-01:temperature_c:29.2:20:60'] };
+const OVERHEAT = {
+  name: 'overheat',
+  description: 'Row A runs hot.',
+  anomalies: [
+    {
+      deviceId: 'dc-env-01',
+      metric: 'temperature_c' as const,
+      value: 29.2,
+      startAt: 20,
+      duration: 60,
+    },
+  ],
+};
+const newLibrary = () => new ScenarioLibrary({ builtIn: [OVERHEAT], devices: DEVICES });
 const JSON_TYPE = { 'Content-Type': 'application/json' };
 
 interface Reply {
@@ -169,7 +183,7 @@ async function startServer(overrides: Partial<ControlServerOptions> = {}) {
   const server = new ControlServer({
     engine,
     devices: DEVICES,
-    scenarios: SCENARIOS,
+    library: newLibrary(),
     poller,
     broker,
     config: { host: '127.0.0.1', port: 0, ingestUrl: 'http://ingest:3100', consoleUrl: null },
@@ -369,6 +383,72 @@ describe('ControlServer commands', () => {
   });
 });
 
+describe('ControlServer scenarios over HTTP', () => {
+  it('refuses a second run on the same device with 409 and its conflicts, and replaces it when asked', async () => {
+    const { port, engine } = await startServer();
+    assert.equal((await send(port, 'POST', '/api/scenarios/overheat/run')).status, 200);
+
+    const refused = await send(port, 'POST', '/api/scenarios/overheat/run');
+    assert.equal(refused.status, 409);
+    assert.deepEqual(refused.json().conflicts, [
+      { deviceId: 'dc-env-01', anomalyId: 'a1', runId: 'r1', scenario: 'overheat' },
+    ]);
+    assert.equal(engine.snapshot().anomalies.length, 1);
+
+    const replaced = await send(port, 'POST', '/api/scenarios/overheat/run', { replace: true });
+    assert.equal(replaced.status, 200);
+    assert.deepEqual(
+      engine.snapshot().anomalies.map((entry) => entry.id),
+      ['a2'],
+    );
+  });
+
+  it('records the run with its id and the stop, in the observations a client pages', async () => {
+    const { port } = await startServer();
+    await send(port, 'POST', '/api/scenarios/overheat/run');
+    await send(port, 'POST', '/api/scenarios/overheat/stop');
+
+    const events = JSON.parse((await get(port, '/api/observations?limit=100')).text) as {
+      kind: string;
+      at: string;
+      data: Json;
+    }[];
+    const run = events.find((e) => e.kind === 'scenario-run');
+    const stop = events.find((e) => e.kind === 'scenario-stop');
+    assert.equal(run?.data.runId, 'r1');
+    assert.deepEqual(run?.data.startedDevices, []);
+    assert.deepEqual(stop?.data, {
+      name: 'overheat',
+      runId: 'r1',
+      anomalyIds: ['a1'],
+      reason: 'stopped',
+    });
+    // The run's own time is the time the observation carries: one clock, the server's.
+    assert.equal(run?.at, new Date(T0).toISOString());
+  });
+
+  it('imports a scenario, and refuses one that does not fit the 16 KiB a request may carry', async () => {
+    const { port } = await startServer();
+    const extra = {
+      name: 'extra',
+      anomalies: [
+        { deviceId: 'dc-env-02', metric: 'temperature_c', value: 30, startAt: 5, duration: 20 },
+      ],
+    };
+    const created = await send(port, 'POST', '/api/scenarios/import', extra);
+    assert.equal(created.status, 201);
+    assert.deepEqual(created.json().scenarios, ['overheat', 'extra']);
+
+    const huge = await send(port, 'POST', '/api/scenarios/import', {
+      ...extra,
+      name: 'huge',
+      description: 'x'.repeat(20 * 1024),
+    });
+    assert.equal(huge.status, 413);
+    assert.equal(((await get(port, '/api/state')).json().scenarios as unknown[]).length, 2);
+  });
+});
+
 describe('ControlServer event stream', () => {
   it('opens with a snapshot of the state and the publish log', async () => {
     const { port } = await startServer();
@@ -470,14 +550,15 @@ describe('ControlServer keeps publishing', () => {
       log: (line) => logs.push(line),
     });
 
-    const paused = await send(port, 'POST', '/api/devices/dc-env-01/pause');
+    // dc-env-02, not the scenario's own device: a run resumes the paused devices it needs.
+    const paused = await send(port, 'POST', '/api/devices/dc-env-02/pause');
     const scenario = await send(port, 'POST', '/api/scenarios/overheat/run');
     const before = publisher.sent.length;
     await engine.step();
 
     assert.equal(paused.status, 200);
     assert.equal(scenario.status, 200);
-    assert.equal(engine.snapshot().devices[0]?.state, 'paused');
+    assert.equal(engine.snapshot().devices[1]?.state, 'paused');
     assert.equal(publisher.sent.length - before, 2);
     assert.deepEqual(tickErrors, []);
     assert.ok(logs.some((line) => line.includes('"state" listener threw')));
@@ -569,7 +650,7 @@ describe('ControlServer listen', () => {
     const server = new ControlServer({
       engine,
       devices: DEVICES,
-      scenarios: SCENARIOS,
+      library: newLibrary(),
       poller,
       broker: new BrokerLink('mqtt://broker:1883'),
       config: { host: '127.0.0.1', port: taken, ingestUrl: 'http://ingest:3100', consoleUrl: null },

@@ -1,11 +1,6 @@
 import { METRIC_NAMES, type MetricName } from '@itp/telemetry-contract';
 import { STATUS_CODES } from 'node:http';
-import {
-  type AlertCause,
-  alertCause,
-  parseScenarioRun,
-  type ScenarioRunAnomaly,
-} from './alert-cause.ts';
+import { type AlertCause, alertCause, parseScenarioRun } from './alert-cause.ts';
 import type { IngestAlert, ObservedAlert } from './alert-observer.ts';
 import type { BrokerState } from './broker-link.ts';
 import {
@@ -16,15 +11,23 @@ import {
   type IngestState,
   type MetricsFeed,
 } from './ingest-poller.ts';
-import type { Engine, EngineSnapshot } from './engine.ts';
-import { type ObservationDraft, type ObservationStore, PAGE_MAX } from './observation-store.ts';
+import type { DeviceState, Engine, EngineSnapshot } from './engine.ts';
+import { type ObservationStore, PAGE_MAX } from './observation-store.ts';
 import type { RulesView } from './rules-source.ts';
+import { lengthS } from './scenario-document.ts';
+import { type Expected, expectedAlerts } from './scenario-expectations.ts';
+import type { LibraryEntry, RejectedScenario, ScenarioLibrary } from './scenario-library.ts';
+import {
+  ScenarioConflictError,
+  type ReplacedRun,
+  type ScenarioRunView,
+  type ScenarioRuns,
+} from './scenario-runs.ts';
 import {
   type Anomaly,
   type AnomalyShape,
   type DeviceSpec,
   type MetricProfile,
-  parseAnomaly,
   profilesOf,
 } from './signals.ts';
 
@@ -46,11 +49,14 @@ export interface RouteResponse {
 /** An answer with a status. Thrown by the checks, turned into the error envelope by the router. */
 export class HttpError extends Error {
   readonly status: number;
+  /** Fields added to the error body beside `statusCode`, `error` and `message` (the `409` of a run names its conflicts). */
+  readonly details: Record<string, unknown> | undefined;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, details?: Record<string, unknown>) {
     super(message);
     this.name = 'HttpError';
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -63,8 +69,10 @@ export interface RoutesContext {
   engine: Engine;
   /** The devices as loaded from the registry (the engine's snapshot has only their state). */
   devices: DeviceSpec[];
-  /** Preset anomalies by name, in the `--anomaly` format (`scenarios.ts`). */
-  scenarios: Record<string, string[]>;
+  /** Every scenario that can be run: the built-ins, the custom ones read at start and the ones imported since. */
+  library: ScenarioLibrary;
+  /** The scenarios Studio started; it records its own observations. */
+  runs: ScenarioRuns;
   store: ObservationStore;
   ingest: {
     state(): IngestState;
@@ -80,15 +88,16 @@ export interface RoutesContext {
   broker: { state(): BrokerState };
   /** The threshold rules read at boot (or why there are none); they do not change while the process runs. */
   rules: RulesView;
-  /** Stores an observation made by a command (a scenario run) and tells the stream about it. */
-  record(draft: ObservationDraft): void;
 }
 
 /** Everything a client needs to draw the current state; the answer to every command. */
 export interface StateView {
   engine: EngineSnapshot;
   devices: DeviceSpec[];
+  /** The names in the library; the library read (`GET /api/scenarios`) has the rest. */
   scenarios: string[];
+  /** The scenarios that are playing now; elapsed time is `engine.elapsedS − offsetS`. */
+  runs: ScenarioRunView[];
   ingest: IngestState;
   /** Whether this simulator is connected to the broker (ingest's own view is `ingest.broker`). */
   broker: BrokerState;
@@ -138,12 +147,39 @@ function profilesFor(devices: DeviceSpec[]): StateView['profiles'] {
   return profiles;
 }
 
+/** One scenario as `GET /api/scenarios` gives it: the document plus what only the simulator can say about it now. */
+export interface ScenarioItem {
+  name: string;
+  description: string;
+  source: LibraryEntry['source'];
+  /** Imported during this session: it is not in the folder and ends with the process. */
+  imported: boolean;
+  anomalies: Anomaly[];
+  /** Seconds from the scenario start to the end of its last anomaly. */
+  lengthS: number;
+  /** Devices that running it would start, in the order it uses them, with the state they are in now. */
+  needsStart: { deviceId: string; state: Exclude<DeviceState, 'running'> }[];
+  /** When it was last run in this session (ISO 8601), or `null`. */
+  lastRunAt: string | null;
+  running: boolean;
+  expected: Expected;
+}
+
+export interface ScenarioLibraryView {
+  scenarios: ScenarioItem[];
+  /** Files and built-ins that were not kept, with the reason. */
+  rejected: RejectedScenario[];
+  /** The engine's publish interval, which the tolerance of the expected times is measured in. */
+  intervalMs: number;
+}
+
 export function buildStateView(context: RoutesContext): StateView {
   const engine = context.engine.snapshot();
   return {
     engine,
     devices: context.devices,
-    scenarios: Object.keys(context.scenarios),
+    scenarios: context.library.names(),
+    runs: context.runs.active(),
     ingest: context.ingest.state(),
     broker: context.broker.state(),
     alerts: context.ingest.alerts(),
@@ -251,7 +287,10 @@ function matchSegments(template: string[], actual: string[]): Params | undefined
 
 function toErrorResponse(error: unknown): RouteResponse {
   if (error instanceof HttpError) {
-    return { status: error.status, body: errorBody(error.status, error.message) };
+    return {
+      status: error.status,
+      body: { ...errorBody(error.status, error.message), ...error.details },
+    };
   }
   // The engine rejects what it cannot play with an Error or a RangeError and a message: that is the
   // caller's input. Anything else (a TypeError, something thrown that is not an Error) is our bug.
@@ -411,46 +450,92 @@ export function createRoutes(context: RoutesContext) {
     return ok(view());
   });
 
-  on('GET', '/api/scenarios', () =>
-    ok({
-      scenarios: Object.entries(context.scenarios).map(([name, specs]) => ({
-        name,
-        anomalies: specs.map(parseAnomaly),
-      })),
-    }),
-  );
+  function scenarioItem(entry: LibraryEntry, engineState: EngineSnapshot): ScenarioItem {
+    const { scenario } = entry;
+    const devices = new Map(engineState.devices.map((device) => [device.id, device]));
+    const needsStart: ScenarioItem['needsStart'] = [];
+    for (const deviceId of new Set(scenario.anomalies.map((anomaly) => anomaly.deviceId))) {
+      const state = devices.get(deviceId)?.state;
+      if (state !== undefined && state !== 'running') needsStart.push({ deviceId, state });
+    }
+    return {
+      name: scenario.name,
+      description: scenario.description,
+      source: entry.source,
+      imported: entry.imported,
+      anomalies: scenario.anomalies,
+      lengthS: lengthS(scenario),
+      needsStart,
+      lastRunAt: context.runs.lastRunAt(scenario.name),
+      running: context.runs.active().some((run) => run.scenario === scenario.name),
+      // Worked out on every read: a device's own interval can change while the process runs.
+      expected: expectedAlerts(scenario, {
+        devices: context.devices,
+        rules: context.rules,
+        intervalMs: engineState.intervalMs,
+        intervalMsOf: (deviceId) => devices.get(deviceId)?.intervalMs ?? engineState.intervalMs,
+        needsStart: new Set(needsStart.map((need) => need.deviceId)),
+        baseMs: engineState.nowMs,
+      }),
+    };
+  }
 
-  on('POST', '/api/scenarios/:name/run', ({ name }) => {
-    const specs = Object.hasOwn(context.scenarios, name) ? context.scenarios[name] : undefined;
-    if (!specs) throw new HttpError(404, `Unknown scenario "${name}"`);
+  function findScenario(name: string): LibraryEntry {
+    const entry = context.library.get(name);
+    if (!entry) throw new HttpError(404, `Unknown scenario "${name}"`);
+    return entry;
+  }
 
-    // The presets are written for the start of a run: "20 s in". Run now, they start 20 s from now.
-    const offsetS = engine.snapshot().elapsedS;
-    const anomalyIds: string[] = [];
-    const anomalies: ScenarioRunAnomaly[] = [];
+  on('GET', '/api/scenarios', () => {
+    const engineState = engine.snapshot();
+    const body: ScenarioLibraryView = {
+      scenarios: context.library.list().map((entry) => scenarioItem(entry, engineState)),
+      rejected: context.library.rejected,
+      intervalMs: engineState.intervalMs,
+    };
+    return ok(body);
+  });
+
+  on('POST', '/api/scenarios/import', (_params, request) => {
+    const result = context.library.import(request.body);
+    if (!result.ok) throw new HttpError(result.kind === 'invalid' ? 400 : 409, result.reason);
+    return {
+      status: 201,
+      body: { scenario: scenarioItem(result.entry, engine.snapshot()), ...view() },
+    };
+  });
+
+  on('POST', '/api/scenarios/:name/run', ({ name }, request) => {
+    const entry = findScenario(name);
+    const body = bodyObject(request);
+    if (body.replace !== undefined && typeof body.replace !== 'boolean') {
+      throw new HttpError(400, '"replace" must be true or false');
+    }
+
+    // All or nothing, and the presets are written for the start of a run: "20 s in" is 20 s from now.
+    let outcome: { run: ScenarioRunView; replaced: ReplacedRun[] };
     try {
-      for (const spec of specs) {
-        const anomaly = parseAnomaly(spec);
-        const startAt = anomaly.startAt + offsetS;
-        const id = engine.addAnomaly({ ...anomaly, startAt });
-        anomalyIds.push(id);
-        anomalies.push({
-          id,
-          deviceId: anomaly.deviceId,
-          metric: anomaly.metric,
-          startAt,
-          duration: anomaly.duration,
-        });
-      }
+      outcome = context.runs.run(entry.scenario, { replace: body.replace === true });
     } catch (error) {
-      // All or nothing: a preset that names a device this registry does not have adds nothing.
-      for (const id of anomalyIds) engine.removeAnomaly(id);
+      if (error instanceof ScenarioConflictError) {
+        throw new HttpError(409, error.message, { conflicts: error.conflicts });
+      }
       throw error;
     }
-    // The anomalies are kept with the run because the engine forgets them on a reset, and the cause of an
-    // alert (`GET /api/alerts`) is worked out from the run, not from what the engine holds now.
-    context.record({ kind: 'scenario-run', data: { name, anomalyIds, offsetS, anomalies } });
-    return ok({ anomalyIds, ...view() });
+    const { run, replaced } = outcome;
+    return ok({
+      runId: run.id,
+      anomalyIds: run.anomalyIds,
+      startedDevices: run.startedDevices,
+      replaced,
+      ...view(),
+    });
+  });
+
+  on('POST', '/api/scenarios/:name/stop', ({ name }) => {
+    findScenario(name);
+    if (!context.runs.stop(name)) throw new HttpError(409, `"${name}" is not running`);
+    return ok(view());
   });
 
   on('POST', '/api/reset', () => {

@@ -21,20 +21,21 @@ Start the ingest service ([its README](../ingest/README.md)), then:
 pnpm --filter @itp/simulator start --scenario server-room-overheat
 ```
 
-| Option                  | Meaning                                                                                                         |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `--broker <url>`        | MQTT broker (default `MQTT_URL`, else `mqtt://localhost:1883`)                                                  |
-| `--registry <path>`     | `devices.json` to simulate (default the ingest service's)                                                       |
-| `--interval <ms>`       | Publish interval per device (default 2000); above 0                                                             |
-| `--anomaly <spec>`      | `device:metric:value:startAt:duration`, repeatable, e.g. `dc-env-01:temperature_c:29.5:20:60`                   |
-| `--scenario <name>`     | Preset anomalies: `server-room-overheat`, `crowded-lecture`                                                     |
-| `--duration <s>`        | Stop after this many seconds (default: until Ctrl+C)                                                            |
-| `--control-host <addr>` | Control server address (default `CONTROL_HOST`, else `127.0.0.1`); see [Control server](#control-server)        |
-| `--control-port <port>` | Control server port (default `CONTROL_PORT`, else `3200`)                                                       |
-| `--ingest-url <url>`    | Ingest the control server reads (default `INGEST_URL`, else `http://localhost:3100`)                            |
-| `--studio-dir <path>`   | Directory with the built Studio UI to serve at `/` (default `STUDIO_DIR`, else `apps/simulator-ui/dist`)        |
-| `--rules <path>`        | `rules.json` that Studio draws the raise and clear lines from (default `RULES_FILE`, else the ingest service's) |
-| `--no-control`          | Run without the control server, as a plain publisher                                                            |
+| Option                   | Meaning                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `--broker <url>`         | MQTT broker (default `MQTT_URL`, else `mqtt://localhost:1883`)                                                         |
+| `--registry <path>`      | `devices.json` to simulate (default the ingest service's)                                                              |
+| `--interval <ms>`        | Publish interval per device (default 2000); above 0                                                                    |
+| `--anomaly <spec>`       | `device:metric:value:startAt:duration`, repeatable, e.g. `dc-env-01:temperature_c:29.5:20:60`                          |
+| `--scenario <name>`      | Play a scenario from the start: the built-ins `server-room-overheat`, `crowded-lecture`, or a custom one of the folder |
+| `--duration <s>`         | Stop after this many seconds (default: until Ctrl+C)                                                                   |
+| `--control-host <addr>`  | Control server address (default `CONTROL_HOST`, else `127.0.0.1`); see [Control server](#control-server)               |
+| `--control-port <port>`  | Control server port (default `CONTROL_PORT`, else `3200`)                                                              |
+| `--ingest-url <url>`     | Ingest the control server reads (default `INGEST_URL`, else `http://localhost:3100`)                                   |
+| `--studio-dir <path>`    | Directory with the built Studio UI to serve at `/` (default `STUDIO_DIR`, else `apps/simulator-ui/dist`)               |
+| `--rules <path>`         | `rules.json` that Studio draws the raise and clear lines from (default `RULES_FILE`, else the ingest service's)        |
+| `--scenarios-dir <path>` | Folder of custom scenario files, read once at start (default `SCENARIOS_DIR`, else `apps/simulator/scenarios`)         |
+| `--no-control`           | Run without the control server, as a plain publisher                                                                   |
 
 `server-room-overheat` opens the "Server room temperature high" alert about 25 s in and clears it
 about a minute later.
@@ -66,20 +67,23 @@ address (`403` otherwise). A body is at most 16 KiB (`413`).
 **Routes.** Errors use ingest's envelope (`statusCode`, `error`, `message`). A command answers with
 the state, as `GET /api/state` returns it.
 
-| Method and path                                       | What it does                                                                                                                                |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/state`                                      | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, rules, profiles, config                                        |
-| `GET /api/stream`                                     | The event stream (below); at most 20 clients, then `503`                                                                                    |
-| `GET /api/observations?before=&limit=`                | The observation store, newest first, `limit` 1 to 500 (default 100); `X-Next-Cursor` holds the next `before`                                |
-| `GET /api/alerts?status=&limit=&before=`              | A page of ingest's alerts, newest first, with what Studio saw and the scenario that caused each (below); `X-Next-Cursor` as ingest sends it |
-| `POST /api/devices/:id/start`, `/pause`, `/stop`      | Device state; `404` for an unknown device                                                                                                   |
-| `PUT /api/devices/:id/interval`                       | `{ "intervalMs": 500 }`, or `null` for the engine's interval                                                                                |
-| `PUT /api/devices/:id/holds/:metric`                  | `{ "value": 31.5 }`: publish exactly that until released; `DELETE` on the same path releases it                                             |
-| `GET /api/anomalies`, `POST /api/anomalies`           | List; add `{ deviceId, metric, value, duration, shape?, startAt?, startIn? }` (`startIn`: seconds from now; `201`)                          |
-| `DELETE /api/anomalies/:id`                           | Remove one                                                                                                                                  |
-| `GET /api/scenarios`, `POST /api/scenarios/:name/run` | The presets of `--scenario`; run one so that its "20 s in" is 20 s from now (all of its anomalies, or none)                                 |
-| `POST /api/reset`                                     | Clear anomalies and held values, restart the anomaly clock                                                                                  |
-| `POST /api/step`                                      | One publish interval on the simulated clock; `409` on the wall clock, which is what `start` uses                                            |
+| Method and path                                  | What it does                                                                                                                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/state`                                 | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, rules, profiles, config                                                                      |
+| `GET /api/stream`                                | The event stream (below); at most 20 clients, then `503`                                                                                                                  |
+| `GET /api/observations?before=&limit=`           | The observation store, newest first, `limit` 1 to 500 (default 100); `X-Next-Cursor` holds the next `before`                                                              |
+| `GET /api/alerts?status=&limit=&before=`         | A page of ingest's alerts, newest first, with what Studio saw and the scenario that caused each (below); `X-Next-Cursor` as ingest sends it                               |
+| `POST /api/devices/:id/start`, `/pause`, `/stop` | Device state; `404` for an unknown device                                                                                                                                 |
+| `PUT /api/devices/:id/interval`                  | `{ "intervalMs": 500 }`, or `null` for the engine's interval                                                                                                              |
+| `PUT /api/devices/:id/holds/:metric`             | `{ "value": 31.5 }`: publish exactly that until released; `DELETE` on the same path releases it                                                                           |
+| `GET /api/anomalies`, `POST /api/anomalies`      | List; add `{ deviceId, metric, value, duration, shape?, startAt?, startIn? }` (`startIn`: seconds from now; `201`)                                                        |
+| `DELETE /api/anomalies/:id`                      | Remove one                                                                                                                                                                |
+| `GET /api/scenarios`                             | The scenario library with what a card needs: the document, `needsStart`, `lastRunAt`, `running`, the `expected` alerts; `rejected` files (below)                          |
+| `POST /api/scenarios/:name/run`                  | Run it so that its "20 s in" is 20 s from now (all of its anomalies, or none); `{ "replace": true }` takes what is in the way out first; `409` with `conflicts` otherwise |
+| `POST /api/scenarios/:name/stop`                 | Stop the run: remove its anomalies; `409` when it is not running                                                                                                          |
+| `POST /api/scenarios/import`                     | The body is a scenario document; validated like a file and kept for this session only (`201`; `400` with the reason; `409` for a taken name)                              |
+| `POST /api/reset`                                | Clear anomalies and held values, restart the anomaly clock                                                                                                                |
+| `POST /api/step`                                 | One publish interval on the simulated clock; `409` on the wall clock, which is what `start` uses                                                                          |
 
 **The stream.** Every message is `event: <name>` and `data: <json>`. The first one is `snapshot`
 (the state, plus `publishLog`: the last 200 published messages), so a page opened mid-demo is not
@@ -132,6 +136,56 @@ anomaly on the same metric inside a run's window would be taken for the run's. A
 `--scenario` or by anything else has no cause, and an engine on the simulated clock never claims one (its
 time is not wall time).
 
+**Scenarios.** A scenario is a plain JSON document, the same for a built-in, a file and an import:
+
+```json
+{
+  "name": "server-room-overheat",
+  "description": "Row A runs hot for a minute, then recovers.",
+  "anomalies": [
+    {
+      "deviceId": "dc-env-01",
+      "metric": "temperature_c",
+      "value": 29.2,
+      "startAt": 20,
+      "duration": 60
+    }
+  ]
+}
+```
+
+Times are seconds from the start of the scenario; `shape` (`step`, the default, `ramp` or `spike`) is optional and the only
+thing the `--anomaly` flag cannot say, so a document with a `ramp` or a `spike` has no flag. A document is refused, with the
+field named, when: the name is not 1 to 64 characters of lower-case letters, digits and hyphens (or is `import`); the
+description is over 200 characters; there are not 1 to 50 anomalies; a field is unknown; a device is not in the registry in
+use or does not report the metric; a `value` is outside the range of the telemetry contract for its metric; `startAt` is
+negative or `duration` is not above 0 and at most 3,600 s; or two anomalies play at once on one device and metric (the engine plays
+only the first). The built-ins are in `scenarios.ts`. Custom ones are `*.json` files (at most 16 KiB each, at most 200 in all,
+imports counted) in `SCENARIOS_DIR`, read once at start and only when the control server runs; a missing folder means none, and
+a file that cannot be used is listed in `rejected` and in the start-up output with its reason, never played and never fatal. An
+import is kept in memory until the process ends and writes nothing. The folder is outside `src/`, so the container image does
+not have it; mount a volume on `SCENARIOS_DIR` to use custom scenarios under Compose.
+
+**Running one.** A run adds the scenario's anomalies "from now" and starts every device it needs that is stopped or paused
+(`startedDevices`); `GET /api/scenarios` lists them beforehand as `needsStart`. A scenario never plays over another anomaly: if an
+anomaly, active or still to come, is on a device it uses, whoever started it (another run, `--scenario`, a hand-added fault), the
+run is refused with `409` and the `conflicts`, unless the body has `"replace": true`, which stops the whole conflicting run
+(a scenario cut in half is not the scenario) and removes a loose anomaly alone. Running the same scenario again is a replace.
+A stop removes the run's anomalies and leaves the devices it started running; an open alert then clears by itself. A run ends by
+itself when the anomaly clock passes the end of its last anomaly, or when a reset or a `DELETE` removes its anomalies; `runs` in the
+state lists those still playing, and `scenario-run` and `scenario-stop` observations record what was done.
+
+**The expected alerts.** For each anomaly and each rule that watches its device kind and metric, `expected` gives the second, from the
+scenario start, at which the alert should open (the `for`-th consecutive reading beyond the raise line) and clear (the first
+reading back past the clear line, at or after the end of the anomaly, or earlier for a `spike`), worked out on the publish ticks with the
+noise-free signal. They are a best case, stated to **within one publish interval** (2 s by default): a device that is already
+running publishes on the engine's own grid, which is not aligned with the click, so the real alert can be up to one interval later.
+`opensMargin` marks a reading within the ±0.1 jitter of the raise line, which may open it later or never. `clearsUncertain` marks a
+clear whose baseline is within the noise of the clear line (CO₂ and power near their daily peak): it may take longer, and `clearsAtS: null`
+means no reading came back past the line within ten ticks. An anomaly that no rule watches, or that never crosses its line, is in
+`quiet`. If the rules file could not be read, `expected` is `{ available: false, reason }`: there is no guess. The numbers say nothing of
+an alert that is already open when the run starts, and they assume the rules the simulator read are the ones ingest runs.
+
 ## Benchmark
 
 ```bash
@@ -150,17 +204,18 @@ starts two ingest replicas of its own.
 (`node --env-file-if-exists`). Command-line options override it, and the real environment wins over
 the file.
 
-| Variable                     | Default                                                 | Used by          |
-| ---------------------------- | ------------------------------------------------------- | ---------------- |
-| `MQTT_URL`                   | `mqtt://localhost:1883`                                 | `start`, `bench` |
-| `DATABASE_URL`               | `postgres://postgres:postgres@localhost:5433/telemetry` | `bench`          |
-| `CONTROL_HOST`               | `127.0.0.1`                                             | `start`          |
-| `CONTROL_PORT`               | `3200`                                                  | `start`          |
-| `INGEST_URL`                 | `http://localhost:3100`                                 | `start`          |
-| `OCC_CONSOLE_URL`            | empty (no incident link)                                | `start`          |
-| `CONTROL_ALLOW_NON_LOOPBACK` | unset; only the exact value `true` allows               | `start`          |
-| `STUDIO_DIR`                 | `apps/simulator-ui/dist`                                | `start`          |
-| `RULES_FILE`                 | `apps/ingest/config/rules.json`                         | `start`          |
+| Variable                     | Default                                                  | Used by          |
+| ---------------------------- | -------------------------------------------------------- | ---------------- |
+| `MQTT_URL`                   | `mqtt://localhost:1883`                                  | `start`, `bench` |
+| `DATABASE_URL`               | `postgres://postgres:postgres@localhost:5433/telemetry`  | `bench`          |
+| `CONTROL_HOST`               | `127.0.0.1`                                              | `start`          |
+| `CONTROL_PORT`               | `3200`                                                   | `start`          |
+| `INGEST_URL`                 | `http://localhost:3100`                                  | `start`          |
+| `OCC_CONSOLE_URL`            | empty (no incident link)                                 | `start`          |
+| `CONTROL_ALLOW_NON_LOOPBACK` | unset; only the exact value `true` allows                | `start`          |
+| `STUDIO_DIR`                 | `apps/simulator-ui/dist`                                 | `start`          |
+| `RULES_FILE`                 | `apps/ingest/config/rules.json`                          | `start`          |
+| `SCENARIOS_DIR`              | `apps/simulator/scenarios` (absent: no custom scenarios) | `start`          |
 
 `OCC_CONSOLE_URL` is the base URL of the command center console; the control server carries it to
 the UI, which builds the incident link from it (the plain id is shown without it). An empty value
@@ -196,7 +251,11 @@ src/
   engine.ts          the publish loop: devices, anomalies, held values, Step and Reset, events
   clock.ts           the engine's time: the system clock, and a manual clock for tests and Step
   device-source.ts   where devices come from (today the ingest registry, devices.json)
-  scenarios.ts       the presets behind --scenario
+  scenarios.ts       the built-in scenarios, as documents
+  scenario-document.ts   the scenario document: its limits, its validation, the --anomaly flag for it
+  scenario-library.ts    the built-ins, the folder of custom files and the imports, by name
+  scenario-expectations.ts  the alerts a scenario should raise and when, from the rules and the interval
+  scenario-runs.ts   the scenarios Studio started: run, replace, stop, and which are still playing
   signals.ts         per-device-kind baselines, daily curves and anomaly shapes (step, ramp, spike)
   random.ts          a seeded random source for reproducible readings
   control-config.ts  the control server's settings, and the loopback rule

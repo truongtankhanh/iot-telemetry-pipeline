@@ -5,7 +5,8 @@ import { ManualClock } from './clock.ts';
 import { JsonFileDeviceSource } from './device-source.ts';
 import { Engine, type Publisher } from './engine.ts';
 import { seededRandom } from './random.ts';
-import { SCENARIOS } from './scenarios.ts';
+import { toAnomalies, toAnomalyFlag } from './scenario-document.ts';
+import { BUILT_IN_SCENARIOS } from './scenarios.ts';
 import { type Anomaly, type DeviceSpec, parseAnomaly, sample } from './signals.ts';
 
 /**
@@ -83,16 +84,20 @@ describe('Engine against the loop it replaced', () => {
     devices = await new JsonFileDeviceSource(registry).load();
   });
 
-  const cases: [string, string[]][] = [
-    ...Object.entries(SCENARIOS),
+  const cases: [string, Anomaly[]][] = [
+    ...BUILT_IN_SCENARIOS.map((scenario): [string, Anomaly[]] => [
+      scenario.name,
+      toAnomalies(scenario),
+    ]),
     ['no scenario', []],
-    ['two anomalies at once', ['dc-env-02:humidity_pct:80:10:30', 'lib-air-01:co2_ppm:1200:40:20']],
+    [
+      'two anomalies at once',
+      ['dc-env-02:humidity_pct:80:10:30', 'lib-air-01:co2_ppm:1200:40:20'].map(parseAnomaly),
+    ],
   ];
 
-  for (const [name, specs] of cases) {
+  for (const [name, anomalies] of cases) {
     it(`publishes the same messages for ${name}`, async () => {
-      const anomalies = specs.map(parseAnomaly);
-
       const expected = oldLoop(devices, anomalies, seededRandom(SEED), TICKS);
       const actual = await runEngine(devices, anomalies);
 
@@ -102,7 +107,10 @@ describe('Engine against the loop it replaced', () => {
   }
 
   it('holds server-room-overheat at the anomaly value from 20 s to 80 s, and only then', async () => {
-    const anomalies = SCENARIOS['server-room-overheat']!.map(parseAnomaly);
+    const overheat = BUILT_IN_SCENARIOS.find(
+      (scenario) => scenario.name === 'server-room-overheat',
+    );
+    const anomalies = toAnomalies(overheat!);
 
     const messages = await runEngine(devices, anomalies);
 
@@ -119,5 +127,19 @@ describe('Engine against the loop it replaced', () => {
         assert.ok(temperature >= 22.2 && temperature <= 22.8, `${seconds} s: ${temperature}`);
       }
     });
+  });
+
+  it('has a --anomaly flag for each built-in that gives back the same anomalies', () => {
+    for (const scenario of BUILT_IN_SCENARIOS) {
+      const flags = scenario.anomalies.map(toAnomalyFlag);
+      assert.ok(
+        flags.every((flag) => flag !== undefined),
+        scenario.name,
+      );
+      assert.deepEqual(
+        flags.map((flag) => parseAnomaly(flag!)),
+        scenario.anomalies,
+      );
+    }
   });
 });

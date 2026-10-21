@@ -169,11 +169,29 @@ export interface BrokerState {
   connected: boolean;
 }
 
+/** A scenario that Studio started and that is still playing; elapsed time is `engine.elapsedS − offsetS`. */
+export interface ScenarioRunView {
+  id: string;
+  scenario: string;
+  /** When the run was started (wall time, ISO 8601). */
+  startedAt: string;
+  /** The engine's anomaly clock (`engine.elapsedS`) at second 0 of the scenario. */
+  offsetS: number;
+  /** The anomaly clock at the end of the scenario's last anomaly. */
+  endsAtS: number;
+  anomalyIds: string[];
+  /** Devices the run found stopped or paused and started. */
+  startedDevices: string[];
+}
+
 /** The answer of `GET /api/state` and of every command. */
 export interface StateView {
   engine: EngineSnapshot;
   devices: DeviceInfo[];
+  /** The names in the scenario library; the library read has the rest. */
   scenarios: string[];
+  /** The scenarios that are playing now. */
+  runs: ScenarioRunView[];
   ingest: IngestState;
   broker: BrokerState;
   alerts: AlertsFeed;

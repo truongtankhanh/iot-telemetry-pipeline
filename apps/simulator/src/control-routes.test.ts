@@ -15,12 +15,41 @@ import {
 import { type AlertsPage, type AlertsPageQuery, IngestReadError } from './ingest-poller.ts';
 import { type ObservationDraft, ObservationStore } from './observation-store.ts';
 import { type RulesView, rulesUnavailable } from './rules-source.ts';
-import { DEVICES, setupEngine } from './test-support.ts';
+import type { ScenarioDocument } from './scenario-document.ts';
+import { ScenarioLibrary } from './scenario-library.ts';
+import { ScenarioRuns } from './scenario-runs.ts';
+import type { DeviceSpec } from './signals.ts';
+import { DEVICES, setupEngine, T0 } from './test-support.ts';
 
-const SCENARIOS = {
-  overheat: ['dc-env-01:temperature_c:29.2:20:60'],
-  both: ['dc-env-01:temperature_c:29:20:60', 'lib-air-01:co2_ppm:1450:10:30'],
-  broken: ['dc-env-01:temperature_c:29:20:60', 'ghost-01:temperature_c:1:0:5'],
+const OVERHEAT: ScenarioDocument = {
+  name: 'overheat',
+  description: 'Row A runs hot.',
+  anomalies: [
+    { deviceId: 'dc-env-01', metric: 'temperature_c', value: 29.2, startAt: 20, duration: 60 },
+  ],
+};
+const BOTH: ScenarioDocument = {
+  name: 'both',
+  description: 'Two things go wrong.',
+  anomalies: [
+    { deviceId: 'dc-env-01', metric: 'temperature_c', value: 29, startAt: 20, duration: 60 },
+    { deviceId: 'lib-air-01', metric: 'co2_ppm', value: 1450, startAt: 10, duration: 30 },
+  ],
+};
+/** Valid for the registry the library is given, but its second device is not in the engine. */
+const BROKEN: ScenarioDocument = {
+  name: 'broken',
+  description: 'Names a device the engine lacks.',
+  anomalies: [
+    { deviceId: 'dc-env-01', metric: 'temperature_c', value: 29, startAt: 20, duration: 60 },
+    { deviceId: 'ghost-01', metric: 'temperature_c', value: 1, startAt: 0, duration: 5 },
+  ],
+};
+const GHOST: DeviceSpec = {
+  id: 'ghost-01',
+  kind: 'server_room',
+  zoneCode: 'BLD-DC',
+  metrics: ['temperature_c'],
 };
 
 const RULES: RulesView = {
@@ -58,23 +87,34 @@ const INGEST = {
 };
 
 /** The routes over an engine on a manual clock, started, with the engine's pieces to look at. */
-async function setup(options: { started?: boolean; wallClock?: boolean; rules?: RulesView } = {}) {
-  const { started = true, wallClock = false, rules = RULES } = options;
+async function setup(
+  options: { started?: boolean; wallClock?: boolean; rules?: RulesView; broken?: boolean } = {},
+) {
+  const { started = true, wallClock = false, rules = RULES, broken = false } = options;
   const { engine, publisher } = setupEngine(wallClock ? { clock: systemClock } : {});
   if (started && !wallClock) await engine.start();
   const store = new ObservationStore();
   const broker = new BrokerLink('mqtt://u:p@localhost:1883', true);
   const recorded: ObservationDraft[] = [];
+  const library = new ScenarioLibrary({
+    builtIn: broken ? [OVERHEAT, BOTH, BROKEN] : [OVERHEAT, BOTH],
+    devices: broken ? [...DEVICES, GHOST] : DEVICES,
+  });
+  const runs = new ScenarioRuns({
+    engine,
+    record: (draft) => recorded.push(draft),
+    now: () => T0 + 123,
+  });
   const context: RoutesContext = {
     engine,
     devices: DEVICES,
-    scenarios: SCENARIOS,
+    library,
+    runs,
     store,
     ingest: INGEST,
     config: { ingestUrl: 'http://localhost:3100', consoleUrl: null },
     broker,
     rules,
-    record: (draft) => recorded.push(draft),
   };
   const handle = createRoutes(context);
   const call = (method: string, path: string, body?: unknown): Promise<RouteResponse> => {
@@ -114,7 +154,8 @@ describe('GET /api/state', () => {
       ],
     );
     assert.deepEqual(state.devices[2]?.metrics, ['co2_ppm', 'temperature_c', 'humidity_pct']);
-    assert.deepEqual(state.scenarios, ['overheat', 'both', 'broken']);
+    assert.deepEqual(state.scenarios, ['overheat', 'both']);
+    assert.deepEqual(state.runs, []);
     assert.equal(state.ingest.status, 'ready');
     assert.deepEqual(state.config, {
       ingestUrl: 'http://localhost:3100',
@@ -418,28 +459,114 @@ describe('anomaly commands', () => {
   });
 });
 
-describe('scenario commands', () => {
-  it('lists the presets with their anomalies', async () => {
+const post = (call: Awaited<ReturnType<typeof setup>>['call'], path: string, body?: unknown) =>
+  call('POST', path, body);
+
+interface Item {
+  name: string;
+  description: string;
+  source: string;
+  imported: boolean;
+  anomalies: { deviceId: string; startAt: number }[];
+  lengthS: number;
+  needsStart: { deviceId: string; state: string }[];
+  lastRunAt: string | null;
+  running: boolean;
+  expected: {
+    available: boolean;
+    reason?: string;
+    alerts?: { ruleId: string; deviceId: string; opensAtS: number; clearsAtS: number | null }[];
+    quiet?: { deviceId: string; why: string }[];
+  };
+}
+const library = (response: RouteResponse) =>
+  response.body as { scenarios: Item[]; rejected: unknown[]; intervalMs: number };
+const item = (response: RouteResponse, name: string) =>
+  library(response).scenarios.find((s) => s.name === name);
+
+describe('GET /api/scenarios', () => {
+  it('lists the library with what Studio draws a card from', async () => {
     const { call } = await setup();
-    const { scenarios } = (await call('GET', '/api/scenarios')).body as {
-      scenarios: { name: string; anomalies: { deviceId: string; startAt: number }[] }[];
-    };
+    const response = await call('GET', '/api/scenarios');
+
+    assert.equal(response.status, 200);
     assert.deepEqual(
-      scenarios.map((s) => s.name),
-      ['overheat', 'both', 'broken'],
+      library(response).scenarios.map((s) => s.name),
+      ['overheat', 'both'],
     );
-    assert.equal(scenarios[0]?.anomalies[0]?.deviceId, 'dc-env-01');
-    assert.equal(scenarios[0]?.anomalies[0]?.startAt, 20);
+    assert.equal(library(response).intervalMs, 2000);
+    assert.deepEqual(library(response).rejected, []);
+    const overheat = item(response, 'overheat');
+    assert.equal(overheat?.description, 'Row A runs hot.');
+    assert.equal(overheat?.source, 'built-in');
+    assert.equal(overheat?.imported, false);
+    assert.equal(overheat?.lengthS, 80);
+    assert.deepEqual(overheat?.needsStart, []);
+    assert.equal(overheat?.running, false);
+    assert.equal(overheat?.lastRunAt, null);
+    assert.equal(overheat?.anomalies[0]?.deviceId, 'dc-env-01');
+    assert.equal(overheat?.anomalies[0]?.startAt, 20);
   });
 
+  it('says which alerts a scenario should raise, and when', async () => {
+    const { call } = await setup();
+    const response = await call('GET', '/api/scenarios');
+
+    const overheat = item(response, 'overheat')?.expected;
+    assert.equal(overheat?.available, true);
+    assert.deepEqual(
+      overheat?.alerts?.map((a) => [a.ruleId, a.deviceId, a.opensAtS, a.clearsAtS]),
+      [['server-room-hot', 'dc-env-01', 24, 80]],
+    );
+    // No rule watches CO₂ in this test's rules: the anomaly is said to raise nothing, not left out.
+    const both = item(response, 'both')?.expected;
+    assert.deepEqual(both?.quiet, [{ deviceId: 'lib-air-01', metric: 'co2_ppm', why: 'no-rule' }]);
+  });
+
+  it('gives no guess when the rules could not be read, and says why', async () => {
+    const { call } = await setup({ rules: rulesUnavailable('cannot read rules.json (ENOENT)') });
+    for (const s of library(await call('GET', '/api/scenarios')).scenarios) {
+      assert.deepEqual(s.expected, { available: false, reason: 'cannot read rules.json (ENOENT)' });
+    }
+  });
+
+  it('lists the devices a run would start, with the state they are in', async () => {
+    const { call } = await setup();
+    await call('POST', '/api/devices/dc-env-01/stop');
+    await call('POST', '/api/devices/lib-air-01/pause');
+
+    const response = await call('GET', '/api/scenarios');
+
+    assert.deepEqual(item(response, 'overheat')?.needsStart, [
+      { deviceId: 'dc-env-01', state: 'stopped' },
+    ]);
+    assert.deepEqual(item(response, 'both')?.needsStart, [
+      { deviceId: 'dc-env-01', state: 'stopped' },
+      { deviceId: 'lib-air-01', state: 'paused' },
+    ]);
+  });
+
+  it("works the expected times out with a device's own interval", async () => {
+    const { call } = await setup();
+    await call('PUT', '/api/devices/dc-env-01/interval', { intervalMs: 1000 });
+    const overheat = item(await call('GET', '/api/scenarios'), 'overheat')?.expected;
+    assert.equal(overheat?.alerts?.[0]?.opensAtS, 22); // 20, 21, 22 s
+  });
+});
+
+describe('POST /api/scenarios/:name/run', () => {
   it('runs a preset starting from now: its "20 s in" is 20 s from the click', async () => {
     const { call, engine, recorded } = await setup();
     for (let i = 0; i < 5; i++) await engine.step(); // 10 s in
 
-    const response = await call('POST', '/api/scenarios/both/run');
+    const response = await post(call, '/api/scenarios/both/run');
 
     assert.equal(response.status, 200);
-    assert.deepEqual((response.body as { anomalyIds: string[] }).anomalyIds, ['a1', 'a2']);
+    const body = response.body as Record<string, unknown>;
+    assert.equal(body.runId, 'r1');
+    assert.deepEqual(body.anomalyIds, ['a1', 'a2']);
+    assert.deepEqual(body.startedDevices, []);
+    assert.deepEqual(body.replaced, []);
     assert.deepEqual(
       engine.snapshot().anomalies.map((a) => [a.id, a.anomaly.startAt, a.anomaly.duration]),
       [
@@ -447,6 +574,17 @@ describe('scenario commands', () => {
         ['a2', 20, 30],
       ],
     );
+    assert.deepEqual(view(response).runs, [
+      {
+        id: 'r1',
+        scenario: 'both',
+        startedAt: '2026-10-01T05:00:00.123Z',
+        offsetS: 10,
+        endsAtS: 90,
+        anomalyIds: ['a1', 'a2'],
+        startedDevices: [],
+      },
+    ]);
     assert.deepEqual(recorded, [
       {
         kind: 'scenario-run',
@@ -459,25 +597,181 @@ describe('scenario commands', () => {
             { id: 'a1', deviceId: 'dc-env-01', metric: 'temperature_c', startAt: 30, duration: 60 },
             { id: 'a2', deviceId: 'lib-air-01', metric: 'co2_ppm', startAt: 20, duration: 30 },
           ],
+          runId: 'r1',
+          startedDevices: [],
+          replaced: [],
         },
       },
     ]);
   });
 
-  it('adds nothing when one anomaly of the preset cannot be added', async () => {
-    const { call, engine, recorded } = await setup();
-    const response = await call('POST', '/api/scenarios/broken/run');
+  it('marks the scenario as running, with the time it was run, in the library read', async () => {
+    const { call } = await setup();
+    await post(call, '/api/scenarios/overheat/run');
+    const overheat = item(await call('GET', '/api/scenarios'), 'overheat');
+    assert.equal(overheat?.running, true);
+    assert.equal(overheat?.lastRunAt, '2026-10-01T05:00:00.123Z');
+    assert.equal(item(await call('GET', '/api/scenarios'), 'both')?.running, false);
+  });
+
+  it('starts the stopped and paused devices it needs and says which', async () => {
+    const { call } = await setup();
+    await call('POST', '/api/devices/dc-env-01/stop');
+    await call('POST', '/api/devices/lib-air-01/pause');
+
+    const response = await post(call, '/api/scenarios/both/run');
+
+    assert.deepEqual((response.body as { startedDevices: string[] }).startedDevices, [
+      'dc-env-01',
+      'lib-air-01',
+    ]);
+    assert.equal(device(response, 'dc-env-01')?.state, 'running');
+    assert.equal(device(response, 'lib-air-01')?.state, 'running');
+  });
+
+  it('adds nothing when one anomaly of the scenario cannot be added', async () => {
+    const { call, engine, recorded } = await setup({ broken: true });
+    const response = await post(call, '/api/scenarios/broken/run');
 
     assertEnvelope(response, 400, /ghost-01/);
     assert.deepEqual(engine.snapshot().anomalies, []);
     assert.deepEqual(recorded, []);
   });
 
-  it('answers 404 for a preset it does not have, including names that exist on every object', async () => {
+  it('refuses to play over a run in the way, names it, and changes nothing', async () => {
+    const { call, engine, recorded } = await setup();
+    await post(call, '/api/scenarios/overheat/run');
+
+    const response = await post(call, '/api/scenarios/overheat/run');
+
+    assertEnvelope(response, 409, /replace/);
+    assert.deepEqual((response.body as { conflicts: unknown }).conflicts, [
+      { deviceId: 'dc-env-01', anomalyId: 'a1', runId: 'r1', scenario: 'overheat' },
+    ]);
+    assert.equal(engine.snapshot().anomalies.length, 1);
+    assert.equal(recorded.length, 1);
+  });
+
+  it('replaces the run in the way when asked to', async () => {
+    const { call, engine } = await setup();
+    await post(call, '/api/scenarios/overheat/run');
+
+    const response = await post(call, '/api/scenarios/overheat/run', { replace: true });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual((response.body as { replaced: unknown }).replaced, [
+      { runId: 'r1', scenario: 'overheat', anomalyIds: ['a1'] },
+    ]);
+    assert.deepEqual(
+      engine.snapshot().anomalies.map((a) => a.id),
+      ['a2'],
+    );
+    assert.deepEqual(
+      view(response).runs.map((r) => r.id),
+      ['r2'],
+    );
+  });
+
+  it('refuses a replace that is not true or false', async () => {
     const { call } = await setup();
-    assertEnvelope(await call('POST', '/api/scenarios/nope/run'), 404, /Unknown scenario "nope"/);
-    assertEnvelope(await call('POST', '/api/scenarios/constructor/run'), 404);
-    assertEnvelope(await call('POST', '/api/scenarios/__proto__/run'), 404);
+    assertEnvelope(
+      await post(call, '/api/scenarios/overheat/run', { replace: 'yes' }),
+      400,
+      /"replace" must be true or false/,
+    );
+    assertEnvelope(
+      await post(call, '/api/scenarios/overheat/run', [true]),
+      400,
+      /must be a JSON object/,
+    );
+  });
+
+  it('answers 404 for a scenario it does not have, including names that exist on every object', async () => {
+    const { call } = await setup();
+    assertEnvelope(await post(call, '/api/scenarios/nope/run'), 404, /Unknown scenario "nope"/);
+    assertEnvelope(await post(call, '/api/scenarios/constructor/run'), 404);
+    assertEnvelope(await post(call, '/api/scenarios/__proto__/run'), 404);
+  });
+});
+
+describe('POST /api/scenarios/:name/stop', () => {
+  it('stops the run, removes its anomalies and records it', async () => {
+    const { call, engine, recorded } = await setup();
+    await post(call, '/api/scenarios/overheat/run');
+
+    const response = await post(call, '/api/scenarios/overheat/stop');
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(view(response).runs, []);
+    assert.deepEqual(engine.snapshot().anomalies, []);
+    assert.deepEqual(recorded.at(-1), {
+      kind: 'scenario-stop',
+      data: { name: 'overheat', runId: 'r1', anomalyIds: ['a1'], reason: 'stopped' },
+    });
+  });
+
+  it('answers 409 for a scenario that is not running, 404 for one that does not exist', async () => {
+    const { call } = await setup();
+    assertEnvelope(
+      await post(call, '/api/scenarios/overheat/stop'),
+      409,
+      /"overheat" is not running/,
+    );
+    assertEnvelope(await post(call, '/api/scenarios/nope/stop'), 404, /Unknown scenario/);
+    assertEnvelope(await post(call, '/api/scenarios/constructor/stop'), 404);
+  });
+});
+
+describe('POST /api/scenarios/import', () => {
+  const extra = {
+    name: 'extra',
+    description: 'Imported.',
+    anomalies: [
+      { deviceId: 'dc-env-02', metric: 'temperature_c', value: 30, startAt: 5, duration: 20 },
+    ],
+  };
+
+  it('keeps a valid scenario for the session and answers with its card', async () => {
+    const { call } = await setup();
+
+    const response = await post(call, '/api/scenarios/import', extra);
+
+    assert.equal(response.status, 201);
+    const created = (response.body as { scenario: Item }).scenario;
+    assert.equal(created.name, 'extra');
+    assert.equal(created.source, 'custom');
+    assert.equal(created.imported, true);
+    assert.deepEqual(
+      created.expected.alerts?.map((a) => [a.deviceId, a.opensAtS, a.clearsAtS]),
+      [['dc-env-02', 10, 26]],
+    );
+    assert.deepEqual(view(response).scenarios, ['overheat', 'both', 'extra']);
+    assert.equal((await post(call, '/api/scenarios/extra/run')).status, 200);
+  });
+
+  it('refuses a value outside the range of the contract, with the reason', async () => {
+    const { call } = await setup();
+    const hot = { ...extra, anomalies: [{ ...extra.anomalies[0], value: 900 }] };
+
+    const response = await post(call, '/api/scenarios/import', hot);
+
+    assertEnvelope(
+      response,
+      400,
+      /^anomalies\[0\]\.value 900 is outside the range of temperature_c \(-40 to 85 °C\)$/,
+    );
+    assert.deepEqual(view(await call('GET', '/api/state')).scenarios, ['overheat', 'both']);
+  });
+
+  it('refuses what is not a scenario, a reserved name and a name that is taken', async () => {
+    const { call } = await setup();
+    assertEnvelope(await post(call, '/api/scenarios/import'), 400, /must be a JSON object/);
+    assertEnvelope(await post(call, '/api/scenarios/import', { ...extra, name: 'import' }), 400);
+    assertEnvelope(
+      await post(call, '/api/scenarios/import', { ...extra, name: 'overheat' }),
+      409,
+      /already exists/,
+    );
   });
 });
 

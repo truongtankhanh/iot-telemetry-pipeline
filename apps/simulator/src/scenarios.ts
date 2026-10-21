@@ -1,9 +1,24 @@
+import type { ScenarioDocument } from './scenario-document.ts';
+
 /**
- * Preset anomalies for `--scenario`, in the `--anomaly` format (`device:metric:value:startAt:duration`).
- * SIM-08 turns these into data; until then the CLI and the tests read them from here.
+ * The scenarios that ship with the simulator, as the same documents a custom scenario is written in. The CLI's
+ * `--scenario`, the control API and Studio all read them through the `ScenarioLibrary`. Times are seconds from
+ * the start of the scenario.
  */
-export const SCENARIOS: Record<string, string[]> = {
-  // Overheats row A for a minute, then recovers: opens and clears "Server room temperature high".
-  'server-room-overheat': ['dc-env-01:temperature_c:29.2:20:60'],
-  'crowded-lecture': ['lha-air-01:co2_ppm:1450:20:90'],
-};
+export const BUILT_IN_SCENARIOS: ScenarioDocument[] = [
+  {
+    name: 'server-room-overheat',
+    // Overheats row A for a minute, then recovers: opens and clears "Server room temperature high".
+    description: 'Row A runs hot for a minute, then recovers.',
+    anomalies: [
+      { deviceId: 'dc-env-01', metric: 'temperature_c', value: 29.2, startAt: 20, duration: 60 },
+    ],
+  },
+  {
+    name: 'crowded-lecture',
+    description: 'Lecture Hall A fills up and CO₂ climbs.',
+    anomalies: [
+      { deviceId: 'lha-air-01', metric: 'co2_ppm', value: 1450, startAt: 20, duration: 90 },
+    ],
+  },
+];
