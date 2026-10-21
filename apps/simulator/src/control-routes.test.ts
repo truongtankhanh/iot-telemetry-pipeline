@@ -7,7 +7,9 @@ import { systemClock } from './clock.ts';
 import {
   buildStateView,
   createRoutes,
+  type ExpectationPreview,
   type PagedAlert,
+  PREVIEW_MAX_ANOMALIES,
   type RouteResponse,
   type RoutesContext,
   type StateView,
@@ -555,6 +557,246 @@ describe('GET /api/scenarios', () => {
     await call('PUT', '/api/devices/dc-env-01/interval', { intervalMs: 1000 });
     const overheat = item(await call('GET', '/api/scenarios'), 'overheat')?.expected;
     assert.equal(overheat?.alerts?.[0]?.opensAtS, 22); // 20, 21, 22 s
+  });
+});
+
+describe('POST /api/expectations', () => {
+  const preview = (response: RouteResponse) => response.body as ExpectationPreview;
+  const anomalyBody = (change: Record<string, unknown> = {}) => ({
+    deviceId: 'dc-env-01',
+    metric: 'temperature_c',
+    value: 29.2,
+    startAt: 20,
+    duration: 60,
+    ...change,
+  });
+  /** `count` anomalies on one device and metric that follow each other without overlapping. */
+  const sequence = (count: number) =>
+    Array.from({ length: count }, (_, i) => anomalyBody({ startAt: i * 10, duration: 10 }));
+
+  it('says what the library says for the anomalies of a scenario, device states included', async () => {
+    const { call } = await setup();
+    await call('POST', '/api/devices/dc-env-01/stop');
+    await call('POST', '/api/devices/lib-air-01/pause');
+
+    const read = await call('GET', '/api/scenarios');
+    for (const scenario of [OVERHEAT, BOTH]) {
+      const response = await call('POST', '/api/expectations', { anomalies: scenario.anomalies });
+      assert.equal(response.status, 200);
+      const listed = item(read, scenario.name);
+      assert.deepEqual(preview(response).expected, listed?.expected, scenario.name);
+      assert.deepEqual(preview(response).needsStart, listed?.needsStart, scenario.name);
+      assert.equal(preview(response).intervalMs, 2000);
+    }
+  });
+
+  it('works out a fault on several devices started a few seconds apart', async () => {
+    const { call } = await setup();
+    const response = await call('POST', '/api/expectations', {
+      anomalies: [anomalyBody(), anomalyBody({ deviceId: 'dc-env-02', startAt: 22 })],
+    });
+
+    const { expected } = preview(response);
+    assert.ok(expected.available);
+    assert.deepEqual(
+      expected.alerts.map((a) => [a.deviceId, a.opensAtS, a.clearsAtS]),
+      [
+        ['dc-env-01', 24, 80],
+        ['dc-env-02', 26, 82],
+      ],
+    );
+    assert.equal(expected.horizonS, 82);
+  });
+
+  it('changes nothing: no anomaly, no library entry, no observation, no state', async () => {
+    const { call, store } = await setup();
+    const before = (await call('GET', '/api/state')).body;
+    const cursor = store.latestId();
+
+    await call('POST', '/api/expectations', { anomalies: [anomalyBody()] });
+    await call('POST', '/api/expectations', { anomalies: [anomalyBody({ deviceId: 'ghost' })] });
+
+    assert.deepEqual((await call('GET', '/api/state')).body, before);
+    assert.deepEqual((await call('GET', '/api/anomalies')).body, { anomalies: [] });
+    assert.deepEqual(
+      library(await call('GET', '/api/scenarios')).scenarios.map((s) => s.name),
+      ['overheat', 'both'],
+    );
+    assert.equal(store.latestId(), cursor);
+  });
+
+  it('lists the devices that are not running, in the order the anomalies use them, and starts their ticks at 1', async () => {
+    const { call } = await setup();
+    const fast = [anomalyBody({ startAt: 0, duration: 30 })];
+    const running = await call('POST', '/api/expectations', { anomalies: fast });
+    assert.deepEqual(preview(running).needsStart, []);
+    const runningExpected = preview(running).expected;
+    assert.ok(runningExpected.available);
+    assert.equal(runningExpected.alerts[0]?.opensAtS, 4);
+
+    await call('POST', '/api/devices/dc-env-01/stop');
+    await call('POST', '/api/devices/dc-env-02/pause');
+    const stopped = await call('POST', '/api/expectations', {
+      anomalies: [anomalyBody({ deviceId: 'dc-env-02' }), ...fast, anomalyBody({ startAt: 200 })],
+    });
+    assert.deepEqual(preview(stopped).needsStart, [
+      { deviceId: 'dc-env-02', state: 'paused' },
+      { deviceId: 'dc-env-01', state: 'stopped' },
+    ]);
+    const first = await call('POST', '/api/expectations', { anomalies: fast });
+    const firstExpected = preview(first).expected;
+    assert.ok(firstExpected.available);
+    assert.equal(firstExpected.alerts[0]?.opensAtS, 6);
+  });
+
+  it("works the times out with a device's own interval", async () => {
+    const { call } = await setup();
+    await call('PUT', '/api/devices/dc-env-01/interval', { intervalMs: 1000 });
+    const { expected } = preview(
+      await call('POST', '/api/expectations', { anomalies: [anomalyBody()] }),
+    );
+    assert.ok(expected.available);
+    assert.equal(expected.alerts[0]?.opensAtS, 22); // 20, 21, 22 s
+  });
+
+  it('accepts as many anomalies as the cap, and says what raises nothing', async () => {
+    const { call } = await setup();
+    const response = await call('POST', '/api/expectations', {
+      anomalies: [
+        ...sequence(PREVIEW_MAX_ANOMALIES - 1),
+        anomalyBody({ metric: 'humidity_pct', value: 70 }),
+      ],
+    });
+    assert.equal(response.status, 200);
+    const { expected } = preview(response);
+    assert.ok(expected.available);
+    assert.deepEqual(expected.quiet, [
+      { deviceId: 'dc-env-01', metric: 'humidity_pct', why: 'no-rule' },
+    ]);
+  });
+
+  it('gives no guess when the rules could not be read, and says why', async () => {
+    const { call } = await setup({ rules: rulesUnavailable('cannot read rules.json (ENOENT)') });
+    const response = await call('POST', '/api/expectations', { anomalies: [anomalyBody()] });
+    assert.equal(response.status, 200);
+    assert.deepEqual(preview(response).expected, {
+      available: false,
+      reason: 'cannot read rules.json (ENOENT)',
+    });
+  });
+
+  it('gives no guess, with the sum and the limit, when the walk would be too long', async () => {
+    const { call } = await setup();
+    for (const id of ['dc-env-01', 'dc-env-02', 'lib-air-01']) {
+      await call('PUT', `/api/devices/${id}/interval`, { intervalMs: 1000 });
+    }
+    // Seven signals over 3,600 s at 1 s: 3,610 ticks each, 25,270 in all, against 20,000.
+    const long = { startAt: 0, duration: 3600 };
+    const response = await call('POST', '/api/expectations', {
+      anomalies: [
+        anomalyBody(long),
+        anomalyBody({ ...long, metric: 'humidity_pct', value: 70 }),
+        anomalyBody({ ...long, deviceId: 'dc-env-02' }),
+        anomalyBody({ ...long, deviceId: 'dc-env-02', metric: 'humidity_pct', value: 70 }),
+        anomalyBody({ ...long, deviceId: 'lib-air-01', metric: 'co2_ppm', value: 1450 }),
+        anomalyBody({ ...long, deviceId: 'lib-air-01' }),
+        anomalyBody({ ...long, deviceId: 'lib-air-01', metric: 'humidity_pct', value: 70 }),
+      ],
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(preview(response).expected, {
+      available: false,
+      reason:
+        'Too many readings to work out the alerts of 7 anomalies on 7 signals over 3600 s: 25270 against a limit of 20000',
+    });
+  });
+
+  it('refuses what a scenario file would refuse, and what is not a request, with the reason', async () => {
+    const { call } = await setup();
+    const refused = async (body: unknown, message: RegExp) =>
+      assertEnvelope(await call('POST', '/api/expectations', body), 400, message);
+    const list = /^anomalies must be a list of 1 to 100 anomalies$/;
+
+    await refused(
+      { anomalies: [anomalyBody({ deviceId: 'ghost' })] },
+      /anomalies\[0\]: unknown device "ghost"/,
+    );
+    await refused({ anomalies: [anomalyBody({ metric: 'power_kw' })] }, /does not report power_kw/);
+    await refused(
+      { anomalies: [anomalyBody({ value: 90 })] },
+      /outside the range of temperature_c/,
+    );
+    await refused(
+      { anomalies: [anomalyBody({ startAt: -1 })] },
+      /startAt must be a number of seconds/,
+    );
+    await refused(
+      { anomalies: [anomalyBody({ duration: 3601 })] },
+      /duration must be .* at most 3600/,
+    );
+    await refused(
+      { anomalies: [anomalyBody({ shape: 'wave' })] },
+      /shape must be one of step, ramp, spike/,
+    );
+    await refused(
+      { anomalies: [anomalyBody({ shap: 'ramp' })] },
+      /anomalies\[0\]\.shap is not a known field/,
+    );
+    await refused(
+      { anomalies: [anomalyBody(), anomalyBody({ startAt: 50, duration: 10 })] },
+      /anomalies\[1\] overlaps anomalies\[0\] on dc-env-01 temperature_c/,
+    );
+    await refused({ anomalies: [] }, list);
+    await refused({}, list);
+    await refused({ anomalies: sequence(PREVIEW_MAX_ANOMALIES + 1) }, list);
+    await refused(
+      { anomalies: [anomalyBody()], name: 'x' },
+      /"name" is not a known field of the request/,
+    );
+    await refused([], /must be a JSON object/);
+  });
+
+  it('answers 405 with Allow: POST to a GET', async () => {
+    const { call } = await setup();
+    const response = await call('GET', '/api/expectations');
+    assertEnvelope(response, 405);
+    assert.equal(response.headers?.Allow, 'POST');
+  });
+});
+
+describe('POST /api/expectations and the fixture of the UI', () => {
+  // apps/simulator-ui types the preview it reads against this file (a real POST /api/expectations body); if the
+  // route changes the keys of its answer, this fails until the file and the UI's types follow.
+  interface Answer {
+    expected: { alerts: unknown[]; series: unknown[] };
+    needsStart: unknown[];
+  }
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../../simulator-ui/src/api/fixtures/expectations.json', import.meta.url),
+      'utf8',
+    ),
+  ) as Answer;
+  const keys = (value: unknown) => Object.keys(value as object).sort();
+
+  it('has the same keys as the fixture, section by section', async () => {
+    const { call } = await setup();
+    await call('POST', '/api/devices/dc-env-01/stop'); // so that there is a device to start
+    const actual = (await call('POST', '/api/expectations', { anomalies: OVERHEAT.anomalies }))
+      .body as Answer;
+
+    assert.deepEqual(keys(actual), keys(fixture), 'the answer');
+    assert.deepEqual(keys(actual.expected), keys(fixture.expected), 'expected');
+    assert.deepEqual(keys(actual.expected.alerts[0]), keys(fixture.expected.alerts[0]), 'an alert');
+    assert.deepEqual(keys(actual.expected.series[0]), keys(fixture.expected.series[0]), 'a series');
+    assert.deepEqual(keys(actual.needsStart[0]), keys(fixture.needsStart[0]), 'a device to start');
+  });
+
+  it('answers the fixture back, value for value, for the scenario it was made from', async () => {
+    const { call } = await setup();
+    await call('POST', '/api/devices/dc-env-01/stop');
+    const response = await call('POST', '/api/expectations', { anomalies: OVERHEAT.anomalies });
+    assert.deepEqual(response.body, fixture);
   });
 });
 

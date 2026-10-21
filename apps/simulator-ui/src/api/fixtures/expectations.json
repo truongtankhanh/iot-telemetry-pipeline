@@ -1,0 +1,35 @@
+{
+  "expected": {
+    "available": true,
+    "intervalS": 2,
+    "horizonS": 80,
+    "alerts": [
+      {
+        "ruleId": "server-room-hot",
+        "title": "Server room temperature high",
+        "severity": "high",
+        "deviceId": "dc-env-01",
+        "metric": "temperature_c",
+        "opensAtS": 24,
+        "opensMargin": false,
+        "clearsAtS": 80,
+        "clearsUncertain": false
+      }
+    ],
+    "quiet": [],
+    "series": [
+      {
+        "deviceId": "dc-env-01",
+        "metric": "temperature_c",
+        "stepS": 2,
+        "points": [
+          22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 29.2, 29.2, 29.2, 29.2, 29.2,
+          29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2,
+          29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 22.5
+        ]
+      }
+    ]
+  },
+  "needsStart": [{ "deviceId": "dc-env-01", "state": "stopped" }],
+  "intervalMs": 2000
+}

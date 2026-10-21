@@ -215,6 +215,7 @@ verify_job() {
   [ "$DO_INSTALL" -eq 1 ] && run_step "pnpm install --frozen-lockfile" pnpm install --frozen-lockfile
   run_step "format:check"  pnpm format:check
   run_step "docs:links (script test)" node --test scripts/check-doc-links.test.mjs
+  run_step "registry-100 (script test)" node --test scripts/gen-registry-100.test.mjs
   run_step "docs:links"     pnpm docs:links
   run_step "lint"          pnpm exec turbo run lint --concurrency="$JOBS" $FORCE
   run_step "typecheck"     pnpm exec turbo run typecheck --concurrency="$JOBS" $FORCE

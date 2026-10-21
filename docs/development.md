@@ -74,6 +74,41 @@ stops with `Unexpected argument '--scenario'`.
 
 `dev` and `docker:demo` are long-lived; stop them when you are done.
 
+### The 100-device registry
+
+The Simulation lab changes shape above 60 devices (a scrolling zone list, a zone table, one lane per zone group). To see that with real
+processes, [apps/simulator/fixtures/devices-100/](../apps/simulator/fixtures/devices-100/) holds a `devices.json` of 100 devices in 20 zones
+and a `rules.json` (a copy of ingest's). The simulator and **ingest must read the same directory**: ingest rejects a device that is not in
+its `devices.json` as `unknown_device`, so with the simulator alone only the six devices of the default registry would raise alerts.
+Run them from the repository root, in two terminals, instead of the commands above (flags **without** a `--`, as above):
+
+```bash
+CONFIG_DIR="$PWD/apps/simulator/fixtures/devices-100" pnpm --filter @itp/ingest dev    # terminal 1, long-lived
+pnpm --filter @itp/simulator start \
+  --registry "$PWD/apps/simulator/fixtures/devices-100/devices.json" \
+  --rules "$PWD/apps/simulator/fixtures/devices-100/rules.json"                         # terminal 2, long-lived
+```
+
+Run it without the command center (leave `OCC_API_URL` unset: the alert sink is a no-op and says so at boot). The zone codes `SIM-Z01` to
+`SIM-Z08` are invented here, and the seven `BLD-` codes beyond the five of the real registry are the buildings drawn in the design's
+twin, not checked against the command center, which would answer `zone <code> does not exist in ops-command-center` for them.
+
+**What it leaves in the database.** Ingest upserts every device of its `devices.json` into the `device` table at boot and keeps the rows when a
+device later leaves the file ([operations](operations.md)), so running it on this directory against the development database leaves 94
+extra devices there. To avoid that, give ingest a database of its own for the check. Ingest creates its tables when it boots, so an empty
+one is enough; these are commands to run by hand, and the first and last are the only ones that create or remove anything:
+
+```bash
+docker compose exec postgres createdb -U postgres telemetry_lab            # once, before the check
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/telemetry_lab \
+  CONFIG_DIR="$PWD/apps/simulator/fixtures/devices-100" pnpm --filter @itp/ingest dev
+docker compose exec postgres dropdb -U postgres telemetry_lab              # afterwards
+```
+
+The files are generated: change the table in [scripts/gen-registry-100.mjs](../scripts/gen-registry-100.mjs) or ingest's `rules.json`, run
+`node scripts/gen-registry-100.mjs`, and commit the result; `node --test scripts/gen-registry-100.test.mjs` (also in CI) fails when they
+drift apart.
+
 ## Repository layout
 
 ```

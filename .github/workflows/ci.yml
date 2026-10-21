@@ -67,6 +67,8 @@ jobs:
       - run: pnpm format:check
       # Every relative link and anchor in the tracked Markdown files resolves (scripts/check-doc-links.mjs).
       - run: node --test scripts/check-doc-links.test.mjs
+      # The committed 100-device registry of the Simulation lab check is what its generator writes, with ingest's rules.json.
+      - run: node --test scripts/gen-registry-100.test.mjs
       - run: pnpm docs:links
       - run: pnpm lint
       - run: pnpm typecheck

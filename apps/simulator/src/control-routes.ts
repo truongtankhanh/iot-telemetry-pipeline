@@ -14,8 +14,8 @@ import {
 import type { DeviceState, Engine, EngineSnapshot } from './engine.ts';
 import { type ObservationStore, PAGE_MAX } from './observation-store.ts';
 import type { RulesView } from './rules-source.ts';
-import { lengthS } from './scenario-document.ts';
-import { type Expected, expectedAlerts } from './scenario-expectations.ts';
+import { lengthS, parseAnomalies, type ScenarioDocument } from './scenario-document.ts';
+import { type Expected, expectedAlerts, MAX_WALK_TICKS } from './scenario-expectations.ts';
 import type { LibraryEntry, RejectedScenario, ScenarioLibrary } from './scenario-library.ts';
 import {
   ScenarioConflictError,
@@ -164,6 +164,21 @@ export interface ScenarioItem {
   running: boolean;
   expected: Expected;
 }
+
+/**
+ * The answer of `POST /api/expectations`: what the rules should do with a list of anomalies that is in no scenario (the
+ * Lab's fault being configured), worked out exactly as the library read does it for a scenario. Times are seconds from now.
+ */
+export interface ExpectationPreview {
+  expected: Expected;
+  /** Devices the anomalies name that are not running now, with the state they are in (the library item's `needsStart`). */
+  needsStart: ScenarioItem['needsStart'];
+  /** The engine's publish interval, which the tolerance of the expected times is measured in. */
+  intervalMs: number;
+}
+
+/** The most anomalies one preview takes: a fault on every device of a registry of this size. */
+export const PREVIEW_MAX_ANOMALIES = 100;
 
 export interface ScenarioLibraryView {
   scenarios: ScenarioItem[];
@@ -450,14 +465,36 @@ export function createRoutes(context: RoutesContext) {
     return ok(view());
   });
 
-  function scenarioItem(entry: LibraryEntry, engineState: EngineSnapshot): ScenarioItem {
-    const { scenario } = entry;
+  /**
+   * What a scenario would need and do, for the library and for the preview alike, so the two cannot drift: the devices it would
+   * start, and the alerts the rules should raise. Worked out on every call: a device's own interval can change while the process runs.
+   */
+  function expectationFor(
+    scenario: ScenarioDocument,
+    engineState: EngineSnapshot,
+    limits: { maxTotalTicks?: number } = {},
+  ): Pick<ScenarioItem, 'needsStart' | 'expected'> {
     const devices = new Map(engineState.devices.map((device) => [device.id, device]));
     const needsStart: ScenarioItem['needsStart'] = [];
     for (const deviceId of new Set(scenario.anomalies.map((anomaly) => anomaly.deviceId))) {
       const state = devices.get(deviceId)?.state;
       if (state !== undefined && state !== 'running') needsStart.push({ deviceId, state });
     }
+    const expected = expectedAlerts(scenario, {
+      devices: context.devices,
+      rules: context.rules,
+      intervalMs: engineState.intervalMs,
+      intervalMsOf: (deviceId) => devices.get(deviceId)?.intervalMs ?? engineState.intervalMs,
+      needsStart: new Set(needsStart.map((need) => need.deviceId)),
+      baseMs: engineState.nowMs,
+      ...limits,
+    });
+    return { needsStart, expected };
+  }
+
+  function scenarioItem(entry: LibraryEntry, engineState: EngineSnapshot): ScenarioItem {
+    const { scenario } = entry;
+    const { needsStart, expected } = expectationFor(scenario, engineState);
     return {
       name: scenario.name,
       description: scenario.description,
@@ -468,15 +505,7 @@ export function createRoutes(context: RoutesContext) {
       needsStart,
       lastRunAt: context.runs.lastRunAt(scenario.name),
       running: context.runs.active().some((run) => run.scenario === scenario.name),
-      // Worked out on every read: a device's own interval can change while the process runs.
-      expected: expectedAlerts(scenario, {
-        devices: context.devices,
-        rules: context.rules,
-        intervalMs: engineState.intervalMs,
-        intervalMsOf: (deviceId) => devices.get(deviceId)?.intervalMs ?? engineState.intervalMs,
-        needsStart: new Set(needsStart.map((need) => need.deviceId)),
-        baseMs: engineState.nowMs,
-      }),
+      expected,
     };
   }
 
@@ -494,6 +523,33 @@ export function createRoutes(context: RoutesContext) {
       intervalMs: engineState.intervalMs,
     };
     return ok(body);
+  });
+
+  // A POST because the body is a list that does not fit a query string; it changes nothing: no anomaly, no library entry, no
+  // observation. It sees only the anomalies of the request, not the ones the engine already plays (the caller checks those).
+  on('POST', '/api/expectations', (_params, request) => {
+    const body = bodyObject(request);
+    const extra = Object.keys(body).find((key) => key !== 'anomalies');
+    if (extra !== undefined) {
+      throw new HttpError(400, `"${extra}" is not a known field of the request`);
+    }
+    const list = parseAnomalies(body.anomalies, {
+      devices: context.devices,
+      max: PREVIEW_MAX_ANOMALIES,
+    });
+    if (!list.ok) throw new HttpError(400, list.reason);
+
+    const engineState = engine.snapshot();
+    const scenario: ScenarioDocument = {
+      name: 'preview',
+      description: '',
+      anomalies: list.anomalies,
+    };
+    const { needsStart, expected } = expectationFor(scenario, engineState, {
+      maxTotalTicks: MAX_WALK_TICKS,
+    });
+    const answer: ExpectationPreview = { expected, needsStart, intervalMs: engineState.intervalMs };
+    return ok(answer);
   });
 
   on('POST', '/api/scenarios/import', (_params, request) => {

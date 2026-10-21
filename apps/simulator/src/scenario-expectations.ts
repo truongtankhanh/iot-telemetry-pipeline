@@ -74,6 +74,12 @@ export interface ExpectationOptions {
   needsStart: ReadonlySet<string>;
   /** Wall time (the engine's clock) at second 0 of the scenario; the baseline of a metric depends on it. */
   baseMs: number;
+  /**
+   * A limit on the ticks walked in all, summed over the lanes (the per-lane limit `MAX_WALK_TICKS` always applies).
+   * Absent for a scenario of the library, which has at most `MAX_ANOMALIES` anomalies; the Lab's preview sets it,
+   * because its request can hold more and the walk is synchronous on the thread that publishes.
+   */
+  maxTotalTicks?: number;
 }
 
 interface Lane {
@@ -201,13 +207,20 @@ export function expectedAlerts(scenario: ScenarioDocument, options: ExpectationO
     lane.anomalies.push(anomaly);
   }
 
-  const ticks = Math.max(
-    ...[...lanes.values()].map((lane) => lengthS(scenario) / lane.intervalS + CLEAR_SEARCH_TICKS),
+  const laneTicks = [...lanes.values()].map(
+    (lane) => lengthS(scenario) / lane.intervalS + CLEAR_SEARCH_TICKS,
   );
-  if (ticks > MAX_WALK_TICKS) {
+  if (Math.max(...laneTicks) > MAX_WALK_TICKS) {
     return {
       available: false,
       reason: `A publish interval of ${options.intervalMs} ms is too short to work out the alerts of a ${lengthS(scenario)} s scenario`,
+    };
+  }
+  const totalTicks = Math.ceil(laneTicks.reduce((sum, ticks) => sum + ticks, 0));
+  if (options.maxTotalTicks !== undefined && totalTicks > options.maxTotalTicks) {
+    return {
+      available: false,
+      reason: `Too many readings to work out the alerts of ${scenario.anomalies.length} anomalies on ${lanes.size} signals over ${lengthS(scenario)} s: ${totalTicks} against a limit of ${options.maxTotalTicks}`,
     };
   }
 

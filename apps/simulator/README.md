@@ -68,23 +68,24 @@ address (`403` otherwise). A body is at most 16 KiB (`413`).
 **Routes.** Errors use ingest's envelope (`statusCode`, `error`, `message`). A command answers with
 the state, as `GET /api/state` returns it.
 
-| Method and path                                  | What it does                                                                                                                                                              |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/state`                                 | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, rules, profiles, config                                                                      |
-| `GET /api/stream`                                | The event stream (below); at most 20 clients, then `503`                                                                                                                  |
-| `GET /api/observations?before=&limit=`           | The observation store, newest first, `limit` 1 to 500 (default 100); `X-Next-Cursor` holds the next `before`                                                              |
-| `GET /api/alerts?status=&limit=&before=`         | A page of ingest's alerts, newest first, with what Studio saw and the scenario that caused each (below); `X-Next-Cursor` as ingest sends it                               |
-| `POST /api/devices/:id/start`, `/pause`, `/stop` | Device state; `404` for an unknown device                                                                                                                                 |
-| `PUT /api/devices/:id/interval`                  | `{ "intervalMs": 500 }`, or `null` for the engine's interval                                                                                                              |
-| `PUT /api/devices/:id/holds/:metric`             | `{ "value": 31.5 }`: publish exactly that until released; `DELETE` on the same path releases it                                                                           |
-| `GET /api/anomalies`, `POST /api/anomalies`      | List; add `{ deviceId, metric, value, duration, shape?, startAt?, startIn? }` (`startIn`: seconds from now; `201`)                                                        |
-| `DELETE /api/anomalies/:id`                      | Remove one                                                                                                                                                                |
-| `GET /api/scenarios`                             | The scenario library with what a card needs: the document, `needsStart`, `lastRunAt`, `running`, the `expected` alerts; `rejected` files (below)                          |
-| `POST /api/scenarios/:name/run`                  | Run it so that its "20 s in" is 20 s from now (all of its anomalies, or none); `{ "replace": true }` takes what is in the way out first; `409` with `conflicts` otherwise |
-| `POST /api/scenarios/:name/stop`                 | Stop the run: remove its anomalies; `409` when it is not running                                                                                                          |
-| `POST /api/scenarios/import`                     | The body is a scenario document; validated like a file and kept for this session only (`201`; `400` with the reason; `409` for a taken name)                              |
-| `POST /api/reset`                                | Clear anomalies and held values, restart the anomaly clock                                                                                                                |
-| `POST /api/step`                                 | One publish interval on the simulated clock; `409` on the wall clock, the default (start with `--simulated-clock` to step)                                                |
+| Method and path                                  | What it does                                                                                                                                                                                                   |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/state`                                 | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, rules, profiles, config                                                                                                           |
+| `GET /api/stream`                                | The event stream (below); at most 20 clients, then `503`                                                                                                                                                       |
+| `GET /api/observations?before=&limit=`           | The observation store, newest first, `limit` 1 to 500 (default 100); `X-Next-Cursor` holds the next `before`                                                                                                   |
+| `GET /api/alerts?status=&limit=&before=`         | A page of ingest's alerts, newest first, with what Studio saw and the scenario that caused each (below); `X-Next-Cursor` as ingest sends it                                                                    |
+| `POST /api/devices/:id/start`, `/pause`, `/stop` | Device state; `404` for an unknown device                                                                                                                                                                      |
+| `PUT /api/devices/:id/interval`                  | `{ "intervalMs": 500 }`, or `null` for the engine's interval                                                                                                                                                   |
+| `PUT /api/devices/:id/holds/:metric`             | `{ "value": 31.5 }`: publish exactly that until released; `DELETE` on the same path releases it                                                                                                                |
+| `GET /api/anomalies`, `POST /api/anomalies`      | List; add `{ deviceId, metric, value, duration, shape?, startAt?, startIn? }` (`startIn`: seconds from now; `201`)                                                                                             |
+| `DELETE /api/anomalies/:id`                      | Remove one                                                                                                                                                                                                     |
+| `GET /api/scenarios`                             | The scenario library with what a card needs: the document, `needsStart`, `lastRunAt`, `running`, the `expected` alerts; `rejected` files (below)                                                               |
+| `POST /api/scenarios/:name/run`                  | Run it so that its "20 s in" is 20 s from now (all of its anomalies, or none); `{ "replace": true }` takes what is in the way out first; `409` with `conflicts` otherwise                                      |
+| `POST /api/scenarios/:name/stop`                 | Stop the run: remove its anomalies; `409` when it is not running                                                                                                                                               |
+| `POST /api/scenarios/import`                     | The body is a scenario document; validated like a file and kept for this session only (`201`; `400` with the reason; `409` for a taken name)                                                                   |
+| `POST /api/expectations`                         | Read-only: `{ anomalies }` (the fields of a scenario's anomaly, `startAt` in seconds from now, 1 to 100 of them) answers `{ expected, needsStart, intervalMs }` as a library item would; `400` with the reason |
+| `POST /api/reset`                                | Clear anomalies and held values, restart the anomaly clock                                                                                                                                                     |
+| `POST /api/step`                                 | One publish interval on the simulated clock; `409` on the wall clock, the default (start with `--simulated-clock` to step)                                                                                     |
 
 **Running on the simulated clock.** By default the engine runs on the wall clock and publishes by itself, so `POST /api/step` answers `409`. To step it by hand,
 start with `--simulated-clock` (or `SIMULATED_CLOCK=true`, exactly that value, in `.env` or the environment):
@@ -205,6 +206,26 @@ clear whose baseline is within the noise of the clear line (CO₂ and power near
 means no reading came back past the line within ten ticks. An anomaly that no rule watches, or that never crosses its line, is in
 `quiet`. If the rules file could not be read, `expected` is `{ available: false, reason }`: there is no guess. The numbers say nothing of
 an alert that is already open when the run starts, and they assume the rules the simulator read are the ones ingest runs.
+
+**Previewing a fault.** `POST /api/expectations` works out the same `expected` for anomalies that are in no scenario, which is what the
+Lab shows before a fault is injected. It is a `POST` because the body is a list, and it changes nothing: no anomaly is added, no
+scenario is kept, nothing is recorded. The anomalies are checked as a scenario file's are (device, metric, the contract's range,
+`duration` up to 3,600 s, no two overlapping on one device and metric), except that it takes up to 100 instead of 50; a body is at most
+16 KiB (`413`), about 100 anomalies with short device ids. Times, in the request and in the answer, are seconds from now. It sees only the
+anomalies of the request, not the ones the engine already plays, so a caller that injects checks `GET /api/anomalies` for an overlap. A
+device that is not running is in `needsStart` and the times assume it starts with the fault, as a run would start it; injecting an anomaly
+does **not** start a device, so on a stopped one nothing would ever be published. When the walk would need more than 20,000 readings in all
+(signals × seconds ÷ interval), `expected` is `{ available: false, reason }` rather than an answer that holds up the publishing tick.
+
+## A registry of 100 devices
+
+[fixtures/devices-100/](fixtures/devices-100/) holds a `devices.json` of 100 devices in 20 zones and a copy of ingest's `rules.json`, for
+checking the Lab at scale (the zone list above 60 devices, a fault on 12 of them). It is generated by
+[scripts/gen-registry-100.mjs](../../scripts/gen-registry-100.mjs) (`node scripts/gen-registry-100.mjs`), committed, and checked against the
+script and against ingest's `rules.json` by `scripts/gen-registry-100.test.mjs` and `src/registry-100.test.ts`. It keeps the six devices
+of ingest's registry, so the built-in scenarios still run. **Ingest must read the same directory** (`CONFIG_DIR`), or it rejects the other 94
+devices as `unknown_device`; how, and what that leaves in the database, is in
+[docs/development.md](../../docs/development.md#the-100-device-registry).
 
 ## Benchmark
 
