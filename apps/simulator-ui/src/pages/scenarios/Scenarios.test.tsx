@@ -391,9 +391,16 @@ describe('Scenarios: importing', () => {
     choose(jsonFile('extra.json', JSON.stringify(document())));
 
     expect(await screen.findByText('Imported extra.')).toBeInTheDocument();
-    const card = await screen.findByRole('article', { name: 'extra' });
-    expect(card).toHaveAttribute('aria-current', 'true');
-    expect(address()).toBe('/lab/scenarios?scenario=extra');
+    await screen.findByRole('article', { name: 'extra' });
+    // The router applies a navigation as a transition, which can land a moment after the library read that brings the
+    // card: the card may be there before the address points at it, so the end state is waited for, not assumed.
+    await waitFor(() => {
+      expect(screen.getByRole('article', { name: 'extra' })).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      expect(address()).toBe('/lab/scenarios?scenario=extra');
+    });
     expect(simulator.callsTo('POST', '/api/scenarios/import')[0]?.body).toEqual(document());
     expect(screen.queryByText(/No scenario is named/)).not.toBeInTheDocument();
   });
