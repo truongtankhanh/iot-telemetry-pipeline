@@ -13,6 +13,8 @@ export interface ControlConfig {
   consoleUrl: string | null;
   /** Absolute path of the directory with the built Studio UI (it may not exist: the UI is not built by every script). */
   studioDir: string;
+  /** Absolute path of the folder with custom scenario files, read at start (it may not exist: that means none). */
+  scenariosDir: string;
   /** True when `CONTROL_ALLOW_NON_LOOPBACK=true` let a non-loopback `host` through. */
   allowNonLoopback: boolean;
 }
@@ -23,6 +25,7 @@ export interface ControlFlags {
   controlPort?: string | undefined;
   ingestUrl?: string | undefined;
   studioDir?: string | undefined;
+  scenariosDir?: string | undefined;
 }
 
 /** A setting is wrong or refused. The message names the setting to change. */
@@ -40,6 +43,8 @@ const DEFAULT_INGEST_URL = 'http://localhost:3100';
 export const DEFAULT_STUDIO_DIR = fileURLToPath(
   new URL('../../simulator-ui/dist', import.meta.url),
 );
+/** `apps/simulator/scenarios`, from `apps/simulator/src`; the repository does not create it. */
+export const DEFAULT_SCENARIOS_DIR = fileURLToPath(new URL('../scenarios', import.meta.url));
 
 /**
  * True for the addresses that cannot be reached from another machine: `localhost`, any `127.x.y.z`
@@ -103,6 +108,10 @@ export function resolveControlConfig(input: {
   const ingestSetting = firstSet([flags.ingestUrl, '--ingest-url'], [env.INGEST_URL, 'INGEST_URL']);
   const consoleSetting = firstSet([env.OCC_CONSOLE_URL, 'OCC_CONSOLE_URL']);
   const studioSetting = firstSet([flags.studioDir, '--studio-dir'], [env.STUDIO_DIR, 'STUDIO_DIR']);
+  const scenariosSetting = firstSet(
+    [flags.scenariosDir, '--scenarios-dir'],
+    [env.SCENARIOS_DIR, 'SCENARIOS_DIR'],
+  );
   const allowNonLoopback = env.CONTROL_ALLOW_NON_LOOPBACK === 'true';
 
   if (!isLoopbackHost(host.value) && !allowNonLoopback) {
@@ -121,6 +130,7 @@ export function resolveControlConfig(input: {
       : DEFAULT_INGEST_URL,
     consoleUrl: consoleSetting ? parseHttpUrl(consoleSetting.value, consoleSetting.where) : null,
     studioDir: studioSetting ? resolvePath(studioSetting.value) : DEFAULT_STUDIO_DIR,
+    scenariosDir: scenariosSetting ? resolvePath(scenariosSetting.value) : DEFAULT_SCENARIOS_DIR,
     allowNonLoopback,
   };
 }

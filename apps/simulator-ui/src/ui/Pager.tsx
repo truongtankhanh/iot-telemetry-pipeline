@@ -15,6 +15,13 @@ export interface PagerProps {
   noun?: string;
   /** The name of the page-size field ("Rows per page", "Cards per page"). */
   sizeLabel?: string;
+  /** Said after the range ("recently run first"): "Scenarios 1–6 of 38, recently run first". */
+  rangeNote?: string;
+  /**
+   * Announces the range politely when it changes (a `status` region). A page change moves nothing on the screen a
+   * reader is on, so a page that pages cards rather than a table asks for it; the Fleet's table does not.
+   */
+  announce?: boolean;
 }
 
 /**
@@ -31,6 +38,8 @@ export function Pager({
   onPageSizeChange,
   noun = 'Rows',
   sizeLabel = 'Rows per page',
+  rangeNote,
+  announce = false,
 }: PagerProps) {
   const count = pageCount(total, pageSize);
   const current = clampPage(page, count);
@@ -38,12 +47,16 @@ export function Pager({
 
   return (
     <nav className={styles.pager} aria-label={`${noun} pages`}>
-      <span className={styles.range}>
+      <span
+        className={styles.range}
+        {...(announce ? ({ role: 'status', 'aria-live': 'polite' } as const) : {})}
+      >
         {noun}{' '}
         <b>
           {from}–{to}
         </b>{' '}
         of <b>{total}</b>
+        {rangeNote === undefined ? null : `, ${rangeNote}`}
       </span>
       <label className={styles.sizes}>
         <span>{sizeLabel}</span>

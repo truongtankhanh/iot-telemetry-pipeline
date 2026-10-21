@@ -339,7 +339,9 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
 2. **When the command center adopts Studio's tokens.** The names match; the values will differ until then. The two
    repositories cannot share a package today (copy, publish a tokens package, or generate both from one JSON file).
 3. **Where custom scenarios live.** A JSON file under `apps/simulator/` (visible in git, easy to share) versus the
-   browser. The mockups assume files; SIM-11 settles it.
+   browser. The mockups assume files; SIM-11 settles it. _For SIM-08 (2026-10-21):_ a read-only folder of `*.json` files
+   (`SCENARIOS_DIR`, default `apps/simulator/scenarios`) read once at start, plus scenarios imported during the session, which
+   are kept in memory and written nowhere. SIM-11 may move the storage; the document does not change.
 4. **Benchmark in the same process.** It saturates the broker and the CPU. A child process keeps the UI responsive;
    SIM-15 decides.
 5. **Studio's port.** _Decided 2026-10-19: `3200`_ (`3100` ingest, `3000` Grafana, `9090` Prometheus, `5433`
@@ -387,3 +389,14 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
     alert is named only when the simulator can show a run of Studio that played on the alert's device and metric around the
     time it opened; an alert from the CLI's `--scenario`, from a fault added by hand, or from anything else has no cause.
     Frame 13 stays as drawn until it is redrawn.
+14. **Frame 03 differs from the build.** _Settled in SIM-08 (2026-10-21)._ Each card's chart is drawn at its true pixel width,
+    not scaled from a 330 px picture, so its text is 13 px (the frame's is 11.5 px) and its colours are tokens; a label that
+    would not fit, or would run into another, is left off the picture and kept in the flag's tooltip and in the card's text.
+    A scenario on one device and one metric gets the value chart, any other the lane chart, at most four lanes and a line
+    "+ n more devices, m anomalies". The time axis runs to the next numbered tick past the end (and a quarter more on the value
+    chart, for the label of the clear). A clear that may come later than shown reads "about 110 s or later", and one that was not
+    found "clear time not known"; with no rules each card says why and draws no chart. Not built: **Edit**, **Duplicate** and
+    **New scenario** (with its dashed card) belong to the editor (SIM-11); **Follow** and the Fleet's running-scenario strip wait
+    for a page that can take the person there (the Digital twin, SIM-09's controls); the pager is the Fleet's, without the
+    first and last buttons; **Import JSON** is in the toolbar, not the header, and opens a file picker. Running a scenario over
+    something that already plays on its devices asks first. Frame 03 stays as drawn until it is redrawn.

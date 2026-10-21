@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ControlConfigError,
+  DEFAULT_SCENARIOS_DIR,
   DEFAULT_STUDIO_DIR,
   type ControlFlags,
   isLoopbackHost,
@@ -19,6 +20,7 @@ describe('resolveControlConfig defaults and sources', () => {
       ingestUrl: 'http://localhost:3100',
       consoleUrl: null,
       studioDir: DEFAULT_STUDIO_DIR,
+      scenariosDir: DEFAULT_SCENARIOS_DIR,
       allowNonLoopback: false,
     });
   });
@@ -188,5 +190,33 @@ describe('resolveControlConfig studio directory', () => {
 
   it('treats a blank value as not set', () => {
     assert.equal(resolve({ STUDIO_DIR: '  ' }, { studioDir: '' }).studioDir, DEFAULT_STUDIO_DIR);
+  });
+});
+
+describe('resolveControlConfig scenarios directory', () => {
+  it('defaults to apps/simulator/scenarios, which the repository does not create', () => {
+    assert.ok(DEFAULT_SCENARIOS_DIR.endsWith('/apps/simulator/scenarios'), DEFAULT_SCENARIOS_DIR);
+    assert.equal(resolve().scenariosDir, DEFAULT_SCENARIOS_DIR);
+  });
+
+  it('reads SCENARIOS_DIR and lets --scenarios-dir beat it', () => {
+    assert.equal(resolve({ SCENARIOS_DIR: '/srv/scenarios' }).scenariosDir, '/srv/scenarios');
+    assert.equal(
+      resolve({ SCENARIOS_DIR: '/srv/scenarios' }, { scenariosDir: '/tmp/mine' }).scenariosDir,
+      '/tmp/mine',
+    );
+  });
+
+  it('makes a relative path absolute, so the server does not depend on where it was started', () => {
+    const dir = resolve({ SCENARIOS_DIR: 'my/scenarios' }).scenariosDir;
+    assert.ok(dir.startsWith('/'), dir);
+    assert.ok(dir.endsWith('/my/scenarios'), dir);
+  });
+
+  it('treats a blank value as not set', () => {
+    assert.equal(
+      resolve({ SCENARIOS_DIR: '  ' }, { scenariosDir: '' }).scenariosDir,
+      DEFAULT_SCENARIOS_DIR,
+    );
   });
 });

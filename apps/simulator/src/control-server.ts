@@ -16,6 +16,8 @@ import { EventStream, type EventStreamOptions } from './event-stream.ts';
 import type { IngestPoller } from './ingest-poller.ts';
 import { type ObservationDraft, ObservationStore, RingBuffer } from './observation-store.ts';
 import { type RulesView, rulesUnavailable } from './rules-source.ts';
+import type { ScenarioLibrary } from './scenario-library.ts';
+import { ScenarioRuns } from './scenario-runs.ts';
 import type { DeviceSpec } from './signals.ts';
 import { resolveStatic, studioIsBuilt } from './static-files.ts';
 
@@ -28,7 +30,8 @@ export interface ControlServerOptions {
   engine: Engine;
   /** The devices as loaded from the registry. */
   devices: DeviceSpec[];
-  scenarios: Record<string, string[]>;
+  /** Every scenario that can be run (built from the built-ins, the custom folder and, later, imports). */
+  library: ScenarioLibrary;
   /** Owned by the server: it starts it when it listens and stops it when it closes. */
   poller: IngestPoller;
   config: Pick<ControlConfig, 'host' | 'port' | 'ingestUrl' | 'consoleUrl'>;
@@ -106,17 +109,18 @@ export class ControlServer {
     if (!WILDCARD_HOSTS.has(bound)) {
       this.allowedHosts.add(bound.includes(':') && !bound.startsWith('[') ? `[${bound}]` : bound);
     }
+    // A command that has done its work must not fail because the timeline could not note it.
+    const record = this.safely('record', (draft: ObservationDraft) => this.observe(draft));
     this.context = {
       engine: options.engine,
       devices: options.devices,
-      scenarios: options.scenarios,
+      library: options.library,
+      runs: new ScenarioRuns({ engine: options.engine, record, now: this.now }),
       store: this.store,
       ingest: options.poller,
       config: { ingestUrl: options.config.ingestUrl, consoleUrl: options.config.consoleUrl },
       broker: options.broker,
       rules: options.rules ?? rulesUnavailable('no rules file was given'),
-      // A command that has done its work must not fail because the timeline could not note it.
-      record: this.safely('record', (draft: ObservationDraft) => this.observe(draft)),
     };
     this.handle = createRoutes(this.context);
     this.server = createServer((req, res) => void this.onRequest(req, res));

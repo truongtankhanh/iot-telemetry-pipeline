@@ -1,17 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
 import alertsPageFixture from './fixtures/alerts-page.json';
+import scenariosFixture from './fixtures/scenarios.json';
 import { stateViewFixture as fixture } from './fixtures/stateView';
 import {
   ApiError,
+  conflictsOf,
   getAlerts,
+  getScenarios,
   getState,
   holdValue,
+  importScenario,
   pauseDevice,
   releaseValue,
+  runScenario,
   setDeviceInterval,
   startDevice,
   stopDevice,
+  stopScenario,
 } from './client';
+import type { ScenarioLibraryView, ScenarioRunView } from './types';
 
 // A real `GET /api/state` body (see types.ts for how both sides are kept in step).
 const view = fixture;
@@ -59,6 +66,7 @@ describe('the types and the fixture', () => {
       'observationCursor',
       'profiles',
       'rules',
+      'runs',
       'scenarios',
     ]);
     expect(keys(view.engine)).toEqual([
@@ -133,6 +141,28 @@ describe('the types and the fixture', () => {
       'baseline',
       'dailySwing',
       'noise',
+    ]);
+  });
+
+  it('declare the keys of a run, which the simulator pins from its side in scenario-runs.test.ts', () => {
+    const run: ScenarioRunView = {
+      id: 'r1',
+      scenario: 'server-room-overheat',
+      startedAt: '2026-10-21T08:00:00.000Z',
+      offsetS: 10,
+      endsAtS: 90,
+      anomalyIds: ['a1'],
+      startedDevices: [],
+    };
+    expect(view.runs).toEqual([]);
+    expect(keys(run)).toEqual([
+      'anomalyIds',
+      'endsAtS',
+      'id',
+      'offsetS',
+      'scenario',
+      'startedAt',
+      'startedDevices',
     ]);
   });
 });
@@ -414,5 +444,265 @@ describe('getAlerts', () => {
     expect(keys(page[0]!.observed)).toEqual(['clearedAt', 'delivered', 'incident', 'openedAt']);
     expect(keys(page[0]!.cause!)).toEqual(['scenario', 'startedAt']);
     expect(page[1]!.cause).toBeNull();
+  });
+});
+
+describe('the scenario fixture', () => {
+  const library = scenariosFixture as unknown as ScenarioLibraryView;
+
+  it('declares the same keys as the types, section by section (the simulator compares the same file)', () => {
+    expect(keys(library)).toEqual(['intervalMs', 'rejected', 'scenarios']);
+    expect(keys(library.rejected[0]!)).toEqual(['file', 'reason']);
+    const [overheat, , afternoon] = library.scenarios;
+    expect(keys(overheat!)).toEqual([
+      'anomalies',
+      'description',
+      'expected',
+      'imported',
+      'lastRunAt',
+      'lengthS',
+      'name',
+      'needsStart',
+      'running',
+      'source',
+    ]);
+    expect(keys(overheat!.anomalies[0]!)).toEqual([
+      'deviceId',
+      'duration',
+      'metric',
+      'startAt',
+      'value',
+    ]);
+    const expected = overheat!.expected;
+    if (!expected.available) throw new Error('the fixture has rules');
+    expect(keys(expected)).toEqual([
+      'alerts',
+      'available',
+      'horizonS',
+      'intervalS',
+      'quiet',
+      'series',
+    ]);
+    expect(keys(expected.alerts[0]!)).toEqual([
+      'clearsAtS',
+      'clearsUncertain',
+      'deviceId',
+      'metric',
+      'opensAtS',
+      'opensMargin',
+      'ruleId',
+      'severity',
+      'title',
+    ]);
+    expect(keys(expected.series[0]!)).toEqual(['deviceId', 'metric', 'points', 'stepS']);
+    const other = afternoon!.expected;
+    if (!other.available) throw new Error('the fixture has rules');
+    expect(keys(other.quiet[0]!)).toEqual(['deviceId', 'metric', 'why']);
+    expect(keys(afternoon!.needsStart[0]!)).toEqual(['deviceId', 'state']);
+  });
+
+  it('has a series of the length its horizon and step give, and the flags the frame shows', () => {
+    const [overheat] = library.scenarios;
+    const expected = overheat!.expected;
+    if (!expected.available) throw new Error('the fixture has rules');
+    const lane = expected.series[0]!;
+    expect(lane.points.length).toBe(Math.floor(expected.horizonS / lane.stepS) + 1);
+    expect([expected.alerts[0]!.opensAtS, expected.alerts[0]!.clearsAtS]).toEqual([24, 80]);
+  });
+});
+
+describe('scenarios', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+  const sent = (fn: ReturnType<typeof reply>) => {
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    return { url, method: init.method, headers: init.headers, body: init.body };
+  };
+  const JSON_HEADERS = { Accept: 'application/json', 'Content-Type': 'application/json' };
+  const refusal = (status: number, message: string, extra: object = {}) =>
+    reply({ statusCode: status, error: 'Refused', message, ...extra }, { status });
+  const item = (scenariosFixture as unknown as ScenarioLibraryView).scenarios[0]!;
+
+  describe('getScenarios', () => {
+    it('reads the library from /api/scenarios', async () => {
+      const fetchFn = reply(scenariosFixture);
+      const library = await getScenarios({ fetch: asFetch(fetchFn) });
+      expect(library).toEqual(scenariosFixture);
+      expect(fetchFn).toHaveBeenCalledWith(
+        '/api/scenarios',
+        expect.objectContaining({ headers: { Accept: 'application/json' } }),
+      );
+    });
+
+    it('fails loudly on a body that is not the documented list', async () => {
+      for (const body of [{ scenarios: 'none' }, { scenarios: [{ name: 1 }], rejected: [] }, []]) {
+        const failure = await getScenarios({ fetch: asFetch(reply(body)) }).catch(
+          (e: unknown) => e,
+        );
+        expect(failure).toBeInstanceOf(ApiError);
+        expect((failure as ApiError).message).toMatch(/does not understand/);
+      }
+    });
+
+    it('turns a refusal into an ApiError and a silent simulator into status 0', async () => {
+      const refused = await getScenarios({
+        fetch: asFetch(refusal(403, 'The Host header must name this machine')),
+      }).catch((e: unknown) => e);
+      expect((refused as ApiError).status).toBe(403);
+      expect((refused as ApiError).message).toBe('The Host header must name this machine');
+
+      const silent = await getScenarios({
+        fetch: asFetch(
+          vi.fn(async () => {
+            throw new TypeError('Failed to fetch');
+          }),
+        ),
+      }).catch((e: unknown) => e);
+      expect((silent as ApiError).status).toBe(0);
+    });
+  });
+
+  describe('runScenario', () => {
+    const answer = {
+      ...view,
+      runId: 'r1',
+      anomalyIds: ['a1'],
+      startedDevices: ['hub-power-01'],
+      replaced: [],
+    };
+
+    it('is a POST with no body, as JSON, and answers the state and what the run did', async () => {
+      const fetchFn = reply(answer);
+      const result = await runScenario('server-room-overheat', {}, { fetch: asFetch(fetchFn) });
+      expect(result.runId).toBe('r1');
+      expect(result.startedDevices).toEqual(['hub-power-01']);
+      expect(result.engine).toEqual(view.engine);
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/scenarios/server-room-overheat/run',
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: undefined,
+      });
+    });
+
+    it('asks to replace only when told to, and encodes the name', async () => {
+      const fetchFn = reply(answer);
+      await runScenario('a b', { replace: true }, { fetch: asFetch(fetchFn) });
+      expect(sent(fetchFn)).toMatchObject({
+        url: '/api/scenarios/a%20b/run',
+        body: '{"replace":true}',
+      });
+      const plain = reply(answer);
+      await runScenario('x', { replace: false }, { fetch: asFetch(plain) });
+      expect(sent(plain).body).toBeUndefined();
+    });
+
+    it('keeps the conflicts of a 409 on the error, and conflictsOf reads them', async () => {
+      const conflicts = [
+        { deviceId: 'dc-env-01', anomalyId: 'a1', runId: 'r1', scenario: 'server-room-overheat' },
+        { deviceId: 'dc-env-02', anomalyId: 'a2', runId: null, scenario: null },
+      ];
+      const failure = await runScenario(
+        'x',
+        {},
+        { fetch: asFetch(refusal(409, 'in the way', { conflicts })) },
+      ).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(ApiError);
+      expect((failure as ApiError).status).toBe(409);
+      expect((failure as ApiError).message).toBe('in the way');
+      expect(conflictsOf(failure)).toEqual(conflicts);
+    });
+
+    it('has no conflicts for another 409, another status, a malformed list or another error', async () => {
+      const other = await stopScenario('x', {
+        fetch: asFetch(refusal(409, '"x" is not running')),
+      }).catch((e: unknown) => e);
+      expect(conflictsOf(other)).toBeNull();
+      const bad = await runScenario(
+        'x',
+        {},
+        { fetch: asFetch(refusal(409, 'm', { conflicts: [{ deviceId: 1 }] })) },
+      ).catch((e: unknown) => e);
+      expect(conflictsOf(bad)).toBeNull();
+      const notConflict = await runScenario(
+        'x',
+        {},
+        { fetch: asFetch(refusal(400, 'm', { conflicts: [] })) },
+      ).catch((e: unknown) => e);
+      expect(conflictsOf(notConflict)).toBeNull();
+      expect(conflictsOf(new Error('x'))).toBeNull();
+      expect(conflictsOf(undefined)).toBeNull();
+    });
+
+    it('fails loudly on an answer without what a run reports', async () => {
+      const failure = await runScenario('x', {}, { fetch: asFetch(reply(view)) }).catch(
+        (e: unknown) => e,
+      );
+      expect((failure as ApiError).message).toMatch(/does not understand/);
+    });
+  });
+
+  describe('stopScenario', () => {
+    it('is a POST with no body, as JSON, and answers the new state', async () => {
+      const fetchFn = reply(view);
+      expect(await stopScenario('server-room-overheat', { fetch: asFetch(fetchFn) })).toEqual(view);
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/scenarios/server-room-overheat/stop',
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: undefined,
+      });
+    });
+
+    it('says what the simulator said when the scenario is not running', async () => {
+      const failure = await stopScenario('x', {
+        fetch: asFetch(refusal(409, '"x" is not running')),
+      }).catch((e: unknown) => e);
+      expect((failure as ApiError).message).toBe('"x" is not running');
+    });
+  });
+
+  describe('importScenario', () => {
+    const document = { name: 'extra', anomalies: [] };
+
+    it('posts the document as it is and answers the state and the scenario', async () => {
+      const fetchFn = reply({ ...view, scenario: item }, { status: 201 });
+      const result = await importScenario(document, { fetch: asFetch(fetchFn) });
+      expect(result.scenario.name).toBe('server-room-overheat');
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/scenarios/import',
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(document),
+      });
+    });
+
+    it('carries the reason of a refusal as the error message', async () => {
+      const reason = 'anomalies[0].value 900 is outside the range of temperature_c (-40 to 85 °C)';
+      const failure = await importScenario(document, {
+        fetch: asFetch(refusal(400, reason)),
+      }).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(ApiError);
+      expect((failure as ApiError).status).toBe(400);
+      expect((failure as ApiError).message).toBe(reason);
+    });
+
+    it('fails loudly on an answer without the scenario', async () => {
+      const failure = await importScenario(document, { fetch: asFetch(reply(view)) }).catch(
+        (e: unknown) => e,
+      );
+      expect((failure as ApiError).message).toMatch(/does not understand/);
+    });
+  });
+
+  it('keeps the body of any refusal on the error, for the callers that need more than the message', async () => {
+    const failure = await getState({
+      fetch: asFetch(refusal(409, 'm', { extra: 1 })),
+    }).catch((e: unknown) => e);
+    expect((failure as ApiError).body).toEqual({
+      statusCode: 409,
+      error: 'Refused',
+      message: 'm',
+      extra: 1,
+    });
   });
 });

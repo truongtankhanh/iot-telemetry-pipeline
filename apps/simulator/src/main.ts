@@ -8,8 +8,10 @@ import { JsonFileDeviceSource } from './device-source.ts';
 import { Engine } from './engine.ts';
 import { IngestPoller } from './ingest-poller.ts';
 import { loadRules } from './rules-source.ts';
-import { SCENARIOS } from './scenarios.ts';
-import { parseAnomaly } from './signals.ts';
+import { toAnomalies } from './scenario-document.ts';
+import { loadScenarioFolder, ScenarioLibrary } from './scenario-library.ts';
+import { BUILT_IN_SCENARIOS } from './scenarios.ts';
+import { type Anomaly, parseAnomaly } from './signals.ts';
 
 const HELP = `Usage: node src/main.ts [options]
 
@@ -21,7 +23,8 @@ const HELP = `Usage: node src/main.ts [options]
   --interval <ms>       publish interval per device (default 2000)
   --anomaly <spec>      device:metric:value:startAt:duration, repeatable
                         e.g. dc-env-01:temperature_c:29.5:20:60
-  --scenario <name>     preset anomalies: server-room-overheat | crowded-lecture
+  --scenario <name>     play a scenario from the start: ${BUILT_IN_SCENARIOS.map((s) => s.name).join(' | ')},
+                        or a custom one from the scenarios folder (read with the control server)
   --duration <s>        stop after this many seconds (default: run until Ctrl+C)
 
 Control server (HTTP commands and an event stream; no authentication):
@@ -32,6 +35,8 @@ Control server (HTTP commands and an event stream; no authentication):
                         (default INGEST_URL, else http://localhost:3100)
   --studio-dir <path>   built Studio UI to serve at / (default STUDIO_DIR, else
                         ../simulator-ui/dist; run pnpm --filter @itp/simulator-ui build)
+  --scenarios-dir <path> folder of custom scenario files (*.json), read once at start
+                        (default SCENARIOS_DIR, else ../scenarios; a missing folder means none)
   --no-control          run without the control server, as a plain publisher
 `;
 
@@ -51,6 +56,7 @@ const { values } = parseArgs({
     'control-port': { type: 'string' },
     'ingest-url': { type: 'string' },
     'studio-dir': { type: 'string' },
+    'scenarios-dir': { type: 'string' },
     'no-control': { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
@@ -62,12 +68,6 @@ if (values.help) {
 }
 
 const devices = await new JsonFileDeviceSource(values.registry).load();
-const anomalies = [
-  ...(values.scenario ? (SCENARIOS[values.scenario] ?? []) : []),
-  ...values.anomaly,
-].map(parseAnomaly);
-if (values.scenario && !SCENARIOS[values.scenario])
-  throw new Error(`Unknown scenario ${values.scenario}`);
 
 // A refused or unusable control address stops the process here, before it connects or publishes.
 function resolveControl() {
@@ -79,6 +79,7 @@ function resolveControl() {
         controlPort: values['control-port'],
         ingestUrl: values['ingest-url'],
         studioDir: values['studio-dir'],
+        scenariosDir: values['scenarios-dir'],
       },
     });
   } catch (error) {
@@ -88,6 +89,28 @@ function resolveControl() {
   }
 }
 const control = values['no-control'] ? undefined : resolveControl();
+
+// The scenarios the simulator can play. The folder of custom ones is read only for the control server, which is
+// what lists and runs them; a document that does not fit this registry is reported, not played.
+const library = new ScenarioLibrary({
+  builtIn: BUILT_IN_SCENARIOS,
+  ...(control ? { folder: loadScenarioFolder(control.scenariosDir, { devices }) } : {}),
+  devices,
+});
+
+function scenarioAnomalies(name: string): Anomaly[] {
+  const entry = library.get(name);
+  if (entry) return toAnomalies(entry.scenario);
+  const unusable = library.rejected.find((rejected) => rejected.file === `built-in:${name}`);
+  if (unusable) {
+    throw new Error(`Scenario ${name} cannot be used with this registry: ${unusable.reason}`);
+  }
+  throw new Error(`Unknown scenario ${name}`);
+}
+const anomalies = [
+  ...(values.scenario ? scenarioAnomalies(values.scenario) : []),
+  ...values.anomaly.map(parseAnomaly),
+];
 
 // The rules are for Studio only: a missing or unusable file never stops the simulator, it is said once here
 // and in the state, and Studio hides what depends on it.
@@ -122,13 +145,23 @@ for (const a of anomalies) {
   );
 }
 
+const counts = library.counts();
+console.log(
+  control
+    ? `Scenarios: ${counts.builtIn} built-in, ${counts.custom} custom from ${control.scenariosDir}`
+    : `Scenarios: ${counts.builtIn} built-in (custom ones are read only with the control server)`,
+);
+for (const rejected of library.rejected) {
+  console.log(`  not used: ${rejected.file}: ${rejected.reason}`);
+}
+
 // The port is bound before the first publish, so an unusable port ends the process with nothing sent.
 let controlServer: ControlServer | undefined;
 if (control) {
   controlServer = new ControlServer({
     engine,
     devices,
-    scenarios: SCENARIOS,
+    library,
     poller: new IngestPoller({ baseUrl: control.ingestUrl, clock: systemClock }),
     broker: brokerLink,
     studioDir: control.studioDir,

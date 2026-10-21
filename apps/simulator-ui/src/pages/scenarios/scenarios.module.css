@@ -1,0 +1,144 @@
+/* The Scenarios page: the layout around the cards. The cards, the chart and the dialog have their own modules. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* The link to the simulator is lost: what is shown is the last data, dimmed. */
+.page[data-stale='true'] .content {
+  opacity: 0.6;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.toolbar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-2);
+}
+
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  min-width: 240px;
+  flex: 1 1 320px;
+  max-width: 420px;
+  border-radius: var(--radius-2);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-0);
+  color: var(--text-secondary);
+}
+
+.search:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.end {
+  margin-left: auto;
+}
+
+/* The cards: as many as fit, never narrower than the chart needs to keep its text at 13 px. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.status,
+.error,
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  font-size: var(--fs-body);
+}
+
+.status[data-tone='ok'] {
+  box-shadow: inset 2px 0 0 var(--success);
+}
+
+.status[data-tone='bad'],
+.error {
+  border-color: var(--danger);
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.notice {
+  border-color: var(--warning);
+  box-shadow: inset 2px 0 0 var(--warning);
+}
+
+.statusText {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.rejected {
+  padding: 8px 14px;
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.rejected summary {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.rejected ul {
+  margin: 8px 0 0;
+  padding-left: 22px;
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}

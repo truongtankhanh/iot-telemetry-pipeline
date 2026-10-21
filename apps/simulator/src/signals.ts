@@ -104,8 +104,11 @@ export function baselineValue(device: DeviceSpec, metric: MetricName, at: Date):
   return profile.base + daily;
 }
 
+/** Half-width of the jitter added to a value while an anomaly is active: the reading is within ±this of its target. */
+export const ANOMALY_JITTER = 0.1;
+
 /** The value an active anomaly aims at, before jitter. */
-function anomalyTarget(
+export function anomalyTarget(
   anomaly: Anomaly,
   device: DeviceSpec,
   metric: MetricName,
@@ -136,7 +139,9 @@ export function sample(
       elapsedS < a.startAt + a.duration,
   );
   if (active) {
-    return round(anomalyTarget(active, device, metric, at, elapsedS) + (random() - 0.5) * 0.2);
+    return round(
+      anomalyTarget(active, device, metric, at, elapsedS) + (random() - 0.5) * (2 * ANOMALY_JITTER),
+    );
   }
 
   const { noise } = profileOf(device, metric);

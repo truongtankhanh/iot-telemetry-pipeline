@@ -3,7 +3,8 @@
  * uses; the shapes live in apps/simulator and a test on each side keeps them honest: `fixtures/state-view.json`
  * is a real `GET /api/state` body, whose keys `client.test.ts` compares with the ones declared here, and
  * `apps/simulator/src/control-routes.test.ts` fails when `buildStateView` stops returning the keys of
- * that same file. (A type assertion on JSON checks little; the key lists are the check.)
+ * that same file. (A type assertion on JSON checks little; the key lists are the check.) The scenario library has
+ * the same arrangement with `fixtures/scenarios.json`.
  * (Why not import the simulator's types: they pull Node typings into browser code. ADR-0011, SIM-04.)
  */
 import type { MetricName } from '@itp/telemetry-contract';
@@ -169,11 +170,29 @@ export interface BrokerState {
   connected: boolean;
 }
 
+/** A scenario that Studio started and that is still playing; elapsed time is `engine.elapsedS − offsetS`. */
+export interface ScenarioRunView {
+  id: string;
+  scenario: string;
+  /** When the run was started (wall time, ISO 8601). */
+  startedAt: string;
+  /** The engine's anomaly clock (`engine.elapsedS`) at second 0 of the scenario. */
+  offsetS: number;
+  /** The anomaly clock at the end of the scenario's last anomaly. */
+  endsAtS: number;
+  anomalyIds: string[];
+  /** Devices the run found stopped or paused and started. */
+  startedDevices: string[];
+}
+
 /** The answer of `GET /api/state` and of every command. */
 export interface StateView {
   engine: EngineSnapshot;
   devices: DeviceInfo[];
+  /** The names in the scenario library; the library read has the rest. */
   scenarios: string[];
+  /** The scenarios that are playing now. */
+  runs: ScenarioRunView[];
   ingest: IngestState;
   broker: BrokerState;
   alerts: AlertsFeed;
@@ -209,3 +228,120 @@ export type StreamEventName =
   | 'broker'
   | 'tick-error'
   | 'observation';
+
+// ---- The scenario library (SIM-08) ----
+// A manual mirror of `ScenarioItem` and the types around it in `apps/simulator/src/control-routes.ts`,
+// `scenario-expectations.ts` and `scenario-runs.ts`. `fixtures/scenarios.json` is a `GET /api/scenarios` body: the
+// key lists of `client.test.ts` and of `apps/simulator/src/control-routes.test.ts` are the check, from both sides.
+
+export type ScenarioSource = 'built-in' | 'custom';
+
+/** An alert the rules should raise while the scenario plays. Times are seconds from the scenario start. */
+export interface ExpectedAlert {
+  ruleId: string;
+  title: string;
+  severity: Severity;
+  deviceId: string;
+  metric: MetricName;
+  opensAtS: number;
+  /** A reading that counts toward the opening is within the jitter of the raise line: it may open later or never. */
+  opensMargin: boolean;
+  /** `null` when no reading comes back past the clear line within the simulator's search. */
+  clearsAtS: number | null;
+  /** The baseline is within the noise of the clear line (or there is no clear): it may take longer. */
+  clearsUncertain: boolean;
+}
+
+/** An anomaly that raises nothing, and why. */
+export interface QuietAnomaly {
+  deviceId: string;
+  metric: MetricName;
+  why: 'no-rule' | 'never-crosses';
+}
+
+/** The noise-free value of one device and metric at `0, stepS, 2·stepS…` up to the horizon. */
+export interface ExpectedSeries {
+  deviceId: string;
+  metric: MetricName;
+  stepS: number;
+  points: number[];
+}
+
+/** What the rules should do with a scenario, or why the simulator will not guess (`available: false`). */
+export type Expected =
+  | { available: false; reason: string }
+  | {
+      available: true;
+      /** The engine's publish interval, which the tolerance of the numbers is measured in. */
+      intervalS: number;
+      /** The end of the picture: the end of the last anomaly, or the last clear if that comes later. */
+      horizonS: number;
+      alerts: ExpectedAlert[];
+      quiet: QuietAnomaly[];
+      series: ExpectedSeries[];
+    };
+
+/** A device that running the scenario would start, with the state it is in now. */
+export interface ScenarioNeed {
+  deviceId: string;
+  state: 'stopped' | 'paused';
+}
+
+/** One scenario of the library with what a card is drawn from. */
+export interface ScenarioItem {
+  name: string;
+  description: string;
+  source: ScenarioSource;
+  /** Imported during this session: it is not in the folder and ends with the process. */
+  imported: boolean;
+  anomalies: Anomaly[];
+  /** Seconds from the scenario start to the end of its last anomaly. */
+  lengthS: number;
+  needsStart: ScenarioNeed[];
+  /** When it was last run in this session (ISO 8601), or `null`. */
+  lastRunAt: string | null;
+  running: boolean;
+  expected: Expected;
+}
+
+/** A file or built-in that the library did not keep, and why. */
+export interface RejectedScenario {
+  file: string;
+  reason: string;
+}
+
+/** The answer of `GET /api/scenarios`. */
+export interface ScenarioLibraryView {
+  scenarios: ScenarioItem[];
+  rejected: RejectedScenario[];
+  /** The engine's publish interval in ms. */
+  intervalMs: number;
+}
+
+/** An anomaly in the engine that a run would play over, and who owns it (`null`: no run, e.g. the command line's). */
+export interface RunConflict {
+  deviceId: string;
+  anomalyId: string;
+  runId: string | null;
+  scenario: string | null;
+}
+
+/** What a run took out of the way: a whole earlier run, or the loose anomalies no run owns (`runId: null`). */
+export interface ReplacedRun {
+  runId: string | null;
+  scenario: string | null;
+  anomalyIds: string[];
+}
+
+/** The answer of `POST /api/scenarios/:name/run`: the state, and what the run did. */
+export interface RunAnswer extends StateView {
+  runId: string;
+  anomalyIds: string[];
+  startedDevices: string[];
+  replaced: ReplacedRun[];
+}
+
+/** The answer of `POST /api/scenarios/import`: the state, and the scenario as a card shows it. */
+export interface ImportAnswer extends StateView {
+  scenario: ScenarioItem;
+}

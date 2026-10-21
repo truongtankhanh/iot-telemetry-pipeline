@@ -110,6 +110,7 @@
     }
   ],
   "scenarios": ["server-room-overheat", "crowded-lecture"],
+  "runs": [],
   "ingest": {
     "status": "ready",
     "database": "up",

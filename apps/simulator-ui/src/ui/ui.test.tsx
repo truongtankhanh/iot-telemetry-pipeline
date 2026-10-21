@@ -423,6 +423,37 @@ describe('Pager', () => {
     ).toEqual(['10', '25', '50', '100']);
   });
 
+  it('says what the rows are sorted by after the range, and names the nouns of cards', () => {
+    render(
+      <Pager
+        {...props}
+        total={38}
+        pageSize={6}
+        page={1}
+        noun="Scenarios"
+        sizeLabel="Cards per page"
+        sizes={[6, 12, 24]}
+        rangeNote="recently run first"
+      />,
+    );
+    expect(screen.getByRole('navigation', { name: 'Scenarios pages' })).toHaveTextContent(
+      /Scenarios 1–6 of 38, recently run first/,
+    );
+    expect(
+      within(screen.getByLabelText('Cards per page'))
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['6', '12', '24']);
+  });
+
+  it('announces the range politely only when asked to', () => {
+    const { rerender } = render(<Pager {...props} page={1} />);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    rerender(<Pager {...props} page={1} announce />);
+    expect(screen.getByRole('status')).toHaveTextContent(/Rows 1–25 of 312/);
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+  });
+
   it('copes with a page out of range and with no rows', () => {
     const { rerender } = render(<Pager {...props} page={99} />);
     expect(screen.getByRole('button', { name: 'Page 13' })).toHaveAttribute('aria-current', 'page');
