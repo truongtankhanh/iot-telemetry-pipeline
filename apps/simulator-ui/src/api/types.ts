@@ -345,3 +345,41 @@ export interface RunAnswer extends StateView {
 export interface ImportAnswer extends StateView {
   scenario: ScenarioItem;
 }
+
+// ---- The observation log (SIM-09) ----
+// A manual mirror of `ObservationEvent` in `apps/simulator/src/observation-store.ts`. `fixtures/observations.json` is a
+// `GET /api/observations` body with one event of every kind: the key lists of `client.test.ts` and of
+// `apps/simulator/src/control-routes.test.ts` are the check, from both sides.
+
+/** Every kind of observation the simulator records. A reader meets an unknown one as `other`, not as an error. */
+export const OBSERVATION_KINDS = [
+  'engine-state',
+  'tick-error',
+  'scenario-run',
+  'scenario-stop',
+  'alert-opened',
+  'alert-cleared',
+  'delivery',
+  'incident',
+  'dependency',
+] as const;
+
+export type ObservationKind = (typeof OBSERVATION_KINDS)[number];
+
+/** Something the control server saw, in the order it saw it. `at` is when Studio saw it (wall time), not when it happened. */
+export interface ObservationEvent {
+  /** Strictly increasing from 1 for the life of the simulator process, whatever has been evicted. */
+  id: number;
+  /** ISO 8601. */
+  at: string;
+  kind: ObservationKind;
+  /** What the kind carries; a reader tolerates a missing key. */
+  data: Record<string, unknown>;
+}
+
+/** One page of observations, newest first, and the `before` of the next: the simulator's `X-Next-Cursor`. */
+export interface ObservationsPage {
+  events: ObservationEvent[];
+  /** `null` on the last page. */
+  next: number | null;
+}

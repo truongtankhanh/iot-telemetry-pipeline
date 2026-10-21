@@ -13,7 +13,11 @@ import {
   type StateView,
 } from './control-routes.ts';
 import { type AlertsPage, type AlertsPageQuery, IngestReadError } from './ingest-poller.ts';
-import { type ObservationDraft, ObservationStore } from './observation-store.ts';
+import {
+  type ObservationDraft,
+  type ObservationKind,
+  ObservationStore,
+} from './observation-store.ts';
 import { type RulesView, rulesUnavailable } from './rules-source.ts';
 import type { ScenarioDocument } from './scenario-document.ts';
 import { ScenarioLibrary } from './scenario-library.ts';
@@ -1308,5 +1312,52 @@ describe('GET /api/scenarios and the fixture of the UI', () => {
     const { call } = await setup({ rules: rulesUnavailable('cannot read rules.json (ENOENT)') });
     const actual = (await call('GET', '/api/scenarios')).body as Library;
     assert.deepEqual(keys(actual.scenarios[0]?.expected), ['available', 'reason']);
+  });
+});
+
+describe('GET /api/observations and the fixture of the UI', () => {
+  // apps/simulator-ui types the observation log it reads against this file (a real GET /api/observations body, one event
+  // of every kind); if the store changes the keys of an event or gains a kind, this fails until the file and the UI follow.
+  interface Event {
+    id: number;
+    at: string;
+    kind: string;
+    data: Record<string, unknown>;
+  }
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../../simulator-ui/src/api/fixtures/observations.json', import.meta.url),
+      'utf8',
+    ),
+  ) as Event[];
+  // Exhaustive by type: a new `ObservationKind` is a compile error here until it has a fixture event.
+  const KINDS = {
+    'engine-state': true,
+    'tick-error': true,
+    'scenario-run': true,
+    'scenario-stop': true,
+    'alert-opened': true,
+    'alert-cleared': true,
+    delivery: true,
+    incident: true,
+    dependency: true,
+  } satisfies Record<ObservationKind, true>;
+
+  it('has one event of every kind, oldest id last', () => {
+    assert.deepEqual(fixture.map((event) => event.kind).sort(), Object.keys(KINDS).sort());
+    assert.deepEqual(
+      fixture.map((event) => event.id),
+      [...fixture.map((event) => event.id)].sort((a, b) => b - a),
+    );
+  });
+
+  it('answers the fixture back, key for key, for the events it holds', async () => {
+    const { call, store } = await setup();
+    for (const event of [...fixture].reverse()) {
+      store.append({ kind: event.kind as ObservationKind, data: event.data }, event.at);
+    }
+    const response = await call('GET', '/api/observations');
+    assert.deepEqual(response.body, fixture);
+    assert.equal(response.headers, undefined);
   });
 });

@@ -305,7 +305,9 @@ any change to it.
   the first.
 - **Step and Reset.** Step advances simulated time by one publish interval and sends that tick; Reset clears
   anomalies and returns devices to baseline. Both need the engine's simulated-clock mode (SIM-02); without it the
-  buttons are absent, not disabled.
+  buttons are absent, not disabled. _As built (SIM-09, 2026-10-21):_ only **Step** needs it (the process is started with
+  `--simulated-clock`); Reset works on both clocks. **Pause** pauses the devices, not the scenario's clock, and is absent on the
+  simulated clock, where nothing publishes by itself.
 - **Selecting a node** in Topology opens its readings, thresholds and alerts below the graph; selecting an alert
   offers _Show in topology_ and the reverse.
 - **Running a scenario starts a stopped device it needs**, and the card says so before the click (frame 03).
@@ -400,3 +402,13 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
     for a page that can take the person there (the Digital twin, SIM-09's controls); the pager is the Fleet's, without the
     first and last buttons; **Import JSON** is in the toolbar, not the header, and opens a file picker. Running a scenario over
     something that already plays on its devices asks first. Frame 03 stays as drawn until it is redrawn.
+15. **Frame 11 differs from the build.** _Settled in SIM-09 (2026-10-21)._ The build shows only what Studio can observe or measure:
+    the timeline has no "Rule raised" row (the rule fires inside ingest; an alert row names its rule) and no "Anomaly started" row
+    (a time inside a run, not an observation); a run's row says what it started. Left out of the figures and the graph: "12 readings
+    buffered", the Broker's "4 ms" and the command center's "incident open" (not measured), and the _Topology | Twin_ switch (the twin is
+    SIM-18). The frame's own figures disagreed (it counted `hub-power-01` as stopped in the timeline and silent in the sixth card):
+    the build follows the brief, availability being the engine's running devices over the registered ones. A figure whose source does
+    not answer reads "unknown" with the reason, never zero. The timeline's sources are Fleet, Scenario, Alert, Outbox, Command Center,
+    Ingest and Engine (the last two are the build's: `dependency` and `tick-error` observations). The graph's search is `gq` in the
+    address, so the timeline's filter keeps `q`; the two scales (12 and 60 devices) are the Topology's. Not built here: the Twin view of
+    the card (SIM-18). Frame 11 stays as drawn until it is redrawn.

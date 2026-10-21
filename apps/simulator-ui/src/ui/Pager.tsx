@@ -22,6 +22,14 @@ export interface PagerProps {
    * reader is on, so a page that pages cards rather than a table asks for it; the Fleet's table does not.
    */
   announce?: boolean;
+  /**
+   * `compact` is the run of page buttons alone, for the top of a table whose full pager (the range, the rows per
+   * page) is at the bottom. Give it a `label` of its own: two navigations with one name are one too many to a screen
+   * reader.
+   */
+  variant?: 'full' | 'compact';
+  /** The name of the navigation; "Rows pages" (from `noun`) by default. */
+  label?: string;
 }
 
 /**
@@ -40,38 +48,44 @@ export function Pager({
   sizeLabel = 'Rows per page',
   rangeNote,
   announce = false,
+  variant = 'full',
+  label,
 }: PagerProps) {
   const count = pageCount(total, pageSize);
   const current = clampPage(page, count);
   const { from, to } = rowRange(current, pageSize, total);
 
   return (
-    <nav className={styles.pager} aria-label={`${noun} pages`}>
-      <span
-        className={styles.range}
-        {...(announce ? ({ role: 'status', 'aria-live': 'polite' } as const) : {})}
-      >
-        {noun}{' '}
-        <b>
-          {from}–{to}
-        </b>{' '}
-        of <b>{total}</b>
-        {rangeNote === undefined ? null : `, ${rangeNote}`}
-      </span>
-      <label className={styles.sizes}>
-        <span>{sizeLabel}</span>
-        <select
-          className={styles.select}
-          value={pageSize}
-          onChange={(event) => onPageSizeChange(Number(event.target.value))}
-        >
-          {sizes.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
-      </label>
+    <nav className={styles.pager} aria-label={label ?? `${noun} pages`}>
+      {variant === 'compact' ? null : (
+        <>
+          <span
+            className={styles.range}
+            {...(announce ? ({ role: 'status', 'aria-live': 'polite' } as const) : {})}
+          >
+            {noun}{' '}
+            <b>
+              {from}–{to}
+            </b>{' '}
+            of <b>{total}</b>
+            {rangeNote === undefined ? null : `, ${rangeNote}`}
+          </span>
+          <label className={styles.sizes}>
+            <span>{sizeLabel}</span>
+            <select
+              className={styles.select}
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            >
+              {sizes.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
       <span className={styles.pages}>
         <button
           type="button"

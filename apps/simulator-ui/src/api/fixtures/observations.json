@@ -1,0 +1,97 @@
+[
+  {
+    "id": 9,
+    "at": "2026-10-20T08:01:32.100Z",
+    "kind": "dependency",
+    "data": {
+      "name": "ingest",
+      "from": "unreachable",
+      "to": "ready",
+      "database": "up",
+      "broker": "up",
+      "alertSink": "ops-command-center",
+      "detail": null
+    }
+  },
+  {
+    "id": 8,
+    "at": "2026-10-20T08:01:31.200Z",
+    "kind": "alert-cleared",
+    "data": {
+      "alertId": "7",
+      "deviceId": "dc-env-01",
+      "ruleId": "server-room-hot",
+      "title": "Server room temperature high"
+    }
+  },
+  {
+    "id": 7,
+    "at": "2026-10-20T08:00:55.000Z",
+    "kind": "scenario-stop",
+    "data": {
+      "name": "server-room-overheat",
+      "runId": "r1",
+      "anomalyIds": ["a1"],
+      "reason": "stopped"
+    }
+  },
+  {
+    "id": 6,
+    "at": "2026-10-20T08:00:30.000Z",
+    "kind": "tick-error",
+    "data": { "message": "Publish failed: connection closed" }
+  },
+  {
+    "id": 5,
+    "at": "2026-10-20T08:00:28.300Z",
+    "kind": "incident",
+    "data": { "alertId": "7", "externalRef": "c3a1f0d2-5b7e-4c1a-9e0f-2d6a8b4c7e11" }
+  },
+  {
+    "id": 4,
+    "at": "2026-10-20T08:00:28.300Z",
+    "kind": "delivery",
+    "data": { "alertId": "7", "phase": "opened", "status": "delivered" }
+  },
+  {
+    "id": 3,
+    "at": "2026-10-20T08:00:27.100Z",
+    "kind": "alert-opened",
+    "data": {
+      "alertId": "7",
+      "deviceId": "dc-env-01",
+      "ruleId": "server-room-hot",
+      "metric": "temperature_c",
+      "severity": "high",
+      "title": "Server room temperature high"
+    }
+  },
+  {
+    "id": 2,
+    "at": "2026-10-20T07:59:55.000Z",
+    "kind": "scenario-run",
+    "data": {
+      "name": "server-room-overheat",
+      "anomalyIds": ["a1"],
+      "offsetS": 12,
+      "anomalies": [
+        {
+          "id": "a1",
+          "deviceId": "dc-env-01",
+          "metric": "temperature_c",
+          "startAt": 32,
+          "duration": 60
+        }
+      ],
+      "runId": "r1",
+      "startedDevices": [],
+      "replaced": []
+    }
+  },
+  {
+    "id": 1,
+    "at": "2026-10-20T07:59:50.000Z",
+    "kind": "engine-state",
+    "data": { "type": "device-state", "deviceId": "stu-air-01", "state": "paused" }
+  }
+]

@@ -20,6 +20,7 @@ import { LinkBanner } from './shell/LinkBanner';
 import { Navigation } from './shell/Navigation';
 import { Shell } from './shell/Shell';
 import { HistoryStore } from './state/history';
+import { ObservationLog } from './state/observationLog';
 import { PulseBus } from './state/pulses';
 import { connectStream } from './state/stream';
 import { createStudioStore } from './state/store';
@@ -237,19 +238,22 @@ export function App() {
   const [history] = useState(() => new HistoryStore());
   // Told when a device publishes, for the dots on the topology's edges.
   const [pulses] = useState(() => new PulseBus());
+  // What the simulator saw happen (the last 5,000 observations), for the Overview's timeline.
+  const [observations] = useState(() => new ObservationLog());
   // One animation budget for the window (12 animated nodes, 24 glowing lines). Without a provider nothing animates.
   const [budget] = useState(() => new AnimationBudget());
   useEffect(() => {
-    const connection = connectStream(store, { history, pulses });
+    const connection = connectStream(store, { history, pulses, observations });
     return () => {
       connection.close();
       history.dispose();
       pulses.dispose();
+      observations.dispose();
     };
-  }, [store, history, pulses]);
+  }, [store, history, pulses, observations]);
 
   return (
-    <StudioProvider store={store} history={history} pulses={pulses}>
+    <StudioProvider store={store} history={history} pulses={pulses} observations={observations}>
       <AnimationBudgetProvider budget={budget}>
         <BrowserRouter>
           <StudioFrame />

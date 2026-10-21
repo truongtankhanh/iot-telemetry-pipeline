@@ -218,3 +218,28 @@ describe('what is drawn over the graph', () => {
     }
   });
 });
+
+describe('the compact graph (the Overview’s card)', () => {
+  // The canvas is the parent of React Flow's own element; the nodes carry a `data-compact` of their own.
+  const canvas = () => document.querySelector('.react-flow')?.parentElement;
+
+  it('draws no minimap, so nothing at all is drawn over the picture', async () => {
+    renderGraph(flowOf(), { compact: true });
+    await waitFor(() => expect(nodeCount()).toBeGreaterThan(0));
+    expect(document.querySelector('.react-flow__minimap')).toBeNull();
+    expect(document.querySelectorAll('.react-flow__panel')).toHaveLength(0);
+    expect(canvas()).toHaveAttribute('data-compact', 'true');
+  });
+
+  it('draws the same nodes as the full graph', async () => {
+    renderGraph(flowOf(), { compact: true });
+    await waitFor(() => expect(nodeCount()).toBe(5 + 6 + 7));
+  });
+
+  it('is not compact by default: the Topology page keeps its minimap and its height', async () => {
+    renderGraph(flowOf());
+    await waitFor(() => expect(nodeCount()).toBeGreaterThan(0));
+    expect(canvas()).not.toHaveAttribute('data-compact');
+    expect(document.querySelector('.react-flow__minimap')).not.toBeNull();
+  });
+});

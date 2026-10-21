@@ -1,13 +1,15 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import scenariosFixture from './api/fixtures/scenarios.json';
 import { stateViewFixture as fixture } from './api/fixtures/stateView';
 import type { StateView } from './api/types';
 import { StudioFrame } from './App';
 import { appRoutes } from './lib/routes';
 import { createStudioStore, type StudioStore } from './state/store';
 import { StudioProvider } from './state/StudioProvider';
+import { installReactFlowStubs } from './pages/topology/topologyTestSupport';
 import { axeViolations } from './test-axe';
 
 const base = fixture;
@@ -42,7 +44,7 @@ function renderStudio({
   return { store, ...result };
 }
 
-/** The header's dependency pills (the Overview draws the same pills again in its connection card). */
+/** The header's dependency pills. */
 const pill = (name: string) => {
   const group = screen.getByRole('group', { name: 'Dependencies' });
   const element = within(group).getByText(name).closest('[data-tone]');
@@ -50,8 +52,30 @@ const pill = (name: string) => {
   return element as HTMLElement;
 };
 
+// The Overview draws the topology, which needs the stand-ins React Flow asks of a browser.
+let restoreStubs: () => void;
+beforeAll(() => {
+  restoreStubs = installReactFlowStubs();
+});
+afterAll(() => restoreStubs());
+
+// The Overview reads the scenario library when it opens: a simulator that answers it, and nothing else.
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) =>
+      new URL(url, 'http://localhost').pathname === '/api/scenarios'
+        ? new Response(JSON.stringify(scenariosFixture), { status: 200 })
+        : new Response(JSON.stringify({ statusCode: 404, error: 'Not Found', message: url }), {
+            status: 404,
+          }),
+    ),
+  );
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   localStorage.clear();
 });
 
@@ -221,7 +245,7 @@ describe('the keyboard', () => {
     renderStudio();
     await userEvent.click(screen.getByRole('button', { name: /Search devices/ }));
     await userEvent.keyboard('gf');
-    expect(screen.getByRole('combobox')).toHaveValue('gf');
+    expect(screen.getByRole('combobox', { name: /Search devices/ })).toHaveValue('gf');
     // The page is inert while the palette is open, which a role query may or may not see through.
     expect(
       screen.getByRole('heading', { level: 1, name: 'Overview', hidden: true }),
@@ -232,6 +256,29 @@ describe('the keyboard', () => {
     renderStudio();
     await userEvent.keyboard('/');
     await waitFor(() => expect(document.querySelector('[inert]')).not.toBeNull());
+  });
+});
+
+describe('the palette’s actions', () => {
+  it('open the Overview with the scenario picked, and run nothing', async () => {
+    renderStudio({ path: '/twin' });
+    await userEvent.keyboard('/');
+    await userEvent.keyboard('>run crowded');
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: 'Scenario' })).toHaveValue(
+      'crowded-lecture',
+    );
+    const calls = vi.mocked(fetch).mock.calls.map(([url]) => String(url));
+    expect(calls.some((url) => url.includes('/run'))).toBe(false);
+  });
+
+  it('open the Overview with the control focused, after the page has moved focus to itself', async () => {
+    renderStudio({ path: '/twin' });
+    await userEvent.keyboard('/');
+    await userEvent.keyboard('>reset');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reset' })).toHaveFocus());
   });
 });
 

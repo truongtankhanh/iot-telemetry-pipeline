@@ -43,7 +43,12 @@ export interface PaletteItem {
   disabled: string | null;
 }
 
-const ACTION_NOTE = 'Available from the Overview (SIM-09)';
+/**
+ * What an action says about itself. The palette never runs a command (a command is given where its effect is in
+ * view): choosing an action opens the Overview, with the scenario picked or the control focused, and the person
+ * presses the button there.
+ */
+const ACTION_DETAIL = 'Opens the Overview';
 
 const item = (
   group: PaletteGroup,
@@ -146,13 +151,15 @@ export function buildPaletteItems({
     );
   }
 
-  const action = (verb: string, label: string) =>
-    item('actions', verb, label, { detail: ACTION_NOTE, keywords: [verb], disabled: ACTION_NOTE });
-  for (const name of view.scenarios) items.push(action(`run ${name}`, `run ${name}`));
-  items.push(action('pause', 'pause'));
+  const action = (verb: string, label: string, target: string) =>
+    item('actions', verb, label, { detail: ACTION_DETAIL, keywords: [verb], target });
+  for (const name of view.scenarios) {
+    items.push(action(`run ${name}`, `run ${name}`, query('/', 'scenario', name)));
+  }
+  items.push(action('pause', 'pause', query('/', 'focus', 'pause')));
   // Step needs the simulated clock; on the wall clock the control is absent, not disabled.
-  if (view.config.simulated) items.push(action('step', 'step'));
-  items.push(action('reset', 'reset'));
+  if (view.config.simulated) items.push(action('step', 'step', query('/', 'focus', 'step')));
+  items.push(action('reset', 'reset', query('/', 'focus', 'reset')));
 
   return items;
 }

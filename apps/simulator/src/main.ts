@@ -1,8 +1,13 @@
 import { connectAsync } from 'mqtt';
 import { parseArgs } from 'node:util';
 import { BrokerLink } from './broker-link.ts';
-import { systemClock } from './clock.ts';
-import { ControlConfigError, isLoopbackHost, resolveControlConfig } from './control-config.ts';
+import { ManualClock, systemClock } from './clock.ts';
+import {
+  ControlConfigError,
+  isLoopbackHost,
+  resolveControlConfig,
+  resolveSimulatedClock,
+} from './control-config.ts';
 import { ControlServer } from './control-server.ts';
 import { JsonFileDeviceSource } from './device-source.ts';
 import { Engine } from './engine.ts';
@@ -26,6 +31,9 @@ const HELP = `Usage: node src/main.ts [options]
   --scenario <name>     play a scenario from the start: ${BUILT_IN_SCENARIOS.map((s) => s.name).join(' | ')},
                         or a custom one from the scenarios folder (read with the control server)
   --duration <s>        stop after this many seconds (default: run until Ctrl+C)
+  --simulated-clock     run on the simulated clock: one tick at start, then a tick only when
+                        Studio steps it (POST /api/step); same as SIMULATED_CLOCK=true; needs
+                        the control server
 
 Control server (HTTP commands and an event stream; no authentication):
   --control-host <addr> listen address (default CONTROL_HOST, else 127.0.0.1; another
@@ -58,6 +66,7 @@ const { values } = parseArgs({
     'studio-dir': { type: 'string' },
     'scenarios-dir': { type: 'string' },
     'no-control': { type: 'boolean', default: false },
+    'simulated-clock': { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
 });
@@ -89,6 +98,22 @@ function resolveControl() {
   }
 }
 const control = values['no-control'] ? undefined : resolveControl();
+
+// Refused here too, before the process connects or publishes: the control server is the only way to step.
+function resolveClockMode(): boolean {
+  try {
+    return resolveSimulatedClock({
+      env: process.env,
+      flag: values['simulated-clock'],
+      controlEnabled: control !== undefined,
+    });
+  } catch (error) {
+    if (!(error instanceof ControlConfigError)) throw error;
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+const simulated = resolveClockMode();
 
 // The scenarios the simulator can play. The folder of custom ones is read only for the control server, which is
 // what lists and runs them; a document that does not fit this registry is reported, not played.
@@ -135,10 +160,18 @@ const engine = new Engine({
   publisher: { publish: (topic, payload, options) => client.publishAsync(topic, payload, options) },
   intervalMs: Number(values.interval),
   anomalies,
+  // The simulated clock starts at the wall time of now, so the first `ts` is inside ingest's window.
+  ...(simulated ? { clock: new ManualClock(Date.now()) } : {}),
 });
 engine.on('tick-error', (error) => console.error(error.message));
 
 console.log(`Simulating ${devices.length} devices → ${values.broker}, every ${values.interval} ms`);
+if (simulated) {
+  console.log(
+    'Clock: simulated. One tick is sent at start; nothing is published until Studio steps it (POST /api/step).\n' +
+      '  Each step moves ts one interval ahead; ingest rejects a ts more than 5 minutes ahead of its own clock.',
+  );
+}
 for (const a of anomalies) {
   console.log(
     `  anomaly: ${a.deviceId} ${a.metric}=${a.value} from t+${a.startAt}s for ${a.duration}s`,

@@ -462,6 +462,52 @@ describe('Pager', () => {
       /Rows 0–0 of 0/,
     );
   });
+
+  describe('compact, for the top of a table', () => {
+    it('is the page buttons alone: no range, no rows per page', () => {
+      render(<Pager {...props} page={2} variant="compact" label="Events pages (top)" />);
+      const nav = screen.getByRole('navigation', { name: 'Events pages (top)' });
+      expect(nav).not.toHaveTextContent(/Rows 26/);
+      expect(within(nav).queryByLabelText('Rows per page')).not.toBeInTheDocument();
+      expect(within(nav).getByRole('button', { name: 'Page 2' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    });
+
+    it('turns the page like the full one, and keeps a name apart from it', async () => {
+      const user = userEvent.setup();
+      const onPageChange = vi.fn();
+      render(
+        <>
+          <Pager
+            {...props}
+            page={7}
+            variant="compact"
+            label="Rows pages (top)"
+            onPageChange={onPageChange}
+          />
+          <Pager {...props} page={7} />
+        </>,
+      );
+      await user.click(
+        within(screen.getByRole('navigation', { name: 'Rows pages (top)' })).getByRole('button', {
+          name: 'Next page',
+        }),
+      );
+      expect(onPageChange).toHaveBeenCalledWith(8);
+      // The two navigations have two names, and only the full one has the range and the size.
+      expect(screen.getAllByRole('navigation')).toHaveLength(2);
+      expect(screen.getAllByLabelText('Rows per page')).toHaveLength(1);
+    });
+
+    it('is the full pager unless asked: the label is only the name', () => {
+      render(<Pager {...props} page={1} label="Events pages" />);
+      const nav = screen.getByRole('navigation', { name: 'Events pages' });
+      expect(nav).toHaveTextContent(/Rows 1–25 of 312/);
+      expect(within(nav).getByLabelText('Rows per page')).toBeInTheDocument();
+    });
+  });
 });
 
 describe('Checkbox', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readRailPinned, writeRailPinned } from './preferences';
+import { readRailPinned, readTimeZone, writeRailPinned, writeTimeZone } from './preferences';
 
 function memory(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -55,5 +55,42 @@ describe('the pinned rail', () => {
     writeRailPinned(true);
     expect(readRailPinned()).toBe(true);
     window.localStorage.clear();
+  });
+});
+
+describe('the time zone of the timeline', () => {
+  it('is the local one when nothing was stored', () => {
+    expect(readTimeZone(memory())).toBe('local');
+  });
+
+  it('is remembered, either way', () => {
+    const storage = memory();
+    writeTimeZone('utc', storage);
+    expect(storage.data.get('studio.timeZone')).toBe('utc');
+    expect(readTimeZone(storage)).toBe('utc');
+
+    writeTimeZone('local', storage);
+    expect(readTimeZone(storage)).toBe('local');
+  });
+
+  it('reads anything but "utc" as local', () => {
+    for (const value of ['UTC', 'Europe/Paris', 'true', '']) {
+      expect(readTimeZone(memory({ 'studio.timeZone': value }))).toBe('local');
+    }
+  });
+
+  it('is kept apart from the pinned rail', () => {
+    const storage = memory();
+    writeTimeZone('utc', storage);
+    writeRailPinned(true, storage);
+    expect(readTimeZone(storage)).toBe('utc');
+    expect(readRailPinned(storage)).toBe(true);
+  });
+
+  it('copes with storage that throws, and with no storage at all', () => {
+    expect(readTimeZone(broken)).toBe('local');
+    expect(() => writeTimeZone('utc', broken)).not.toThrow();
+    expect(readTimeZone(null)).toBe('local');
+    expect(() => writeTimeZone('utc', null)).not.toThrow();
   });
 });

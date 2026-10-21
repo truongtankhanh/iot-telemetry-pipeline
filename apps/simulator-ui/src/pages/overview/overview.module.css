@@ -1,0 +1,658 @@
+/* The Overview (frame 11): the key figures, the alert feed, the controls with the progress of a scenario. Tokens only. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* A page whose link to the simulator is lost keeps its last data, dimmed. */
+.page[data-stale='true'] {
+  opacity: 0.7;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link:hover {
+  color: var(--text-primary);
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+/* The columns of the page; the graph joins them with its own card. */
+.cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ---- the live topology ---- */
+
+.graphBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.graphSummary {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+}
+
+/* ---- the key figures ---- */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.kpi {
+  padding: 12px 16px;
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  border: 1px solid rgba(71, 215, 255, 0.12);
+  box-shadow: var(--shadow-1);
+  min-width: 0;
+}
+
+.kpi[data-tone='warn'] {
+  border-color: rgba(255, 194, 61, 0.45);
+}
+
+.kpi[data-tone='bad'] {
+  border-color: rgba(255, 98, 128, 0.45);
+}
+
+.kpi[data-tone='unknown'] {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+.kpi dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.kpi dd {
+  margin: 0;
+}
+
+/* Only numerals of 24 px and up glow; an unknown figure is plain text. */
+.kpiValue {
+  font-family: var(--font-ui);
+  font-size: var(--fs-numeral);
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: #e6fbff;
+  text-shadow:
+    0 0 8px rgba(71, 215, 255, 0.6),
+    0 0 20px rgba(71, 215, 255, 0.3);
+}
+
+.kpiValue[data-unknown='true'] {
+  color: var(--text-secondary);
+  font-size: var(--fs-card-title);
+  font-weight: 500;
+  text-shadow: none;
+}
+
+.kpiUnit {
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-shadow: none;
+}
+
+.kpiNote {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.availability {
+  display: flex;
+  height: 6px;
+  margin: 6px 0;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.availability i {
+  display: block;
+  height: 100%;
+}
+
+.availability i[data-state='running'] {
+  background: var(--st-running);
+}
+
+.availability i[data-state='paused'] {
+  background: var(--st-paused);
+}
+
+.availability i[data-state='stopped'] {
+  background: var(--st-stopped);
+}
+
+.severities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: var(--fs-min);
+}
+
+/* ---- the alert feed ---- */
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.feed[data-dimmed='true'] {
+  opacity: 0.6;
+}
+
+.feedItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.feedItem:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.feedHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feedTime {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  color: var(--text-tertiary);
+}
+
+.feedTitle {
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.feedTitle:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.feedMeta {
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+/* ---- the controls ---- */
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  font-size: var(--fs-body);
+}
+
+.status[data-tone='ok'] {
+  box-shadow: inset 2px 0 0 var(--success);
+}
+
+.status[data-tone='bad'] {
+  border-color: var(--danger);
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.statusText {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+/* ---- the progress of a scenario: three named phases on one bar ---- */
+
+.phase {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phaseBar {
+  position: relative;
+  height: 14px;
+  margin-top: 30px;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.phaseSegment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  background: var(--tint-info);
+}
+
+.phaseSegment[data-phase='anomaly'] {
+  background: var(--tint-warn);
+}
+
+.phaseSegment[data-phase='recovery'] {
+  background: var(--tint-ok);
+}
+
+.phaseSegment i {
+  display: block;
+  height: 100%;
+  background: var(--flow);
+}
+
+.phaseSegment[data-phase='anomaly'] i {
+  background: var(--warning);
+}
+
+.phaseSegment[data-phase='recovery'] i {
+  background: var(--success);
+}
+
+/* An alert opens (a circle) and clears (a square); filled once it has happened, hollow before. */
+.phaseFlag {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--sev-high);
+  border-radius: 50%;
+  background: var(--surface-0);
+}
+
+.phaseFlag[data-kind='clears'] {
+  border-color: var(--success);
+  border-radius: 3px;
+}
+
+.phaseFlag[data-done='true'] {
+  background: var(--sev-high);
+}
+
+.phaseFlag[data-kind='clears'][data-done='true'] {
+  background: var(--success);
+}
+
+.phaseFlag[data-uncertain='true'] {
+  border-style: dashed;
+}
+
+.phasePlayhead {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  box-shadow: var(--neon-accent);
+  pointer-events: none;
+}
+
+.phasePill {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--fs-min);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The columns are as wide as their phase, but never narrower than their words, so two labels cannot run together. */
+.phaseLabels {
+  display: grid;
+  gap: 8px;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+}
+
+.phaseLabels b {
+  display: block;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.phaseLabels span:last-child {
+  text-align: right;
+}
+
+.phaseSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0;
+  font-size: var(--fs-body);
+}
+
+.phaseSummary span:first-child {
+  color: var(--text-primary);
+}
+
+.phaseSummary span:last-child {
+  color: var(--text-secondary);
+}
+
+/* ---- the event timeline ---- */
+
+.timelineBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.filterField {
+  display: inline-flex;
+  flex: 1 1 320px;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  min-width: 240px;
+  padding: 0 10px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  color: var(--text-secondary);
+}
+
+.filterField:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.filterField input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.customRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+}
+
+.customRow label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.customRow input {
+  height: 30px;
+  padding: 0 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-1);
+  color: var(--text-primary);
+  color-scheme: dark;
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.customRow input:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 1px;
+}
+
+.timelinePages {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* The strip of events per stretch: bars drawn at the strip's own pixel width, and two handles over them. */
+.strip {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.stripSvg {
+  display: block;
+}
+
+.stripBase {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.stripBar {
+  fill: var(--flow);
+  fill-opacity: 0.9;
+}
+
+.stripSelection {
+  fill: var(--tint-accent);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.stripText {
+  fill: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-variant-numeric: tabular-nums;
+}
+
+.stripHandle {
+  position: absolute;
+  top: 14px;
+  width: 12px;
+  height: 38px;
+  margin-left: -6px;
+  background: var(--text-primary);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.stripHandle:hover {
+  box-shadow: var(--neon-accent);
+}
+
+.stripHandle:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+  box-shadow: var(--neon-flow);
+}
+
+/* The table of events. */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.events {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+}
+
+.events th {
+  padding: 6px 10px;
+  text-align: left;
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.events td {
+  padding: 8px 10px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.event:hover {
+  background: rgba(71, 215, 255, 0.06);
+}
+
+.event[data-fresh='true'] {
+  background: var(--tint-accent);
+}
+
+.eventToggle {
+  width: 36px;
+  padding-right: 0;
+}
+
+.eventTime {
+  width: 100px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.eventMessage {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-1);
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  color: var(--text-primary);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 1px;
+}
+
+.iconButton[aria-expanded='true'] {
+  color: var(--text-primary);
+}
+
+.iconButton[aria-expanded='true'] .chevron {
+  transform: rotate(90deg);
+}
+
+.eventDetails td {
+  background: var(--surface-0);
+}
+
+.eventFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.eventFields dt {
+  font-size: var(--fs-min);
+  color: var(--text-tertiary);
+}
+
+.eventFields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

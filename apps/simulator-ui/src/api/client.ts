@@ -1,6 +1,8 @@
 import type {
   AlertsPage,
   ImportAnswer,
+  ObservationEvent,
+  ObservationsPage,
   PagedAlert,
   RunAnswer,
   RunConflict,
@@ -356,4 +358,75 @@ export function conflictsOf(error: unknown): RunConflict[] | null {
     return null;
   }
   return conflicts;
+}
+
+// ---- The engine's clock commands, and the observation log (SIM-09) ----
+
+/**
+ * Moves the simulated clock forward by one publish interval and sends the tick that falls due. The simulator answers
+ * `409` on the wall clock (which is what it runs on unless it was started with `--simulated-clock`) and when the engine
+ * is not started; the `ApiError` carries its reason.
+ */
+export const stepEngine = (options: RequestOptions = {}) =>
+  sendCommand('POST', '/api/step', undefined, options);
+
+/** Clears every anomaly and held value and restarts the anomaly clock. Device states and intervals stay. */
+export const resetEngine = (options: RequestOptions = {}) =>
+  sendCommand('POST', '/api/reset', undefined, options);
+
+export interface ObservationsRequest {
+  /** Exclusive: only events older than this id. Taken from the `next` of a previous page, never built by the caller. */
+  before?: number;
+  /** 1 to 500, as the simulator allows. */
+  limit?: number;
+}
+
+/**
+ * A well-formed envelope. The `kind` is only checked to be text: a simulator newer than this page may record a kind it
+ * does not know, and that event is shown as "Other" rather than failing the whole read.
+ */
+function isObservationEvent(item: unknown): item is ObservationEvent {
+  return (
+    isObject(item) &&
+    Number.isInteger(item.id) &&
+    typeof item.at === 'string' &&
+    typeof item.kind === 'string' &&
+    isObject(item.data)
+  );
+}
+
+/**
+ * `GET /api/observations`: one page of what the control server saw, newest first. The next page is asked for by sending
+ * `next` back as `before`. A body that is not the documented array fails loudly instead of rendering as an empty log.
+ */
+export async function getObservations(
+  request: ObservationsRequest = {},
+  options: RequestOptions = {},
+): Promise<ObservationsPage> {
+  const params = new URLSearchParams();
+  if (request.before !== undefined) params.set('before', String(request.before));
+  if (request.limit !== undefined) params.set('limit', String(request.limit));
+  const search = params.toString();
+
+  const response = await send(
+    `/api/observations${search === '' ? '' : `?${search}`}`,
+    { headers: { Accept: 'application/json' } },
+    options,
+  );
+  const body = await readJson(response);
+  if (!Array.isArray(body) || !body.every(isObservationEvent)) {
+    throw new ApiError(
+      response.status,
+      'The simulator answered with observations Studio does not understand',
+    );
+  }
+  const cursor = response.headers.get('X-Next-Cursor');
+  const next = cursor === null || cursor === '' ? null : Number(cursor);
+  if (next !== null && !Number.isInteger(next)) {
+    throw new ApiError(
+      response.status,
+      'The simulator answered with a cursor Studio does not understand',
+    );
+  }
+  return { events: body, next };
 }

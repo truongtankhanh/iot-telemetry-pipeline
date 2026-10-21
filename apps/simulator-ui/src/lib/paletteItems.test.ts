@@ -82,16 +82,19 @@ describe('buildPaletteItems', () => {
     expect(topics[0]?.target).toBe(`/events?topic=${encodeURIComponent(topics[0]?.label ?? '')}`);
   });
 
-  it('lists the actions, none of which can be chosen yet, and step only on the simulated clock', () => {
+  it('lists the actions, each of which opens the Overview, and step only on the simulated clock', () => {
     const actions = group(build(), 'actions');
-    expect(actions.map((a) => a.label)).toEqual([
-      'run server-room-overheat',
-      'run crowded-lecture',
-      'pause',
-      'step',
-      'reset',
+    expect(actions.map((a) => [a.label, a.target])).toEqual([
+      ['run server-room-overheat', '/?scenario=server-room-overheat'],
+      ['run crowded-lecture', '/?scenario=crowded-lecture'],
+      ['pause', '/?focus=pause'],
+      ['step', '/?focus=step'],
+      ['reset', '/?focus=reset'],
     ]);
-    expect(actions.every((a) => a.disabled !== null && a.target === null)).toBe(true);
+    // The palette runs nothing: an action can be chosen, and says where it goes.
+    expect(actions.every((a) => a.disabled === null && a.detail === 'Opens the Overview')).toBe(
+      true,
+    );
 
     const wall = group(
       build((v) => void (v.config.simulated = false)),
@@ -99,6 +102,11 @@ describe('buildPaletteItems', () => {
     );
     expect(wall.map((a) => a.label)).not.toContain('step');
     expect(wall.map((a) => a.label)).toContain('reset');
+  });
+
+  it('encodes the name of a scenario in the address it opens', () => {
+    const odd = build((v) => void (v.scenarios = ['a b&c']));
+    expect(group(odd, 'actions')[0]?.target).toBe('/?scenario=a%20b%26c');
   });
 
   it('copes with a device without a name', () => {

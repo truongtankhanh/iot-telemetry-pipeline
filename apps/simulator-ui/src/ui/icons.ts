@@ -9,6 +9,7 @@ import {
   Bell,
   Boxes,
   Building2,
+  Calendar,
   ChartColumn,
   Check,
   ChevronLeft,
@@ -23,8 +24,10 @@ import {
   CornerDownLeft,
   Cpu,
   Database,
+  Download,
   Droplets,
   ExternalLink,
+  Filter,
   FlaskConical,
   Focus,
   Gauge,
@@ -50,6 +53,7 @@ import {
   Server,
   Shield,
   Square,
+  StepForward,
   Terminal,
   Thermometer,
   TriangleAlert,
@@ -61,6 +65,7 @@ import {
 import type { Severity } from '../api/types';
 import type { DeviceGlyph, MetricIconName } from '../lib/deviceIdentity';
 import type { TrailGlyph } from '../lib/alertTrail';
+import type { EventGlyph } from '../lib/eventRows';
 import type { StageId } from '../lib/pipeline';
 import type { NavIconName } from '../lib/routes';
 
@@ -131,12 +136,16 @@ export const uiIcons = {
   stop: Square,
   copy: Copy,
   reset: RotateCcw,
+  step: StepForward,
   inspect: PanelRightOpen,
   plus: Plus,
   minus: Minus,
   fit: Focus,
   chevronDown: ChevronDown,
   external: ExternalLink,
+  download: Download,
+  calendar: Calendar,
+  filter: Filter,
 } satisfies Record<string, Glyph>;
 
 /** The glyph of each stage of the pipeline in the topology. */
@@ -158,4 +167,16 @@ export const trailGlyphs: Record<TrailGlyph, Glyph> = {
   outbox: Inbox,
   incident: Shield,
   clear: CircleCheck,
+};
+
+/** The mark on the source chip of a row of the event timeline. */
+export const eventGlyphs: Record<EventGlyph, Glyph> = {
+  fleet: Boxes,
+  scenario: FlaskConical,
+  alert: Bell,
+  outbox: Inbox,
+  incident: Shield,
+  ingest: Radio,
+  engine: Cpu,
+  other: Info,
 };

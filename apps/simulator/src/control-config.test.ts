@@ -7,6 +7,7 @@ import {
   type ControlFlags,
   isLoopbackHost,
   resolveControlConfig,
+  resolveSimulatedClock,
 } from './control-config.ts';
 
 const resolve = (env: Record<string, string | undefined> = {}, flags: ControlFlags = {}) =>
@@ -218,5 +219,65 @@ describe('resolveControlConfig scenarios directory', () => {
       resolve({ SCENARIOS_DIR: '  ' }, { scenariosDir: '' }).scenariosDir,
       DEFAULT_SCENARIOS_DIR,
     );
+  });
+});
+
+describe('resolveSimulatedClock', () => {
+  const simulated = (
+    env: Record<string, string | undefined> = {},
+    flag?: boolean,
+    controlEnabled = true,
+  ) => resolveSimulatedClock({ env, flag, controlEnabled });
+
+  it('is off when nothing asks for it', () => {
+    assert.equal(simulated(), false);
+    assert.equal(simulated({}, false), false);
+  });
+
+  it('is on only for the exact value true, as CONTROL_ALLOW_NON_LOOPBACK is', () => {
+    assert.equal(simulated({ SIMULATED_CLOCK: 'true' }), true);
+    for (const value of ['', '  ', '1', 'yes', 'TRUE', 'True', 'false']) {
+      assert.equal(simulated({ SIMULATED_CLOCK: value }), false, JSON.stringify(value));
+    }
+  });
+
+  it('is on with the flag, with or without the variable', () => {
+    assert.equal(simulated({}, true), true);
+    assert.equal(simulated({ SIMULATED_CLOCK: 'true' }, true), true);
+  });
+
+  it('cannot be turned off by the flag: the flag only turns it on', () => {
+    assert.equal(simulated({ SIMULATED_CLOCK: 'true' }, false), true);
+    assert.equal(simulated({ SIMULATED_CLOCK: 'false' }, true), true);
+  });
+
+  it('is refused without the control server, naming the flag and --no-control', () => {
+    assert.throws(
+      () => simulated({}, true, false),
+      (error: unknown) =>
+        error instanceof ControlConfigError &&
+        error.message.includes('--simulated-clock') &&
+        error.message.includes('--no-control'),
+    );
+  });
+
+  it('is refused without the control server, naming the variable when it asked', () => {
+    assert.throws(
+      () => simulated({ SIMULATED_CLOCK: 'true' }, undefined, false),
+      (error: unknown) =>
+        error instanceof ControlConfigError &&
+        error.message.includes('SIMULATED_CLOCK') &&
+        !error.message.includes('--simulated-clock') &&
+        error.message.includes('--no-control'),
+    );
+  });
+
+  it('names the flag when both the flag and the variable asked', () => {
+    assert.throws(() => simulated({ SIMULATED_CLOCK: 'true' }, true, false), /--simulated-clock/);
+  });
+
+  it('does not mind the missing control server when the clock is off', () => {
+    assert.equal(simulated({}, undefined, false), false);
+    assert.equal(simulated({ SIMULATED_CLOCK: '1' }, false, false), false);
   });
 });

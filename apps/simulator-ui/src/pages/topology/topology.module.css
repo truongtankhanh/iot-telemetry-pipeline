@@ -697,6 +697,12 @@
   --xy-minimap-mask-stroke-width: 1.5;
 }
 
+/* The Overview's card: the same canvas, shorter. */
+.canvas[data-compact='true'] {
+  height: min(440px, 60vh);
+  min-height: 320px;
+}
+
 .canvas :global(.react-flow) {
   background: transparent;
 }
