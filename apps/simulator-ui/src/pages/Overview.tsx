@@ -1,122 +1,123 @@
 import { dependencyNotes } from '../lib/dependencyNotes';
 import { formatClockTime } from '../lib/time';
-import { usePills } from '../shell/usePills';
+import { useNow } from '../state/useNow';
 import { useStudio } from '../state/studioContext';
 import { Card } from '../ui/Card';
 import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
-import { Pill } from '../ui/Pill';
-import styles from './pages.module.css';
+import { uiIcons } from '../ui/icons';
+import { AlertFeed } from './overview/AlertFeed';
+import { OverviewKpis } from './overview/OverviewKpis';
+import { SimulationControls } from './overview/SimulationControls';
+import { useOverviewKpis } from './overview/useOverviewKpis';
+import { useOverviewParams } from './overview/useOverviewParams';
+import { useSimulationControls } from './overview/useSimulationControls';
+import { useRunElapsed } from './scenarios/useRunElapsed';
+import styles from './overview/overview.module.css';
+import pages from './pages.module.css';
+
+const DESCRIPTION =
+  'Campus simulation environment. What is running, what it caused, and what to do next.';
 
 /**
- * The Overview of this ticket: the shell with one real card, the connection. It proves the stream works
- * and that the pills in the header are not decoration; the KPIs, the live topology, the alert feed, the
- * controls and the timeline arrive with SIM-09.
+ * "server-room-overheat · 41 s in": the scenario that is playing. Its own component because it owns the timer of
+ * `useRunElapsed`, which only a page that shows a running scenario needs.
+ */
+function RunningScenario({ name }: { name: string }) {
+  const lengthS = useStudio((state) => {
+    const run = state.view?.runs.find((r) => r.scenario === name);
+    return run === undefined ? 0 : Math.max(0, run.endsAtS - run.offsetS);
+  });
+  const elapsed = useRunElapsed(name, lengthS);
+  return (
+    <Chip tone="warn" icon={uiIcons.play}>
+      {name}
+      {elapsed === null ? '' : ` · ${Math.floor(elapsed)} s in`}
+    </Chip>
+  );
+}
+
+/**
+ * The Overview (frame 11), the page Studio opens on: what is running and what it caused. The key figures, the alerts
+ * and the controls of the simulation are here; each figure comes from the source its own page reads. Before the first
+ * message there is a loading line, with the link lost the last data stays, dimmed, and says when it was lost, and a
+ * dependency that is down is told in a sentence above the figures.
  */
 export function Overview() {
+  const view = useStudio((state) => state.view);
   const link = useStudio((state) => state.link);
   const lostSince = useStudio((state) => state.lostSince);
-  const lastDataAt = useStudio((state) => state.lastDataAt);
   const lastAlertSink = useStudio((state) => state.lastAlertSink);
-  const publishRate = useStudio((state) => state.publishRate);
-  const view = useStudio((state) => state.view);
-  const pills = usePills();
-  const notes = dependencyNotes(view, lastAlertSink);
+  const now = useNow();
+  const kpis = useOverviewKpis(now);
+  const controls = useSimulationControls();
+  const [query, update] = useOverviewParams();
 
-  const devices = view?.engine.devices ?? [];
-  const running = devices.filter((device) => device.state === 'running').length;
+  const status =
+    link === 'live' ? (
+      <Chip tone="ok">Connected</Chip>
+    ) : link === 'connecting' ? (
+      <Chip>Connecting</Chip>
+    ) : (
+      <Chip tone="bad">Lost{lostSince === null ? '' : ` at ${formatClockTime(lostSince)}`}</Chip>
+    );
+
+  if (view === null || kpis === null) {
+    return (
+      <>
+        <PageHeader title="Overview" description={DESCRIPTION}>
+          {status}
+        </PageHeader>
+        <Card title="Simulation">
+          <p role="status">
+            {link === 'lost'
+              ? 'The simulator has not answered yet.'
+              : 'Waiting for the first message from the simulator…'}
+          </p>
+        </Card>
+      </>
+    );
+  }
+
+  const notes = dependencyNotes(view, lastAlertSink);
+  const running = view.runs[0];
+  const alertsUnknown = kpis.alerts.known ? null : kpis.alerts.reason;
 
   return (
-    <>
-      <PageHeader
-        title="Overview"
-        description="Health of the simulated campus: the pipeline from device to incident."
-      >
-        {link === 'live' ? <Chip tone="ok">Connected</Chip> : null}
-        {link === 'connecting' ? <Chip>Connecting</Chip> : null}
-        {link === 'lost' ? (
-          <Chip tone="bad">
-            Lost{lostSince === null ? '' : ` at ${formatClockTime(lostSince)}`}
-          </Chip>
-        ) : null}
+    <div className={styles.page} data-stale={link === 'lost' ? 'true' : undefined}>
+      <PageHeader title="Overview" description={DESCRIPTION}>
+        {running === undefined ? null : <RunningScenario name={running.scenario} />}
+        {status}
       </PageHeader>
 
-      <div className={styles.cards}>
-        <Card title="Connection">
-          <div className={styles.row}>
-            {pills.map((pill) => (
-              <Pill
-                key={pill.id}
-                label={pill.label}
-                detail={pill.detail}
-                tone={pill.tone}
-                stale={pill.stale}
-              />
-            ))}
-          </div>
+      {notes.length === 0 ? null : (
+        <ul className={pages.notes}>
+          {notes.map((note) => (
+            <li
+              key={note.id}
+              className={pages.note}
+              data-tone={note.tone}
+              role={note.tone === 'bad' ? 'alert' : 'status'}
+            >
+              <div className={pages.noteTitle}>{note.title}</div>
+              <div className={pages.noteText}>{note.text}</div>
+            </li>
+          ))}
+        </ul>
+      )}
 
-          {view === null ? (
-            <p className={styles.muted}>
-              {link === 'lost'
-                ? 'The simulator has not answered yet.'
-                : 'Waiting for the first message from the simulator…'}
-            </p>
-          ) : notes.length === 0 ? (
-            <p className={styles.muted}>
-              The broker, ingest and the command center are all answering.
-            </p>
-          ) : (
-            <ul className={styles.notes}>
-              {notes.map((note) => (
-                <li key={note.id} className={styles.note} data-tone={note.tone}>
-                  <div className={styles.noteTitle}>{note.title}</div>
-                  <div className={styles.noteText}>{note.text}</div>
-                </li>
-              ))}
-            </ul>
-          )}
+      <OverviewKpis kpis={kpis} />
 
-          {view !== null ? (
-            <dl className={styles.facts}>
-              <dt>Engine</dt>
-              <dd>
-                {view.engine.running ? 'running' : 'stopped'} · {running} of {devices.length}{' '}
-                devices · {publishRate.toFixed(1)} msg/s
-              </dd>
-              <dt>Clock</dt>
-              <dd>{view.config.simulated ? 'simulated (moves when stepped)' : 'wall clock'}</dd>
-              <dt>Interval</dt>
-              <dd>{view.config.intervalMs} ms per device</dd>
-              <dt>Last data</dt>
-              <dd>{lastDataAt === null ? '—' : formatClockTime(lastDataAt)}</dd>
-            </dl>
-          ) : null}
-
-          {view !== null && view.scenarios.length > 0 ? (
-            <div className={styles.row}>
-              <span className={styles.muted}>Scenarios</span>
-              {view.scenarios.map((name) => (
-                <Chip key={name} tone="accent">
-                  {name}
-                </Chip>
-              ))}
-            </div>
-          ) : null}
-        </Card>
-
-        <Card title="The rest of the Overview">
-          <p>
-            The KPIs, the live topology, the alert feed, the simulation controls and the event
-            timeline arrive with <b>SIM-09</b>. Until then this page shows the one thing every other
-            page depends on: whether Studio is talking to the simulator, and whether the simulator
-            is talking to the pipeline.
-          </p>
-          <p className={styles.muted}>
-            Search anything with the box in the header, or press <b>/</b>; go to a page with{' '}
-            <b>g</b> and a letter.
-          </p>
-        </Card>
+      <div className={styles.cols}>
+        <div className={styles.col}>
+          <AlertFeed alerts={view.alerts.alerts} unknownReason={alertsUnknown} />
+          <SimulationControls
+            controls={controls}
+            scenario={query.scenario}
+            onScenario={(scenario) => update({ scenario })}
+          />
+        </div>
       </div>
-    </>
+    </div>
   );
 }

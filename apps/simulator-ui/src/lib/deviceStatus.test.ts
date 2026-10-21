@@ -121,6 +121,33 @@ describe('deviceStatus', () => {
       const status = deviceStatus(input({ lastSeen: NOW - 60_000, latest: { temperature_c: 40 } }));
       expect(status.kind).toBe('silent');
     });
+
+    it('is never called on a stepped engine: its messages stand still between steps', () => {
+      const stepped = { anomalies: [], elapsedS: 100, simulated: true };
+      expect(deviceStatus(input({ engine: stepped, lastSeen: NOW - 600_000 })).kind).toBe(
+        'running',
+      );
+      // An anomaly is still told, and a paused device is still paused.
+      expect(
+        deviceStatus(
+          input({ engine: stepped, lastSeen: NOW - 600_000, latest: { temperature_c: 29.3 } }),
+        ).kind,
+      ).toBe('anomaly');
+      expect(
+        deviceStatus(
+          input({
+            engine: stepped,
+            engineDevice: engineDevice('paused'),
+            lastSeen: NOW - 600_000,
+          }),
+        ).kind,
+      ).toBe('paused');
+    });
+
+    it('is called on the wall clock, whether the engine says so or leaves it out', () => {
+      const wall = { anomalies: [], elapsedS: 100, simulated: false };
+      expect(deviceStatus(input({ engine: wall, lastSeen: NOW - 6001 })).kind).toBe('silent');
+    });
   });
 
   describe('without rules', () => {

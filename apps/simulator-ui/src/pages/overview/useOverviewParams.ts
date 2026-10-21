@@ -1,0 +1,45 @@
+import { useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
+
+/** What the address says about the Overview. */
+export interface OverviewQuery {
+  /** The scenario the controls show (`?scenario=`, which the command palette links to), or `null` for the default. */
+  scenario: string | null;
+}
+
+/** The longest scenario name the simulator accepts. */
+const NAME_MAX_LENGTH = 64;
+
+/** Reads the address. A value that is not usable falls back to the default: a shared link always opens. */
+export function parseOverviewQuery(params: URLSearchParams): OverviewQuery {
+  return { scenario: (params.get('scenario') ?? '').slice(0, NAME_MAX_LENGTH) || null };
+}
+
+/**
+ * The query of the Overview, read from and written to the address, so that a reload and a shared link keep the place.
+ * A change replaces the history entry (the choice of a scenario is not a page to go back to) and leaves every
+ * parameter it does not own as it is: the graph and the timeline write theirs in the same address.
+ */
+export function useOverviewParams(): [OverviewQuery, (patch: Partial<OverviewQuery>) => void] {
+  const [params, setParams] = useSearchParams();
+  const query = useMemo(() => parseOverviewQuery(params), [params]);
+
+  const update = useCallback(
+    (patch: Partial<OverviewQuery>) => {
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if ('scenario' in patch) {
+            if (patch.scenario) next.set('scenario', patch.scenario);
+            else next.delete('scenario');
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
+
+  return [query, update];
+}

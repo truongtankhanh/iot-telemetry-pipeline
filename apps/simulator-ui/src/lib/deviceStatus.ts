@@ -53,7 +53,9 @@ export interface DeviceStatusInput {
   device: DeviceInfo;
   /** The engine's entry for the device; `undefined` if the engine does not know it (then it counts as stopped). */
   engineDevice: EngineSnapshot['devices'][number] | undefined;
-  engine: Pick<EngineSnapshot, 'anomalies' | 'elapsedS'>;
+  /** `simulated` (the engine is on the stepped clock) is optional: an input that leaves it out is on the wall clock. */
+  engine: Pick<EngineSnapshot, 'anomalies' | 'elapsedS'> &
+    Partial<Pick<EngineSnapshot, 'simulated'>>;
   rules: RulesView;
   /** The newest value of each metric, from the history. */
   latest: Partial<Record<MetricName, number>>;
@@ -66,7 +68,9 @@ export interface DeviceStatusInput {
  * What state a device is in. The engine knows running, paused and stopped. Of the running ones, silent is one that
  * has said nothing for three intervals (at least five seconds): the engine says running, the broker has heard
  * nothing, and that is the state worth noticing. A device that has never been heard from since the page opened is
- * not called silent (there is no "since" to give, and a reload would flag every device for a moment).
+ * not called silent (there is no "since" to give, and a reload would flag every device for a moment). On a stepped
+ * engine (the simulated clock) nothing is called silent: the messages' `ts` follows the simulated clock, which stands
+ * still between steps while the browser's clock does not, so every running device would read silent after five seconds.
  * An anomaly is a latest value beyond a rule's raise line; with rules not available it is a value inside an
  * anomaly the engine is playing now.
  */
@@ -94,7 +98,7 @@ export function deviceStatus(input: DeviceStatusInput): DeviceStatus {
     SILENT_AFTER_INTERVALS * (engineDevice?.intervalMs ?? 0),
     SILENT_AFTER_MIN_MS,
   );
-  if (lastSeen !== null && now - lastSeen > silentAfter) {
+  if (engine.simulated !== true && lastSeen !== null && now - lastSeen > silentAfter) {
     return base('silent', 'down', { since: lastSeen });
   }
 

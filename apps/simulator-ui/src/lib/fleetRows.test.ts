@@ -75,8 +75,18 @@ describe('buildFleetRows', () => {
   });
 
   it('calls a running device that has said nothing for a while silent', () => {
-    const rows = rowsOf(viewWith(), {}, { 'dc-env-01': NOW - 30_000 });
+    // The fixture is the state of a stepped engine; silence means something only on the wall clock.
+    const wall = viewWith((v) => {
+      v.engine.simulated = false;
+    });
+    const rows = rowsOf(wall, {}, { 'dc-env-01': NOW - 30_000 });
     expect(rows[0]?.status.kind).toBe('silent');
+    expect(rows[0]?.lastSeen).toBe(NOW - 30_000);
+  });
+
+  it('does not call it silent on a stepped engine, however long it has been', () => {
+    const rows = rowsOf(viewWith(), {}, { 'dc-env-01': NOW - 30_000 });
+    expect(rows[0]?.status.kind).toBe('running');
     expect(rows[0]?.lastSeen).toBe(NOW - 30_000);
   });
 
