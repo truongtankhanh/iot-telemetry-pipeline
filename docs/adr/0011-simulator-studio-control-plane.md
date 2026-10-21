@@ -389,3 +389,35 @@ halves. What was decided on the way:
   20,000 ticks (a very short interval on a long scenario) is refused the same way.
 - **Nothing in ingest, the contract or the metrics changed;** no dependency was added. The folder is outside `src/`, so the image has no
   custom scenarios unless a volume is mounted on `SCENARIOS_DIR`.
+
+## Amendment, 2026-10-21: Scenarios as built (SIM-08, Studio half)
+
+- **The page pages the whole library.** `GET /api/scenarios` sends every scenario with what its card needs; the browser searches (every word in the
+  name, a device of its anomalies, or the id or title of a rule it should raise), counts the tabs over the search, sorts (recently run, name,
+  longest first) and cuts the page, 6, 12 or 24 cards, with the Fleet's pager. The address holds the search, the tab, the sort, the page, the size
+  and `?scenario=` (the palette's link), so a reload opens the same page. `?scenario=` is a pointer, not a filter: it marks the card and shows
+  its page, says so when a tab or the search hides it or when there is no such scenario, and any other change of the address drops it.
+- **The library is read again when something it depends on changes,** not on a timer: the signature is the ids of the runs and each device's state
+  and interval (`needsStart`, `running` and the expected times depend on them), plus after each of the page's own commands (an import adds a scenario
+  without changing the signature). The last good library stays on show through a failed or running read; an overtaken read is aborted and never shown.
+- **A card says what the simulator worked out and nothing else.** The sentence, the flags and the curve come from `expected`; the browser never
+  computes an alert time. Times are plain seconds from the scenario start and read "about"; a clear that may come later reads "or later", one that was
+  not found "clear time not known" with a note; an anomaly that no rule watches, or that never crosses, is told; with no rules the card gives the reason and
+  draws no chart.
+- **The chart is a figure at its true pixel width** (text 13 px, colours from tokens): the value against the rule's raise and clear lines with the alert
+  and the clear as flags for a scenario on one device and metric, and one lane for each device (at most four, then a line of text) for any other. A label
+  that would run into another or out of the picture is left off and kept in the tooltip; the sentence of the `role="img"` carries every number. The
+  playhead is a still line with a pill, drawn only while the scenario plays; its time is the anomaly clock minus the run's offset, advanced by the page's
+  clock on the wall clock and not on the simulated clock (which moves only on a step).
+- **Replacing is asked about after the simulator refuses,** not predicted: Run is sent without `replace`; a `409` with conflicts becomes a dialog that
+  names the runs and the loose anomalies in the way, and Replace sends the run again with `replace`. The rule stays in one place (the simulator knows about
+  the command line's scenario too). The dialog is modal like the hold dialog; its focus goes back to the Run button even though that button was disabled
+  while the request was on its way.
+- **Import is a file picker.** A file that is not JSON, or over 16 KiB, is refused before it is sent; anything else is the simulator's to refuse and its
+  reason is shown as it is ("anomalies[0].value 900 is outside the range of temperature_c (-40 to 85 °C)"). A success points the address at the new card.
+- **Shared pieces:** `Pager` has an optional note after its range and an optional polite announcement (the Fleet uses neither); `LabSwitcher` is the
+  switch between the Lab's pages, built from the routes; `ApiError` keeps the body of a refusal and `conflictsOf` reads a `409`'s conflicts.
+  `fixtures/scenarios.json` is a `GET /api/scenarios` body: the key lists of `client.test.ts` and of `apps/simulator/src/control-routes.test.ts`
+  compare against it.
+- **Not built here:** the Fleet's running-scenario strip and the **Follow** menu (no page to take the person to yet), and **Edit**, **Duplicate** and
+  **New scenario** (the editor, SIM-11). The palette's `run <name>` actions stay listed and disabled until SIM-09. No dependency was added.

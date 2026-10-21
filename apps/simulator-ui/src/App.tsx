@@ -51,6 +51,11 @@ const Alerts = lazy(() =>
   import('./pages/alerts/Alerts').then((module) => ({ default: module.Alerts })),
 );
 
+// The Scenarios is its own chunk: it brings the cards, the charts and the replace dialog, which no other page needs.
+const Scenarios = lazy(() =>
+  import('./pages/scenarios/Scenarios').then((module) => ({ default: module.Scenarios })),
+);
+
 const TITLE = 'Simulator Studio';
 
 // One array for the life of the window: the shortcuts and the palette's items are derived from it.
@@ -110,6 +115,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Alerts />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/lab/scenarios"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Scenarios />
           </Suspense>
         }
       />

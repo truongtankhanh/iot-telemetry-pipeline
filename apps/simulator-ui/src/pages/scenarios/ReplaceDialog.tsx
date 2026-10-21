@@ -59,11 +59,20 @@ export function ReplaceDialog({ pending, busy, onConfirm, onCancel }: ReplaceDia
     store.getState().pushModal();
     dialog.current?.focus();
     const returnTo = opener.current;
+    const asked = pending.name;
     return () => {
       store.getState().popModal();
-      if (returnTo instanceof HTMLElement && returnTo.isConnected) returnTo.focus();
+      // The button that asked is disabled while its request is on its way, and a disabled element gives up the focus:
+      // by the time this dialog opens the opener may be the page itself. Then the focus goes to the Run button.
+      const target =
+        returnTo instanceof HTMLElement && returnTo.isConnected && returnTo !== document.body
+          ? returnTo
+          : [...document.querySelectorAll('button')].find(
+              (button) => button.getAttribute('aria-label') === `Run ${asked}`,
+            );
+      target?.focus();
     };
-  }, [store]);
+  }, [store, pending.name]);
 
   return createPortal(
     <div className={styles.scrim} onMouseDown={onCancel}>
