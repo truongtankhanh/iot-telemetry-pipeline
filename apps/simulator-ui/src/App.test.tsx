@@ -259,6 +259,29 @@ describe('the keyboard', () => {
   });
 });
 
+describe('the palette’s actions', () => {
+  it('open the Overview with the scenario picked, and run nothing', async () => {
+    renderStudio({ path: '/twin' });
+    await userEvent.keyboard('/');
+    await userEvent.keyboard('>run crowded');
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: 'Scenario' })).toHaveValue(
+      'crowded-lecture',
+    );
+    const calls = vi.mocked(fetch).mock.calls.map(([url]) => String(url));
+    expect(calls.some((url) => url.includes('/run'))).toBe(false);
+  });
+
+  it('open the Overview with the control focused, after the page has moved focus to itself', async () => {
+    renderStudio({ path: '/twin' });
+    await userEvent.keyboard('/');
+    await userEvent.keyboard('>reset');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reset' })).toHaveFocus());
+  });
+});
+
 describe('accessibility', () => {
   it('has no violations on the Overview, a placeholder and Foundations', async () => {
     const overview = renderStudio();

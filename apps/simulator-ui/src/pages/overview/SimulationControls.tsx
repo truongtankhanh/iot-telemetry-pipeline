@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useStudio } from '../../state/studioContext';
 import type { ObservedAlert, ScenarioItem, ScenarioRunView } from '../../api/types';
 import { runFor } from '../../lib/runClock';
@@ -15,6 +16,7 @@ import { useRunElapsed } from '../scenarios/useRunElapsed';
 import { PhaseBar } from './PhaseBar';
 import { pickScenario } from './pickScenario';
 import styles from './overview.module.css';
+import type { FocusTarget } from './useOverviewParams';
 import type { SimulationControls as Controls } from './useSimulationControls';
 
 const NO_ALERTS: readonly ObservedAlert[] = [];
@@ -70,6 +72,9 @@ export interface SimulationControlsProps {
   /** `?scenario=` of the address. */
   scenario: string | null;
   onScenario: (name: string) => void;
+  /** A control to put focus on, once (`?focus=`); `onFocused` takes it out of the address. */
+  focus?: FocusTarget | null;
+  onFocused?: () => void;
 }
 
 /**
@@ -78,8 +83,32 @@ export interface SimulationControlsProps {
  * Resume for the devices, Step on a stepped clock, and Reset. Pausing stops the devices, not the scenario's clock, and
  * the control says so; Step is drawn only where it can work (the brief: absent, not disabled).
  */
-export function SimulationControls({ controls, scenario, onScenario }: SimulationControlsProps) {
+export function SimulationControls({
+  controls,
+  scenario,
+  onScenario,
+  focus = null,
+  onFocused,
+}: SimulationControlsProps) {
   const { library, commands, devices, clock } = controls;
+  const buttons = useRef<Record<FocusTarget, HTMLButtonElement | null>>({
+    pause: null,
+    step: null,
+    reset: null,
+  });
+  // The command palette sent the person here for one control: it takes focus once the page has settled (a page change
+  // moves focus to `main` in an effect of the shell, which would win over an effect of this component), and the
+  // parameter leaves the address. A control that is absent (Step on the wall clock) or off (nothing to pause) is not
+  // focused; the person is on the page that has it.
+  useEffect(() => {
+    if (focus === null) return;
+    const timer = setTimeout(() => {
+      const button = buttons.current[focus];
+      if (button !== null && !button.disabled) button.focus();
+      onFocused?.();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [focus, onFocused]);
   const runs = useStudio((state) => state.view?.runs);
   const intervalMs = useStudio((state) => state.view?.config.intervalMs ?? 0);
   const items = library.library?.scenarios ?? [];
@@ -177,6 +206,9 @@ export function SimulationControls({ controls, scenario, onScenario }: Simulatio
         {devices.canPause ? (
           <>
             <Button
+              ref={(element) => {
+                buttons.current.pause = element;
+              }}
               icon={uiIcons.pause}
               disabled={devices.pausable === 0 || devices.state.running}
               onClick={devices.pause}
@@ -192,6 +224,9 @@ export function SimulationControls({ controls, scenario, onScenario }: Simulatio
         ) : null}
         {clock.simulated ? (
           <Button
+            ref={(element) => {
+              buttons.current.step = element;
+            }}
             icon={uiIcons.step}
             disabled={clock.busy !== null}
             onClick={() => void clock.step()}
@@ -200,6 +235,9 @@ export function SimulationControls({ controls, scenario, onScenario }: Simulatio
           </Button>
         ) : null}
         <Button
+          ref={(element) => {
+            buttons.current.reset = element;
+          }}
           variant="ghost"
           icon={uiIcons.reset}
           disabled={clock.busy !== null}

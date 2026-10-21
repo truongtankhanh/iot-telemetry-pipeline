@@ -106,15 +106,23 @@ describe('CommandPalette', () => {
     expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('does nothing when an action is chosen, and says where it is available', async () => {
+  it('opens the Overview with the scenario picked when "run" is chosen, and runs nothing', async () => {
     const { open } = renderPalette();
     open();
     await userEvent.keyboard('>');
     const first = screen.getAllByRole('option')[0];
-    expect(first).toHaveAttribute('aria-disabled', 'true');
+    expect(first).not.toHaveAttribute('aria-disabled');
+    expect(first).toHaveTextContent('Opens the Overview');
     await userEvent.keyboard('{Enter}');
-    expect(where()).toBe('/');
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(where()).toBe('/?scenario=server-room-overheat');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens the Overview with a control to focus when pause, step or reset is chosen', async () => {
+    const { open } = renderPalette();
+    open();
+    await userEvent.keyboard('>reset{Enter}');
+    expect(where()).toBe('/?focus=reset');
   });
 
   it('says so when nothing matches', async () => {

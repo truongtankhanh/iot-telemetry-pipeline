@@ -566,3 +566,47 @@ describe('the event timeline on the page', () => {
     expect(rows.getByText('something-new')).toBeInTheDocument();
   });
 });
+
+describe('the controls the command palette sends the person to', () => {
+  const focused = (name: string | RegExp) => async () =>
+    expect(await screen.findByRole('button', { name })).toHaveFocus();
+
+  it('puts focus on Reset, and takes the parameter out of the address', async () => {
+    renderOverview({ path: '/?focus=reset' });
+    await waitFor(focused('Reset'));
+    await waitFor(() => expect(address()).toBe('/'));
+  });
+
+  it('puts focus on Pause, and leaves the other parameters where they are', async () => {
+    renderOverview({ path: '/?scenario=bad-afternoon&focus=pause' });
+    await waitFor(focused('Pause 5'));
+    await waitFor(() => expect(address()).toBe('/?scenario=bad-afternoon'));
+  });
+
+  it('puts focus on Step on a stepped clock', async () => {
+    renderOverview({ path: '/?focus=step', simulated: true });
+    await waitFor(focused('Step +2 s'));
+  });
+
+  it('does not invent a Step on the wall clock: the parameter goes, nothing takes focus', async () => {
+    renderOverview({ path: '/?focus=step' });
+    await waitFor(() => expect(address()).toBe('/'));
+    expect(screen.queryByRole('button', { name: /Step/ })).not.toBeInTheDocument();
+    expect(document.activeElement?.tagName).toBe('BODY');
+  });
+
+  it('leaves a button that is off alone: there is nothing to pause', async () => {
+    const view = structuredClone(viewWithDevices(2));
+    for (const device of view.engine.devices) device.state = 'paused';
+    renderOverview({ view, seed: false, path: '/?focus=pause' });
+    await waitFor(() => expect(address()).toBe('/'));
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeDisabled();
+    expect(document.activeElement?.tagName).toBe('BODY');
+  });
+
+  it('ignores a control it does not know', () => {
+    renderOverview({ path: '/?focus=explode' });
+    expect(address()).toBe('/?focus=explode');
+    expect(document.activeElement?.tagName).toBe('BODY');
+  });
+});

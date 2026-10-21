@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useCallback } from 'react';
 import { dependencyNotes } from '../lib/dependencyNotes';
 import { formatClockTime } from '../lib/time';
 import { useNow } from '../state/useNow';
@@ -60,6 +60,7 @@ export function Overview() {
   const kpis = useOverviewKpis(now);
   const controls = useSimulationControls();
   const [query, update] = useOverviewParams();
+  const controlFocused = useCallback(() => update({ focus: null }), [update]);
 
   const status =
     link === 'live' ? (
@@ -132,6 +133,8 @@ export function Overview() {
             controls={controls}
             scenario={query.scenario}
             onScenario={(scenario) => update({ scenario })}
+            focus={query.focus}
+            onFocused={controlFocused}
           />
         </div>
       </div>

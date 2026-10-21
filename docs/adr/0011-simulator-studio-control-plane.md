@@ -445,3 +445,50 @@ section supersedes it.
   on the wall clock; a pausable clock is a different change to `engine.ts` and `clock.ts`.
 - **For the Studio half:** a stepped process makes `deviceStatus`'s _silent_ meaningless (it compares the browser's wall clock with the
   message `ts`, which stands still between steps), so the Overview must not call a device silent on a simulated engine.
+
+## Amendment, 2026-10-21: Overview as built (SIM-09, Studio half)
+
+The Overview ([frame 11](../design/simulator/mockups/11-overview.dc.html)) is the page Studio opens on. It reads only what Studio already
+had, plus the simulator's observation log, and adds no dependency and no route to the simulator (the simulated-clock flag of the
+simulator half is the amendment above).
+
+- **Every figure has the source of its detail page.** The six key figures are computed in `lib/overviewKpis.ts`: devices online is the
+  engine's `running` devices over the registered ones (the Fleet's "Active devices"; the brief's definition of availability), active alerts
+  are the open ones of the store's alert feed by severity (the Alerts page's and the Topology's feed: the newest 100 the poller keeps, and
+  the card says so when the feed is full), the rate is the stream's, the lag is the Topology's `IngestRates` written with the same digits as
+  its Ingest stage (a test pins the two), delivery counts the feed's `deliveryStatus`, and "not reporting" is the Fleet's paused, stopped and
+  silent. A source that does not answer makes its figure **"unknown" with the reason, never zero**. "12 readings buffered", the Broker's
+  "4 ms" and the command center's "incident open" of the frame are not measured by Studio and are not drawn (open question 15 of the brief).
+- **The observation log is in the browser, outside React.** `state/observationLog.ts` holds the last 5,000 events, deduplicated by `id`,
+  notified once a second like the history. A snapshot of the stream carries `observationCursor` (the id of the newest event): when the log is
+  behind it, `stream.ts` reads `GET /api/observations` newest first, 500 at a time, to the end (at most ten requests, one read at a time, a
+  newer snapshot cancels the one going on) and adds the result; events that arrived live meanwhile are kept; a cursor **below** what the log
+  holds means the simulator started again (its ids begin at 1), so the log is cleared first; a failed read changes nothing and the next
+  snapshot tries again. The stream's `observation` event feeds it between reads. This gives numbered pages, a count, a density strip and an
+  export without a second API, which a cursor-only pager (as the Alerts' has) cannot.
+- **The timeline shows what was observed.** Sources: Fleet, Scenario, Alert, Outbox, Command Center, Ingest (`dependency`), Engine
+  (`tick-error`, anomalies, reset). The frame's "Rule raised" and "Anomaly started" rows are **not observations** (the rule fires inside
+  ingest; an anomaly's start is a time inside a run), so they are not rows: an alert row names its rule, and a run's row says what it started.
+  The filter is `key:value` terms (`source`, `device`, `rule`, `alert`, `scenario`) and words, every one of which must match; an unknown key is
+  searched as text and said so. Page, size, range (`5m`, `30m`, `1h`, `3h`, `12h`, custom with ISO UTC bounds), filter and source are in the
+  address, beside the controls' `scenario` and the graph's `gq`, `group` and `problems`; Local or UTC is a per-viewer preference. The strip's
+  handles can narrow the range, not widen it, and write it when released (pointer) or on key-up (arrow keys, Home and End). Export is a CSV of
+  every event that passes the filter, with times in UTC, made in the browser by an object URL and a link with a `download` name; a download is
+  a navigation, so `connect-src 'self'` does not apply, which is checked by hand.
+- **Pause pauses the devices, and the scenario keeps counting.** The engine has no pause of its own (a pausable clock is a different change
+  to `engine.ts` and `clock.ts`, not made). Pause pauses every running device through the per-device routes and Resume starts every paused
+  one (no memory: a reload loses nothing, and a device paused by hand is resumed too, which the label says); both go through the Fleet's bulk
+  run and ask first above ten devices. With the simulated clock there is nothing to pause, so Pause is absent; **Step** is drawn only there
+  (the brief's "absent, not disabled"); **Reset** works on both clocks.
+- **"Silent" is meaningless on a stepped engine,** because the messages' `ts` follows the simulated clock, which stands still between steps
+  while the browser's does not. `deviceStatus` never calls a device silent when `engine.simulated`, so the Fleet, the Topology and the
+  Overview agree.
+- **The compact topology is the Topology's own model** (`useTopologyModel`, the same nodes, edges and tiers) in a shorter canvas
+  (`TopologyGraph` gained `compact`: no minimap), without the detail row, the zoom bar or the Twin switch. It is a `React.lazy` card, so the
+  figures, the feed and the controls paint before React Flow arrives. **Open in Topology** carries the grouping, the filter and the chosen node.
+- **The palette runs nothing.** `run <name>` opens `/?scenario=<name>`, and `pause`, `step` and `reset` open `/?focus=<control>`; the Overview
+  puts focus on that control once and takes the parameter out of the address. The "Available from the Overview (SIM-09)" note of the
+  Shell amendment is now "Opens the Overview".
+- **Shared pieces:** `Pager` has a `compact` variant and a `label` (the top pager of a table; the Fleet's and the Scenarios' pagers pass
+  neither); `uiIcons.step`, `.download`, `.calendar`, `.filter` and `eventGlyphs`; `stepEngine`, `resetEngine` and `getObservations` in
+  the client, with `fixtures/observations.json` checked from both sides (`apps/simulator/src/control-routes.test.ts`).

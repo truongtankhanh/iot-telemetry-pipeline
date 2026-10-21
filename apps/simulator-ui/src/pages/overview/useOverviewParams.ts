@@ -3,6 +3,10 @@ import { useSearchParams } from 'react-router';
 import { type EventQuery, readEventQuery, writeEventQuery } from '../../lib/eventQuery';
 import type { Grouping } from '../../lib/topology';
 
+/** A control the command palette sends the person to (`?focus=`). */
+export type FocusTarget = 'pause' | 'step' | 'reset';
+const FOCUS_TARGETS: readonly FocusTarget[] = ['pause', 'step', 'reset'];
+
 /** What the address says about the Overview. */
 export interface OverviewQuery {
   /** The scenario the controls show (`?scenario=`, which the command palette links to), or `null` for the default. */
@@ -13,6 +17,11 @@ export interface OverviewQuery {
   group: Grouping | null;
   /** _Problems only_ in the graph. */
   problems: boolean;
+  /**
+   * A control to put focus on once (`?focus=`, which the command palette links to): the page does it and takes the
+   * parameter out of the address, so a reload does not do it again.
+   */
+  focus: FocusTarget | null;
   /** The event timeline: page, size, range, filter and source (`page`, `size`, `range`, `from`, `to`, `q`, `source`). */
   events: EventQuery;
 }
@@ -28,11 +37,13 @@ const NAME_MAX_LENGTH = 64;
 /** Reads the address. A value that is not usable falls back to the default: a shared link always opens. */
 export function parseOverviewQuery(params: URLSearchParams): OverviewQuery {
   const group = params.get('group');
+  const focus = params.get('focus');
   return {
     scenario: (params.get('scenario') ?? '').slice(0, NAME_MAX_LENGTH) || null,
     gq: (params.get('gq') ?? '').slice(0, 100),
     group: group === 'zone' || group === 'all' ? group : null,
     problems: params.get('problems') === '1',
+    focus: FOCUS_TARGETS.find((target) => target === focus) ?? null,
     events: readEventQuery(params),
   };
 }
@@ -61,6 +72,7 @@ export function useOverviewParams(): [OverviewQuery, (patch: OverviewPatch) => v
           if ('gq' in patch) write(next, 'gq', patch.gq ?? null);
           if ('group' in patch) write(next, 'group', patch.group ?? null);
           if ('problems' in patch) write(next, 'problems', patch.problems ? '1' : null);
+          if ('focus' in patch) write(next, 'focus', patch.focus ?? null);
           if (patch.events) {
             next = writeEventQuery(next, { ...readEventQuery(next), ...patch.events });
           }
