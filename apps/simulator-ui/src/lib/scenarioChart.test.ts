@@ -136,6 +136,8 @@ describe('the value chart (server-room-overheat at 400 px)', () => {
     const [alert, clear] = value(overheat, 200).flags;
     expect(alert?.label).toBe('alert ≈ 24 s');
     expect(clear?.label).toBeNull();
+    // The words are still there for a tooltip.
+    expect(clear?.text).toBe('clears ≈ 80 s');
   });
 
   it('tags the highest value above the line, inside the plot', () => {
@@ -199,6 +201,7 @@ describe('the lane chart (bad-afternoon at 400 px)', () => {
       ['DC·1', 'rounded-square', 'dc-env-01 temperature_c'],
       ['LHA', 'circle', 'lha-air-01 temperature_c'],
     ]);
+    expect(chart.lanes.map((lane) => lane.code)).toEqual(['HUB', 'DC·1', 'LHA']);
     expect(chart.lanes.map((lane) => lane.y)).toEqual([6, 36, 66]);
     expect(chart.more).toBeNull();
   });
@@ -274,6 +277,7 @@ describe('the lane chart (bad-afternoon at 400 px)', () => {
       anomalies: [first, { ...first, metric: 'humidity_pct' as const, startAt: 30 }],
     };
     expect(lanes(two).lanes.map((lane) => lane.label)).toEqual(['DC·1 Temp', 'DC·1 Humidity']);
+    expect(lanes(two).lanes.map((lane) => lane.code)).toEqual(['DC·1', 'DC·1']);
   });
 
   it('shows a device the registry does not have by its id', () => {

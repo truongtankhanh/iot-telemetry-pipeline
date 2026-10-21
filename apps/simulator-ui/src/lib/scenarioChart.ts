@@ -36,7 +36,8 @@ const VALUE_BOTTOM_MARGIN = 26;
 const TAG_ROOM = 18;
 const LANES_LEFT = 56;
 const SIDE_MARGIN = 12;
-const LANE_HEIGHT = 26;
+/** The height of one lane of the lane chart, in pixels. */
+export const LANE_HEIGHT = 26;
 const LANE_GAP = 4;
 const LANES_TOP = 6;
 const MORE_HEIGHT = 20;
@@ -135,7 +136,9 @@ export interface ChartFlag {
   severity: Severity;
   x: number;
   y: number;
-  /** The words beside the dot ("alert ≈ 24 s"); `null` when there is no room for them. */
+  /** The words of the flag ("alert ≈ 24 s"), for a tooltip, whether or not there is room to write them beside it. */
+  text: string;
+  /** The same words beside the dot; `null` when there is no room for them. */
   label: string | null;
   labelX: number;
   labelAnchor: 'start' | 'end';
@@ -182,6 +185,7 @@ function placeFlags(inputs: readonly FlagInput[], axis: ChartAxis): ChartFlag[] 
         severity: input.severity,
         x: input.x,
         y: FLAG_Y,
+        text: input.text,
         label: fit ? input.text : null,
         labelX: fit ? round1(fit.anchor === 'end' ? fit.to : fit.from) : input.x,
         labelAnchor: fit?.anchor ?? 'start',
@@ -337,7 +341,9 @@ export interface LaneAlert {
 
 export interface ChartLane {
   key: string;
-  /** The device's short code ("DC·1"), with the metric when the device has more than one lane. */
+  /** The device's short code ("DC·1"): what is written beside the lane. */
+  code: string;
+  /** The code with the metric when the device has more than one lane ("DC·1 Temp"): its tooltip. */
   label: string;
   shape: DeviceShape;
   /** Words for a tooltip: the device and the metric. */
@@ -402,6 +408,7 @@ function laneChart(
     const code = device ? deviceCode(device, [...devices]) : first.deviceId;
     return {
       key,
+      code,
       label: sameDevice > 1 ? `${code} ${metricLabel(first.metric)}` : code,
       shape: kindIdentity(device?.kind ?? '').shape,
       title: `${first.deviceId} ${first.metric}`,

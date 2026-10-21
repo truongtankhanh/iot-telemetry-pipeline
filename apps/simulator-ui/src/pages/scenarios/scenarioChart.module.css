@@ -1,0 +1,250 @@
+/*
+ * The chart of a scenario card. Every colour is a token; every text is at least --fs-min (13 px) because the picture
+ * is drawn at its true pixel width. Nothing here moves: the playhead is a still line.
+ */
+.figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.chart {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+}
+
+/* ---- the time axis ---- */
+.gridMajor {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+
+.gridMinor {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.baseline {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.tickLabel {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+/* ---- the value chart ---- */
+.areaTop {
+  stop-color: var(--warning);
+  stop-opacity: 0.34;
+}
+
+.areaBottom {
+  stop-color: var(--warning);
+  stop-opacity: 0.02;
+}
+
+.series {
+  fill: none;
+  stroke: var(--flow);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+/* The same line again, clipped to what lies beyond the raise line. */
+.seriesBreach {
+  fill: none;
+  stroke: var(--warning);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+
+.raiseLine {
+  stroke: var(--warning);
+  stroke-width: 1.2;
+  stroke-dasharray: 5 4;
+}
+
+.clearLine {
+  stroke: var(--success);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 4;
+}
+
+/* A label sits on a halo of the card's own colour so that a line behind it does not cut the letters. */
+.ruleLabel,
+.tag,
+.flagLabel,
+.blockLabel,
+.more,
+.laneCode {
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  paint-order: stroke;
+  stroke: var(--surface-1);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.ruleLabel {
+  fill: var(--text-secondary);
+}
+
+.tag {
+  fill: var(--warning);
+  font-weight: 600;
+}
+
+/* ---- flags: the alert is coloured by its severity, the clear is green; the words say which ---- */
+.flag {
+  color: var(--text-secondary);
+}
+
+.flag[data-kind='alert'][data-severity='critical'] {
+  color: var(--sev-critical);
+}
+
+.flag[data-kind='alert'][data-severity='high'] {
+  color: var(--sev-high);
+}
+
+.flag[data-kind='alert'][data-severity='medium'] {
+  color: var(--sev-medium);
+}
+
+.flag[data-kind='alert'][data-severity='low'] {
+  color: var(--sev-low);
+}
+
+.flag[data-kind='clear'] {
+  color: var(--success);
+}
+
+.flagLine {
+  stroke: currentcolor;
+  stroke-width: 1.2;
+  stroke-dasharray: 2 3;
+}
+
+.flagDot {
+  fill: currentcolor;
+  stroke: var(--surface-1);
+  stroke-width: 1.5;
+}
+
+.flagLabel {
+  fill: currentcolor;
+}
+
+/* A clear that may come later than shown is drawn with an open end. */
+.flag[data-uncertain='true'] .flagLine {
+  stroke-dasharray: 1 5;
+}
+
+.flag[data-uncertain='true'] .flagDot {
+  fill: var(--surface-1);
+  stroke: currentcolor;
+}
+
+/* ---- the lane chart ---- */
+.laneBand {
+  fill: var(--surface-2);
+  fill-opacity: 0.45;
+}
+
+.laneBand[data-odd='true'] {
+  fill-opacity: 0.2;
+}
+
+.mark {
+  fill: var(--surface-3);
+  stroke: var(--text-secondary);
+  stroke-width: 1.2;
+}
+
+.laneCode {
+  fill: var(--text-primary);
+  font-weight: 600;
+}
+
+.block {
+  fill: var(--accent);
+  fill-opacity: 0.22;
+  stroke: var(--accent);
+  stroke-opacity: 0.7;
+}
+
+.blockLabel {
+  fill: var(--text-primary);
+  font-weight: 600;
+  stroke: none;
+  paint-order: normal;
+}
+
+.alertRun {
+  color: var(--text-secondary);
+}
+
+.alertRun[data-severity='critical'] {
+  color: var(--sev-critical);
+}
+
+.alertRun[data-severity='high'] {
+  color: var(--sev-high);
+}
+
+.alertRun[data-severity='medium'] {
+  color: var(--sev-medium);
+}
+
+.alertRun[data-severity='low'] {
+  color: var(--sev-low);
+}
+
+.runLine {
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-opacity: 0.85;
+}
+
+.alertRun[data-open='true'] .runLine,
+.alertRun[data-uncertain='true'] .runLine {
+  stroke-dasharray: 3 3;
+}
+
+.alertDot {
+  fill: currentcolor;
+}
+
+.clearDot {
+  fill: var(--success);
+}
+
+.more {
+  fill: var(--text-secondary);
+}
+
+/* ---- the playhead of a running scenario ---- */
+.played {
+  fill: var(--flow);
+  fill-opacity: 0.08;
+}
+
+.playheadLine {
+  stroke: var(--flow);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 3px var(--neon-flow));
+}
+
+.pill {
+  fill: var(--flow);
+}
+
+.pillText {
+  fill: var(--surface-0);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  font-weight: 600;
+}

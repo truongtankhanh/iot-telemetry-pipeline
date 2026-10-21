@@ -1,0 +1,167 @@
+/* A scenario card (frame 03). Colours, sizes and timings come from tokens. */
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-1);
+}
+
+/* A link pointed at this card (the palette's `?scenario=`) and a card that plays are marked, and the words say so too. */
+.card[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+
+.card[data-running='true'] {
+  border-color: var(--warning);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 0;
+}
+
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.tile[data-severity='critical'] {
+  color: var(--sev-critical);
+}
+
+.tile[data-severity='high'] {
+  color: var(--sev-high);
+}
+
+.tile[data-severity='medium'] {
+  color: var(--sev-medium);
+}
+
+.tile[data-severity='low'] {
+  color: var(--sev-low);
+}
+
+.titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.meta {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 0;
+}
+
+.description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.expect {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  line-height: 1.35;
+}
+
+.expect svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-tertiary);
+}
+
+.expect b {
+  color: var(--text-primary);
+}
+
+.expect[data-kind='unavailable'] svg {
+  color: var(--warning);
+}
+
+.notes {
+  margin: 0;
+  padding-left: 22px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.banner {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-2);
+  background: var(--tint-warn);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.banner svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--warning);
+}
+
+.error {
+  margin: 12px 16px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-2);
+  background: var(--tint-bad);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--border-subtle);
+}
