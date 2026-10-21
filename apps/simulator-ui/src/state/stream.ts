@@ -1,7 +1,19 @@
-import { getState as fetchState } from '../api/client';
-import type { PublishedMessage, Snapshot, StateView } from '../api/types';
+import {
+  getObservations as fetchObservations,
+  getState as fetchState,
+  type ObservationsRequest,
+  type RequestOptions,
+} from '../api/client';
+import type {
+  ObservationEvent,
+  ObservationsPage,
+  PublishedMessage,
+  Snapshot,
+  StateView,
+} from '../api/types';
 import { RateCounter } from '../lib/rate';
 import type { HistoryStore } from './history';
+import { OBSERVATION_CAPACITY, type ObservationLog } from './observationLog';
 import type { PulseBus } from './pulses';
 import type { StudioStore } from './store';
 
@@ -26,7 +38,20 @@ export interface StreamOptions {
   pulses?: PulseBus;
   /** How often the publish rate is written to the store. */
   rateEveryMs?: number;
+  /**
+   * Where the simulator's observations are kept for the timeline: fed by each `observation` event, and filled from
+   * `GET /api/observations` when a snapshot shows the log is behind (see `connectStream`). Without it they are ignored.
+   */
+  observations?: ObservationLog;
+  /** Reads one page of observations; defaults to `GET /api/observations`. */
+  getObservations?: (
+    request: ObservationsRequest,
+    options: RequestOptions,
+  ) => Promise<ObservationsPage>;
 }
+
+/** The most the simulator lets one page hold. */
+const OBSERVATIONS_PAGE = 500;
 
 export interface StreamConnection {
   close(): void;
@@ -45,7 +70,13 @@ export interface StreamConnection {
  *   its listeners at most once a second). A snapshot seeds the history from its publish log, replacing what was
  *   there, so a reconnect does not double the readings. With `pulses`, each `published` message also tells that bus
  *   which device published (the topology's dots); the publish log of a snapshot is the past and is not replayed.
- * - `tick-error` and `observation` are not used by the shell.
+ * - `observation` is recorded in `observations`, when one is given. A snapshot shows how far the simulator's log has
+ *   got (`observationCursor`, the id of its newest event): when the log here is behind, it is read from the simulator
+ *   newest first, page by page, to the end and added (the events that arrived live meanwhile stay; one read at a
+ *   time, a newer snapshot cancels the one going on); when the cursor is _lower_ than what the log holds the simulator
+ *   started again and its ids began at 1, so the log is cleared first. A read that fails changes nothing: the live
+ *   events go on filling the log, and the next snapshot tries again.
+ * - `tick-error` is not used by the shell.
  *
  * The browser reconnects an `EventSource` by itself. The link is `live` while it is open and `lost`
  * between a failure and the next open; the store keeps the last view meanwhile, and the pills show it dimmed.
@@ -59,8 +90,12 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
   const source = (options.createSource ?? ((target: string) => new EventSource(target)))(url);
   const rate = new RateCounter(options.rateWindowMs ?? 5000, now());
 
+  const observations = options.observations;
+  const readObservations = options.getObservations ?? fetchObservations;
+
   let closed = false;
   let refetchTimer: ReturnType<typeof setTimeout> | undefined;
+  let observationRead: AbortController | undefined;
 
   store.getState().setLink('connecting', now());
   source.addEventListener('open', () => store.getState().setLink('live', now()));
@@ -79,9 +114,50 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     });
   }
 
+  /** Reads the simulator's observations to their end into the log; resolves when it is done, cancelled or failed. */
+  async function fillObservations(cursor: number): Promise<void> {
+    if (observations === undefined) return;
+    observationRead?.abort();
+    observationRead = undefined;
+    if (cursor < observations.newestId()) observations.clear();
+    else if (observations.newestId() >= cursor) {
+      // Up to date; a read that this snapshot just cancelled must not leave the log marked as loading.
+      observations.setLoading(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    observationRead = controller;
+    const collected: ObservationEvent[] = [];
+    observations.setLoading(0);
+    try {
+      let before: number | undefined;
+      for (;;) {
+        const page = await readObservations(
+          { limit: OBSERVATIONS_PAGE, ...(before === undefined ? {} : { before }) },
+          { signal: controller.signal },
+        );
+        if (controller.signal.aborted) return;
+        collected.push(...page.events);
+        observations.setLoading(collected.length);
+        if (page.next === null || collected.length >= OBSERVATION_CAPACITY) break;
+        before = page.next;
+      }
+      observations.seed(collected);
+    } catch {
+      // The log stays as it is: the live events keep filling it and the next snapshot reads again.
+    } finally {
+      if (!controller.signal.aborted) {
+        observations.setLoading(null);
+        observationRead = undefined;
+      }
+    }
+  }
+
   on<Snapshot>('snapshot', (data, at) => {
     store.getState().applySnapshot(data, at);
     options.history?.seed(Array.isArray(data.publishLog) ? data.publishLog : []);
+    if (typeof data.observationCursor === 'number') void fillObservations(data.observationCursor);
   });
   on<StateView['ingest']>('ingest', (data, at) => store.getState().patchSlice('ingest', data, at));
   on<StateView['alerts']>('alerts', (data, at) => store.getState().patchSlice('alerts', data, at));
@@ -111,6 +187,10 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     if (typeof message.deviceId === 'string') options.pulses?.emit(message.deviceId, at);
   });
   source.addEventListener('published', () => rate.record(now()));
+  on<ObservationEvent>('observation', (event) => {
+    // An event without an id cannot be told from another, and could not be kept once.
+    if (typeof event.id === 'number') observations?.record(event);
+  });
 
   const rateTimer = setInterval(() => {
     const next = Math.round(rate.perSecond(now()) * 10) / 10;
@@ -120,6 +200,8 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
   return {
     close() {
       closed = true;
+      observationRead?.abort();
+      observations?.setLoading(null);
       if (refetchTimer !== undefined) clearTimeout(refetchTimer);
       clearInterval(rateTimer);
       source.close();

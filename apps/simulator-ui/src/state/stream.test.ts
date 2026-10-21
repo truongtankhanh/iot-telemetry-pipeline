@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stateViewFixture as fixture } from '../api/fixtures/stateView';
-import type { PublishedMessage, Snapshot, StateView } from '../api/types';
+import type {
+  ObservationEvent,
+  ObservationsPage,
+  PublishedMessage,
+  Snapshot,
+  StateView,
+} from '../api/types';
 import { HistoryStore } from './history';
+import { ObservationLog } from './observationLog';
 import { PulseBus } from './pulses';
 import { createStudioStore } from './store';
 import { connectStream, type EventSourceLike } from './stream';
@@ -33,7 +40,16 @@ class FakeSource implements EventSourceLike {
 }
 
 function setup(
-  options: { getState?: () => Promise<StateView>; history?: HistoryStore; pulses?: PulseBus } = {},
+  options: {
+    getState?: () => Promise<StateView>;
+    history?: HistoryStore;
+    pulses?: PulseBus;
+    observations?: ObservationLog;
+    getObservations?: (
+      request: { before?: number; limit?: number },
+      options: { signal?: AbortSignal },
+    ) => Promise<ObservationsPage>;
+  } = {},
 ) {
   const store = createStudioStore();
   const source = new FakeSource();
@@ -43,6 +59,8 @@ function setup(
     getState,
     ...(options.history ? { history: options.history } : {}),
     ...(options.pulses ? { pulses: options.pulses } : {}),
+    ...(options.observations ? { observations: options.observations } : {}),
+    ...(options.getObservations ? { getObservations: options.getObservations } : {}),
   });
   return { store, source, getState, connection };
 }
@@ -329,5 +347,214 @@ describe('the pulses', () => {
     for (let i = 0; i < 3; i++) source.emit('published', published('dc-env-01', T0 + i));
     await vi.advanceTimersByTimeAsync(1000);
     expect(store.getState().publishRate).toBe(3);
+  });
+});
+
+describe('the observation log', () => {
+  const event = (id: number): ObservationEvent => ({
+    id,
+    at: new Date(T0 + id * 1000).toISOString(),
+    kind: 'engine-state',
+    data: { n: id },
+  });
+  const snapshotAt = (cursor: number): Snapshot => ({
+    ...view,
+    observationCursor: cursor,
+    publishLog: [],
+  });
+  /** Pages of 2 events, newest first, over ids 1 to `newest`; `next` is the id of the oldest event on the page. */
+  const pagesOf = (newest: number) =>
+    vi.fn(async ({ before }: { before?: number; limit?: number }) => {
+      const top = before === undefined ? newest : before - 1;
+      const events = [top, top - 1].filter((id) => id >= 1).map(event);
+      const last = events.at(-1)?.id ?? 0;
+      return { events, next: last > 1 ? last : null } satisfies ObservationsPage;
+    });
+  const ids = (log: ObservationLog) => log.snapshot().events.map((e) => e.id);
+  const settle = () => vi.advanceTimersByTimeAsync(0);
+
+  it('records each observation event', () => {
+    const observations = new ObservationLog();
+    const { source } = setup({ observations });
+    source.emit('observation', event(1));
+    source.emit('observation', event(2));
+    vi.advanceTimersByTime(1000);
+    expect(ids(observations)).toEqual([2, 1]);
+  });
+
+  it('ignores an observation that has no id, and one that is not JSON', () => {
+    const observations = new ObservationLog();
+    const { source } = setup({ observations });
+    source.emit('observation', { kind: 'engine-state', data: {}, at: 'x' });
+    source.emit('observation', 'not json');
+    vi.advanceTimersByTime(1000);
+    expect(ids(observations)).toEqual([]);
+  });
+
+  it('reads the log to its end when a snapshot shows it is behind, then holds what it read', async () => {
+    const observations = new ObservationLog();
+    const getObservations = pagesOf(5);
+    const { source } = setup({ observations, getObservations });
+    source.emit('snapshot', snapshotAt(5));
+    expect(observations.snapshot().loading).toBe(0);
+
+    await settle();
+    expect(ids(observations)).toEqual([5, 4, 3, 2, 1]);
+    expect(observations.snapshot().loading).toBeNull();
+    const calls = getObservations.mock.calls.map(([request]) => request);
+    expect(calls).toEqual([{ limit: 500 }, { limit: 500, before: 4 }, { limit: 500, before: 2 }]);
+  });
+
+  it('reads nothing when the log already has the newest event', async () => {
+    const observations = new ObservationLog();
+    observations.seed([event(5), event(4)]);
+    const getObservations = pagesOf(5);
+    const { source } = setup({ observations, getObservations });
+    source.emit('snapshot', snapshotAt(5));
+    await settle();
+    expect(getObservations).not.toHaveBeenCalled();
+    expect(observations.snapshot().loading).toBeNull();
+  });
+
+  it('reads nothing for a simulator that has no observation yet', async () => {
+    const observations = new ObservationLog();
+    const getObservations = pagesOf(0);
+    const { source } = setup({ observations, getObservations });
+    source.emit('snapshot', snapshotAt(0));
+    await settle();
+    expect(getObservations).not.toHaveBeenCalled();
+  });
+
+  it('reads what a dropped link missed, and keeps what it had', async () => {
+    const observations = new ObservationLog();
+    observations.seed([event(2), event(1)]);
+    const { source } = setup({ observations, getObservations: pagesOf(4) });
+    source.emit('snapshot', snapshotAt(4));
+    await settle();
+    expect(ids(observations)).toEqual([4, 3, 2, 1]);
+  });
+
+  it('forgets the log first when the simulator started again and its ids began at 1', async () => {
+    const observations = new ObservationLog();
+    observations.seed([event(40), event(39)]);
+    const { source } = setup({ observations, getObservations: pagesOf(2) });
+    source.emit('snapshot', snapshotAt(2));
+    await settle();
+    expect(ids(observations)).toEqual([2, 1]);
+  });
+
+  it('keeps an event that arrived live while the read was on its way', async () => {
+    const observations = new ObservationLog();
+    const { source } = setup({ observations, getObservations: pagesOf(5) });
+    source.emit('snapshot', snapshotAt(5));
+    source.emit('observation', event(6));
+    await settle();
+    expect(ids(observations)).toEqual([6, 5, 4, 3, 2, 1]);
+  });
+
+  it('stops at the 5,000 events the simulator keeps, however long it says the log is', async () => {
+    const observations = new ObservationLog();
+    // Pages of 500 that never end: the cursor always points at one more.
+    let pageNo = 0;
+    const getObservations = vi.fn(async (_request: unknown, _options: unknown) => {
+      const top = 9000 - pageNo * 500;
+      pageNo += 1;
+      const events = Array.from({ length: 500 }, (_, i) => event(top - i));
+      return { events, next: top - 499 } satisfies ObservationsPage;
+    });
+    const { source } = setup({ observations, getObservations });
+    source.emit('snapshot', snapshotAt(9000));
+    await settle();
+    expect(getObservations).toHaveBeenCalledTimes(10);
+    expect(ids(observations)).toHaveLength(5000);
+    expect(ids(observations)[0]).toBe(9000);
+  });
+
+  it('leaves the log as it is when a read fails, and reads again at the next snapshot', async () => {
+    const observations = new ObservationLog();
+    observations.seed([event(2)]);
+    const getObservations = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Cannot reach the simulator'))
+      .mockImplementation(pagesOf(4));
+    const { source } = setup({ observations, getObservations });
+    source.emit('snapshot', snapshotAt(4));
+    await settle();
+    expect(ids(observations)).toEqual([2]);
+    expect(observations.snapshot().loading).toBeNull();
+
+    source.emit('snapshot', snapshotAt(4));
+    await settle();
+    expect(ids(observations)).toEqual([4, 3, 2, 1]);
+  });
+
+  it('cancels the read going on when a newer snapshot arrives, and only the newer one writes', async () => {
+    const observations = new ObservationLog();
+    const signals: AbortSignal[] = [];
+    const release: (() => void)[] = [];
+    const getObservations = vi.fn(
+      (_request: unknown, options: { signal?: AbortSignal }) =>
+        new Promise<ObservationsPage>((resolve) => {
+          if (options.signal) signals.push(options.signal);
+          release.push(() => resolve({ events: [event(signals.length)], next: null }));
+        }),
+    );
+    const { source } = setup({ observations, getObservations });
+    source.emit('snapshot', snapshotAt(3));
+    source.emit('snapshot', snapshotAt(3));
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+
+    release[0]?.();
+    release[1]?.();
+    await settle();
+    expect(ids(observations)).toEqual([2]);
+    expect(observations.snapshot().loading).toBeNull();
+  });
+
+  it('cancels a read that is up to date at the second snapshot, without leaving the log loading', async () => {
+    const observations = new ObservationLog();
+    const release: (() => void)[] = [];
+    const getObservations = vi.fn(
+      () =>
+        new Promise<ObservationsPage>((resolve) => {
+          release.push(() => resolve({ events: [event(1)], next: null }));
+        }),
+    );
+    const { source } = setup({ observations, getObservations });
+    source.emit('snapshot', snapshotAt(1));
+    observations.seed([event(1)]); // the event arrived live
+    source.emit('snapshot', snapshotAt(1));
+    expect(observations.snapshot().loading).toBeNull();
+    release[0]?.();
+    await settle();
+    expect(observations.snapshot().loading).toBeNull();
+  });
+
+  it('does not write a read that finished after it was closed', async () => {
+    const observations = new ObservationLog();
+    const release: (() => void)[] = [];
+    const getObservations = vi.fn(
+      () =>
+        new Promise<ObservationsPage>((resolve) => {
+          release.push(() => resolve({ events: [event(1)], next: null }));
+        }),
+    );
+    const { source, connection } = setup({ observations, getObservations });
+    source.emit('snapshot', snapshotAt(1));
+    connection.close();
+    release[0]?.();
+    await settle();
+    expect(ids(observations)).toEqual([]);
+    expect(observations.snapshot().loading).toBeNull();
+  });
+
+  it('works without a log: a snapshot reads nothing and an observation is ignored', async () => {
+    const getObservations = pagesOf(5);
+    const { source } = setup({ getObservations });
+    source.emit('snapshot', snapshotAt(5));
+    source.emit('observation', event(1));
+    await settle();
+    expect(getObservations).not.toHaveBeenCalled();
   });
 });

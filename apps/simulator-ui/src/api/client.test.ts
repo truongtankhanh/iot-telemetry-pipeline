@@ -1,24 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
 import alertsPageFixture from './fixtures/alerts-page.json';
+import observationsFixture from './fixtures/observations.json';
 import scenariosFixture from './fixtures/scenarios.json';
 import { stateViewFixture as fixture } from './fixtures/stateView';
 import {
   ApiError,
   conflictsOf,
   getAlerts,
+  getObservations,
   getScenarios,
   getState,
   holdValue,
   importScenario,
   pauseDevice,
   releaseValue,
+  resetEngine,
   runScenario,
   setDeviceInterval,
   startDevice,
+  stepEngine,
   stopDevice,
   stopScenario,
 } from './client';
-import type { ScenarioLibraryView, ScenarioRunView } from './types';
+import { OBSERVATION_KINDS, type ScenarioLibraryView, type ScenarioRunView } from './types';
 
 // A real `GET /api/state` body (see types.ts for how both sides are kept in step).
 const view = fixture;
@@ -704,5 +708,133 @@ describe('scenarios', () => {
       message: 'm',
       extra: 1,
     });
+  });
+});
+
+describe('the observation fixture', () => {
+  const events = observationsFixture;
+
+  it('has the keys of an event, newest first, and one event of every kind', () => {
+    for (const event of events) {
+      expect(Object.keys(event).sort()).toEqual(['at', 'data', 'id', 'kind']);
+    }
+    const ids = events.map((event) => event.id);
+    expect(ids).toEqual([...ids].sort((a, b) => b - a));
+    expect(events.map((event) => event.kind).sort()).toEqual([...OBSERVATION_KINDS].sort());
+  });
+});
+
+describe('getObservations', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+  const replyEvents = (body: unknown, init: ResponseInit = {}) =>
+    vi.fn(async () => new Response(JSON.stringify(body), init));
+  const urlOf = (fn: ReturnType<typeof replyEvents>) =>
+    (fn.mock.calls[0] as unknown as [string])[0];
+
+  it('asks for the page the request describes', async () => {
+    const fetchFn = replyEvents(observationsFixture);
+    await getObservations({ before: 40, limit: 500 }, { fetch: asFetch(fetchFn) });
+    expect(urlOf(fetchFn)).toBe('/api/observations?before=40&limit=500');
+
+    const plain = replyEvents(observationsFixture);
+    await getObservations({}, { fetch: asFetch(plain) });
+    expect(urlOf(plain)).toBe('/api/observations');
+  });
+
+  it('returns the events and the cursor as the simulator sent them', async () => {
+    const fetchFn = replyEvents(observationsFixture, { headers: { 'X-Next-Cursor': '1' } });
+    const result = await getObservations({ limit: 9 }, { fetch: asFetch(fetchFn) });
+    expect(result.events.map((event) => event.id)).toEqual([9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(result.next).toBe(1);
+  });
+
+  it('has no next cursor on the last page', async () => {
+    const result = await getObservations({}, { fetch: asFetch(replyEvents(observationsFixture)) });
+    expect(result.next).toBeNull();
+  });
+
+  it('keeps an event of a kind it does not know', async () => {
+    const future = { id: 10, at: '2026-10-20T08:02:00.000Z', kind: 'something-new', data: {} };
+    const result = await getObservations({}, { fetch: asFetch(replyEvents([future])) });
+    expect(result.events).toEqual([future]);
+  });
+
+  it('turns a refusal of the simulator into an ApiError with its message', async () => {
+    const refused = replyEvents(
+      { statusCode: 400, error: 'Bad Request', message: '"limit" must be a whole number' },
+      { status: 400 },
+    );
+    const failure = await getObservations({}, { fetch: asFetch(refused) }).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(400);
+    expect((failure as ApiError).message).toBe('"limit" must be a whole number');
+  });
+
+  it('fails loudly on a body that is not the documented array, or a cursor that is not a number', async () => {
+    for (const body of [
+      { events: [] },
+      [{ id: 1 }],
+      [null],
+      [{ id: 1.5, at: 'x', kind: 'k', data: {} }],
+    ]) {
+      const failure = await getObservations({}, { fetch: asFetch(replyEvents(body)) }).catch(
+        (e: unknown) => e,
+      );
+      expect(failure).toBeInstanceOf(ApiError);
+      expect((failure as ApiError).message).toMatch(/does not understand/);
+    }
+    const badCursor = replyEvents(observationsFixture, { headers: { 'X-Next-Cursor': 'abc' } });
+    const failure = await getObservations({}, { fetch: asFetch(badCursor) }).catch(
+      (e: unknown) => e,
+    );
+    expect((failure as ApiError).message).toMatch(/cursor/);
+  });
+
+  it('reports a simulator that does not answer with status 0, and passes an abort on', async () => {
+    const down = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const failure = await getObservations({}, { fetch: asFetch(down) }).catch((e: unknown) => e);
+    expect((failure as ApiError).status).toBe(0);
+
+    const controller = new AbortController();
+    const fetchFn = replyEvents(observationsFixture);
+    await getObservations({}, { fetch: asFetch(fetchFn), signal: controller.signal });
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.signal).toBe(controller.signal);
+  });
+});
+
+describe('stepEngine and resetEngine', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+
+  it('post to the clock commands as JSON and answer the new state', async () => {
+    for (const [send, path] of [
+      [stepEngine, '/api/step'],
+      [resetEngine, '/api/reset'],
+    ] as const) {
+      const fetchFn = reply(view);
+      const state = await send({ fetch: asFetch(fetchFn) });
+      expect(state.engine.devices.length).toBe(view.engine.devices.length);
+      const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe(path);
+      expect(init.method).toBe('POST');
+      expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+    }
+  });
+
+  it('carries the reason of a refusal: step on the wall clock is a 409', async () => {
+    const refused = reply(
+      {
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'step needs the simulated clock; this engine runs on the wall clock',
+      },
+      { status: 409 },
+    );
+    const failure = await stepEngine({ fetch: asFetch(refused) }).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(409);
+    expect((failure as ApiError).message).toMatch(/simulated clock/);
   });
 });
