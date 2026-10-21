@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import scenariosFixture from './api/fixtures/scenarios.json';
 import { stateViewFixture as fixture } from './api/fixtures/stateView';
 import type { StateView } from './api/types';
@@ -9,6 +9,7 @@ import { StudioFrame } from './App';
 import { appRoutes } from './lib/routes';
 import { createStudioStore, type StudioStore } from './state/store';
 import { StudioProvider } from './state/StudioProvider';
+import { installReactFlowStubs } from './pages/topology/topologyTestSupport';
 import { axeViolations } from './test-axe';
 
 const base = fixture;
@@ -50,6 +51,13 @@ const pill = (name: string) => {
   if (element === null) throw new Error(`no pill named ${name}`);
   return element as HTMLElement;
 };
+
+// The Overview draws the topology, which needs the stand-ins React Flow asks of a browser.
+let restoreStubs: () => void;
+beforeAll(() => {
+  restoreStubs = installReactFlowStubs();
+});
+afterAll(() => restoreStubs());
 
 // The Overview reads the scenario library when it opens: a simulator that answers it, and nothing else.
 beforeEach(() => {

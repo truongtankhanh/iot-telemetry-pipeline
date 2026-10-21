@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { dependencyNotes } from '../lib/dependencyNotes';
 import { formatClockTime } from '../lib/time';
 import { useNow } from '../state/useNow';
@@ -15,6 +16,12 @@ import { useSimulationControls } from './overview/useSimulationControls';
 import { useRunElapsed } from './scenarios/useRunElapsed';
 import styles from './overview/overview.module.css';
 import pages from './pages.module.css';
+
+// The compact topology is its own chunk, as the Topology is: it brings React Flow, which the rest of the Overview does
+// not need, so the figures, the feed and the controls paint without waiting for it.
+const OverviewTopology = lazy(() =>
+  import('./overview/OverviewTopology').then((module) => ({ default: module.OverviewTopology })),
+);
 
 const DESCRIPTION =
   'Campus simulation environment. What is running, what it caused, and what to do next.';
@@ -109,6 +116,15 @@ export function Overview() {
       <OverviewKpis kpis={kpis} />
 
       <div className={styles.cols}>
+        <Suspense
+          fallback={
+            <Card title="Live topology">
+              <p role="status">Loading the topology…</p>
+            </Card>
+          }
+        >
+          <OverviewTopology now={now} query={query} onQuery={update} />
+        </Suspense>
         <div className={styles.col}>
           <AlertFeed alerts={view.alerts.alerts} unknownReason={alertsUnknown} />
           <SimulationControls

@@ -1,10 +1,17 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
+import type { Grouping } from '../../lib/topology';
 
 /** What the address says about the Overview. */
 export interface OverviewQuery {
   /** The scenario the controls show (`?scenario=`, which the command palette links to), or `null` for the default. */
   scenario: string | null;
+  /** The graph's search (`gq`: the timeline's filter keeps `q`). */
+  gq: string;
+  /** `null` is automatic: every device up to 12, zones above. */
+  group: Grouping | null;
+  /** _Problems only_ in the graph. */
+  problems: boolean;
 }
 
 /** The longest scenario name the simulator accepts. */
@@ -12,7 +19,19 @@ const NAME_MAX_LENGTH = 64;
 
 /** Reads the address. A value that is not usable falls back to the default: a shared link always opens. */
 export function parseOverviewQuery(params: URLSearchParams): OverviewQuery {
-  return { scenario: (params.get('scenario') ?? '').slice(0, NAME_MAX_LENGTH) || null };
+  const group = params.get('group');
+  return {
+    scenario: (params.get('scenario') ?? '').slice(0, NAME_MAX_LENGTH) || null,
+    gq: (params.get('gq') ?? '').slice(0, 100),
+    group: group === 'zone' || group === 'all' ? group : null,
+    problems: params.get('problems') === '1',
+  };
+}
+
+/** Writes one parameter, or takes it out when it has its default (a plain page has a plain address). */
+function write(params: URLSearchParams, key: string, value: string | null): void {
+  if (value === null || value === '') params.delete(key);
+  else params.set(key, value);
 }
 
 /**
@@ -29,10 +48,10 @@ export function useOverviewParams(): [OverviewQuery, (patch: Partial<OverviewQue
       setParams(
         (current) => {
           const next = new URLSearchParams(current);
-          if ('scenario' in patch) {
-            if (patch.scenario) next.set('scenario', patch.scenario);
-            else next.delete('scenario');
-          }
+          if ('scenario' in patch) write(next, 'scenario', patch.scenario ?? null);
+          if ('gq' in patch) write(next, 'gq', patch.gq ?? null);
+          if ('group' in patch) write(next, 'group', patch.group ?? null);
+          if ('problems' in patch) write(next, 'problems', patch.problems ? '1' : null);
           return next;
         },
         { replace: true },

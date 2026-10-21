@@ -43,6 +43,8 @@ export interface TopologyGraphProps {
   fitKey: string;
   /** For a test that wants to count renders; the real ones by default. */
   nodeTypes?: NodeTypes;
+  /** The Overview's card: a shorter canvas and no minimap (the Topology page owns the whole picture). */
+  compact?: boolean;
 }
 
 /**
@@ -58,6 +60,7 @@ export function TopologyGraph({
   onToggleZone,
   fitKey,
   nodeTypes = NODE_TYPES,
+  compact = false,
 }: TopologyGraphProps) {
   const selectedId = nodes.find((node) => node.selected)?.id ?? null;
   const actions = useMemo(() => ({ toggleZone: onToggleZone }), [onToggleZone]);
@@ -80,7 +83,7 @@ export function TopologyGraph({
 
   return (
     <TopologyActionsContext.Provider value={actions}>
-      <div className={styles.canvas}>
+      <div className={styles.canvas} data-compact={compact ? 'true' : undefined}>
         <ReactFlow<FlowNode, FlowEdge>
           nodes={nodes}
           edges={edges}
@@ -103,12 +106,14 @@ export function TopologyGraph({
           proOptions={{ hideAttribution: true }}
           aria-label="System topology"
         >
-          <MiniMap<FlowNode>
-            pannable
-            zoomable
-            ariaLabel="Minimap of the whole graph"
-            nodeClassName={(node) => MINI_CLASSES[miniState(node)] ?? ''}
-          />
+          {compact ? null : (
+            <MiniMap<FlowNode>
+              pannable
+              zoomable
+              ariaLabel="Minimap of the whole graph"
+              nodeClassName={(node) => MINI_CLASSES[miniState(node)] ?? ''}
+            />
+          )}
           <FitOnChange fitKey={fitKey} />
         </ReactFlow>
       </div>

@@ -1,11 +1,18 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { StateView } from '../../api/types';
 import { axeViolations } from '../../test-axe';
 import { viewWithDevices } from '../fleet/fleetTestSupport';
+import { graphNode, installReactFlowStubs } from '../topology/topologyTestSupport';
 import { address, renderOverview } from './overviewTestSupport';
 
+// The Overview draws the topology, which needs the stand-ins React Flow asks of a browser.
+let restoreStubs: () => void;
+beforeAll(() => {
+  restoreStubs = installReactFlowStubs();
+});
+afterAll(() => restoreStubs());
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -175,7 +182,9 @@ describe('the controls', () => {
       await screen.findByRole('button', { name: 'Stop server-room-overheat' }),
     ).toBeInTheDocument();
     expect(simulator.callsTo('POST', '/api/scenarios/server-room-overheat/run')).toHaveLength(1);
-    expect(screen.getByText('Running')).toBeInTheDocument();
+    // "Running" is also the word of every healthy device in the graph: ask the controls' card.
+    const controlsCard = screen.getByRole('region', { name: 'Simulation controls' });
+    expect(within(controlsCard).getByText('Running')).toBeInTheDocument();
     expect(screen.getByText(/Running server-room-overheat\./)).toBeInTheDocument();
     // The header names the scenario and how far it has got.
     expect(screen.getByText(/^server-room-overheat · \d+ s in$/)).toBeInTheDocument();
@@ -397,5 +406,88 @@ describe('accessibility', () => {
     await user.click(await runButton());
     await screen.findByRole('button', { name: 'Stop server-room-overheat' });
     expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('the live topology', () => {
+  const nodeCount = () => document.querySelectorAll('.react-flow__node').length;
+  const openLink = () => screen.getByRole('link', { name: /Open in Topology/ });
+
+  it('is its own chunk: the figures are there first, the graph follows', async () => {
+    renderOverview();
+    expect(kpi('Devices online')).toHaveTextContent('5 of 6');
+    expect(
+      await screen.findByRole('group', { name: 'Find and arrange the graph' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(graphNode('stage:broker')).not.toBeNull());
+  });
+
+  it('draws the Topology’s nodes: a node for each device, zone and stage of the six devices', async () => {
+    renderOverview();
+    await waitFor(() => expect(nodeCount()).toBe(6 + 5 + 7));
+    expect(graphNode('device:dc-env-01')).not.toBeNull();
+    // No minimap, no zoom bar: nothing over the picture, and no detail row under it.
+    expect(document.querySelector('.react-flow__minimap')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Zoom in' })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/6 devices · 5 zones · groups automatically above 12 devices/),
+    ).toBeInTheDocument();
+  });
+
+  it('writes the grouping, Problems only and the search into the address, apart from the timeline’s', async () => {
+    const user = userEvent.setup();
+    renderOverview({ path: '/?scenario=bad-afternoon' });
+    await waitFor(() => expect(graphNode('stage:broker')).not.toBeNull());
+
+    await user.click(screen.getByRole('radio', { name: 'Grouped by zone' }));
+    expect(address()).toBe('/?scenario=bad-afternoon&group=zone');
+    await waitFor(() => expect(graphNode('device:dc-env-01')).toBeNull());
+    expect(graphNode('zone:BLD-DC')).not.toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /Problems only/ }));
+    expect(address()).toContain('problems=1');
+    await user.type(screen.getByRole('searchbox', { name: 'Find a device or zone' }), 'hub');
+    expect(address()).toContain('gq=hub');
+    // The scenario the controls show is still there.
+    expect(address()).toContain('scenario=bad-afternoon');
+  });
+
+  it('opens a link that keeps the grouping and the filter, and adds the node that was chosen', async () => {
+    const user = userEvent.setup();
+    renderOverview({ path: '/?group=zone&problems=1&gq=air' });
+    await waitFor(() => expect(graphNode('stage:broker')).not.toBeNull());
+    expect(openLink()).toHaveAttribute('href', '/topology?q=air&group=zone&problems=1');
+
+    await user.click(screen.getByRole('button', { name: /Problems only/ }));
+    expect(openLink()).toHaveAttribute('href', '/topology?q=air&group=zone');
+  });
+
+  it('adds the chosen device to that link', async () => {
+    renderOverview({ path: '/?group=all' });
+    await waitFor(() => expect(graphNode('device:dc-env-01')).not.toBeNull());
+    fireEvent.click(graphNode('device:dc-env-01') as HTMLElement);
+    await waitFor(() =>
+      expect(openLink()).toHaveAttribute('href', '/topology?group=all&device=dc-env-01'),
+    );
+  });
+
+  it('shows zone groups, never one node for each of a hundred devices', async () => {
+    renderOverview({ view: viewWithDevices(100), seed: false });
+    await waitFor(() => expect(graphNode('stage:broker')).not.toBeNull());
+    expect(document.querySelectorAll('.react-flow__node[data-id^="device:"]')).toHaveLength(0);
+    expect(graphNode('zone:BLD-Z0')).not.toBeNull();
+    expect(screen.getByRole('radio', { name: 'All devices' })).toBeDisabled();
+  });
+
+  it('says so when nothing matches the search, and that the pipeline is still shown', async () => {
+    const user = userEvent.setup();
+    renderOverview();
+    await waitFor(() => expect(graphNode('stage:broker')).not.toBeNull());
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Find a device or zone' }),
+      'nothing-like-this',
+    );
+    expect(await screen.findByText(/No device matches “nothing-like-this”/)).toBeInTheDocument();
+    expect(graphNode('stage:broker')).not.toBeNull();
   });
 });
