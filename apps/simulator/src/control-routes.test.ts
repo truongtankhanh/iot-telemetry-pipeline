@@ -1245,3 +1245,68 @@ describe('GET /api/alerts and the fixture of the UI', () => {
     assert.equal(fixture[1]?.cause, null);
   });
 });
+
+describe('GET /api/scenarios and the fixture of the UI', () => {
+  // apps/simulator-ui types the library it reads against this file (a real GET /api/scenarios body); if the
+  // simulator changes the keys of the library read, this fails until the file and the UI's types follow.
+  interface Library {
+    scenarios: {
+      anomalies: unknown[];
+      needsStart: unknown[];
+      expected: {
+        alerts: unknown[];
+        quiet: unknown[];
+        series: unknown[];
+      };
+    }[];
+    rejected: unknown[];
+  }
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../../simulator-ui/src/api/fixtures/scenarios.json', import.meta.url),
+      'utf8',
+    ),
+  ) as Library;
+  const keys = (value: unknown) => Object.keys(value as object).sort();
+
+  it('has the same keys as the fixture, section by section', async () => {
+    const { call } = await setup();
+    await call('POST', '/api/devices/dc-env-01/stop'); // so that a scenario has a device to start
+    const actual = (await call('GET', '/api/scenarios')).body as Library;
+    const [overheat, both] = actual.scenarios;
+    const [fixtureOverheat, , fixtureAfternoon] = fixture.scenarios;
+
+    assert.deepEqual(keys(actual), keys(fixture), 'the library read');
+    assert.deepEqual(keys(overheat), keys(fixtureOverheat), 'an item');
+    assert.deepEqual(keys(overheat?.anomalies[0]), keys(fixtureOverheat?.anomalies[0]), 'anomaly');
+    assert.deepEqual(keys(overheat?.expected), keys(fixtureOverheat?.expected), 'expected');
+    assert.deepEqual(
+      keys(overheat?.expected.alerts[0]),
+      keys(fixtureOverheat?.expected.alerts[0]),
+      'an expected alert',
+    );
+    assert.deepEqual(
+      keys(overheat?.expected.series[0]),
+      keys(fixtureOverheat?.expected.series[0]),
+      'a series',
+    );
+    assert.deepEqual(
+      keys(both?.expected.quiet[0]),
+      keys(fixtureAfternoon?.expected.quiet[0]),
+      'a quiet anomaly',
+    );
+    assert.deepEqual(
+      keys(overheat?.needsStart[0]),
+      keys(fixtureAfternoon?.needsStart[0]),
+      'a device to start',
+    );
+    // No file is rejected in this setup, so the entry is checked against what the library defines.
+    assert.deepEqual(keys(fixture.rejected[0]), ['file', 'reason']);
+  });
+
+  it('has the keys the UI expects when the rules are not available', async () => {
+    const { call } = await setup({ rules: rulesUnavailable('cannot read rules.json (ENOENT)') });
+    const actual = (await call('GET', '/api/scenarios')).body as Library;
+    assert.deepEqual(keys(actual.scenarios[0]?.expected), ['available', 'reason']);
+  });
+});

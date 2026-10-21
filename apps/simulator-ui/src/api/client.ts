@@ -1,13 +1,25 @@
-import type { AlertsPage, PagedAlert, StateView } from './types';
+import type {
+  AlertsPage,
+  ImportAnswer,
+  PagedAlert,
+  RunAnswer,
+  RunConflict,
+  ScenarioItem,
+  ScenarioLibraryView,
+  StateView,
+} from './types';
 
 /** A request the simulator refused or could not answer. `status` is 0 when it did not answer at all. */
 export class ApiError extends Error {
   readonly status: number;
+  /** The parsed JSON of a refusal (the envelope and what the simulator added to it), or `undefined`. */
+  readonly body: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -37,6 +49,7 @@ async function readJson(response: Response): Promise<unknown> {
     throw new ApiError(
       response.status,
       typeof message === 'string' ? message : `HTTP ${response.status}`,
+      body,
     );
   }
   return body;
@@ -62,21 +75,28 @@ async function send(url: string, init: RequestInit, options: RequestOptions): Pr
   }
 }
 
-/** Sends a request and reads the simulator's answer as a state view (the answer of `GET /api/state` and of every command). */
-async function fetchState(
+/**
+ * Sends a request and reads the simulator's answer as a state view (the answer of `GET /api/state` and of every
+ * command), plus whatever else `hasExtras` requires of it: a run also answers what it did, an import the scenario.
+ */
+async function fetchAnswer<T extends StateView>(
   url: string,
   init: RequestInit,
   options: RequestOptions,
-): Promise<StateView> {
+  hasExtras: (body: Record<string, unknown>) => boolean = () => true,
+): Promise<T> {
   const response = await send(url, init, options);
   const body = await readJson(response);
-  if (!isStateView(body))
+  if (!isStateView(body) || !hasExtras(body as unknown as Record<string, unknown>))
     throw new ApiError(
       response.status,
       'The simulator answered with a state Studio does not understand',
     );
-  return body;
+  return body as T;
 }
+
+const fetchState = (url: string, init: RequestInit, options: RequestOptions) =>
+  fetchAnswer<StateView>(url, init, options);
 
 /** `GET /api/state`: everything the pages draw, in one reply. Commands answer with the same. */
 export function getState(options: RequestOptions = {}): Promise<StateView> {
@@ -94,7 +114,18 @@ function sendCommand(
   body: unknown,
   options: RequestOptions,
 ): Promise<StateView> {
-  return fetchState(
+  return sendCommandFor<StateView>(method, path, body, options);
+}
+
+/** A command whose answer is the state and something more (`hasExtras` checks the something). */
+function sendCommandFor<T extends StateView>(
+  method: 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  body: unknown,
+  options: RequestOptions,
+  hasExtras?: (body: Record<string, unknown>) => boolean,
+): Promise<T> {
+  return fetchAnswer<T>(
     path,
     {
       method,
@@ -102,6 +133,7 @@ function sendCommand(
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     },
     options,
+    hasExtras,
   );
 }
 
@@ -212,3 +244,116 @@ export const releaseValue = (deviceId: string, metric: string, options: RequestO
     undefined,
     options,
   );
+
+// ---- Scenarios ----
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+function isScenarioItem(item: unknown): item is ScenarioItem {
+  if (!isObject(item)) return false;
+  return (
+    typeof item.name === 'string' &&
+    typeof item.description === 'string' &&
+    (item.source === 'built-in' || item.source === 'custom') &&
+    typeof item.imported === 'boolean' &&
+    Array.isArray(item.anomalies) &&
+    typeof item.lengthS === 'number' &&
+    Array.isArray(item.needsStart) &&
+    'lastRunAt' in item &&
+    typeof item.running === 'boolean' &&
+    isObject(item.expected) &&
+    typeof item.expected.available === 'boolean'
+  );
+}
+
+/**
+ * `GET /api/scenarios`: the whole scenario library with what a card is drawn from (the simulator pages nothing: the
+ * page does). A body that is not the documented list fails loudly instead of rendering as an empty library.
+ */
+export async function getScenarios(options: RequestOptions = {}): Promise<ScenarioLibraryView> {
+  const response = await send(
+    '/api/scenarios',
+    { headers: { Accept: 'application/json' } },
+    options,
+  );
+  const body = await readJson(response);
+  if (
+    !isObject(body) ||
+    !Array.isArray(body.scenarios) ||
+    !body.scenarios.every(isScenarioItem) ||
+    !Array.isArray(body.rejected) ||
+    typeof body.intervalMs !== 'number'
+  ) {
+    throw new ApiError(
+      response.status,
+      'The simulator answered with scenarios Studio does not understand',
+    );
+  }
+  return body as unknown as ScenarioLibraryView;
+}
+
+const scenarioPath = (name: string) => `/api/scenarios/${encodeURIComponent(name)}`;
+
+/**
+ * Runs a scenario from now. Without `replace` the simulator refuses (`409`) to play over an anomaly that is active or
+ * coming on a device the scenario uses, and the `ApiError` carries the conflicts (`conflictsOf`); with it, what is in
+ * the way is taken out first. The answer is the new state and what the run did.
+ */
+export function runScenario(
+  name: string,
+  request: { replace?: boolean } = {},
+  options: RequestOptions = {},
+): Promise<RunAnswer> {
+  return sendCommandFor<RunAnswer>(
+    'POST',
+    `${scenarioPath(name)}/run`,
+    request.replace === true ? { replace: true } : undefined,
+    options,
+    (body) =>
+      typeof body.runId === 'string' &&
+      Array.isArray(body.startedDevices) &&
+      Array.isArray(body.replaced),
+  );
+}
+
+/** Stops the run of a scenario; `409` from the simulator when it is not running. */
+export const stopScenario = (name: string, options: RequestOptions = {}) =>
+  sendCommand('POST', `${scenarioPath(name)}/stop`, undefined, options);
+
+/**
+ * Sends a scenario document to be kept for the session. The simulator checks it and refuses with the reason (the
+ * `ApiError`'s message); nothing is checked here beyond its being JSON, which the caller has done.
+ */
+export function importScenario(
+  document: unknown,
+  options: RequestOptions = {},
+): Promise<ImportAnswer> {
+  return sendCommandFor<ImportAnswer>('POST', '/api/scenarios/import', document, options, (body) =>
+    isScenarioItem(body.scenario),
+  );
+}
+
+function isRunConflict(item: unknown): item is RunConflict {
+  if (!isObject(item)) return false;
+  const owned = (value: unknown) => value === null || typeof value === 'string';
+  return (
+    typeof item.deviceId === 'string' &&
+    typeof item.anomalyId === 'string' &&
+    owned(item.runId) &&
+    owned(item.scenario)
+  );
+}
+
+/**
+ * What a refused run would have played over, or `null` when `error` is not that refusal (a `409` with a list of
+ * conflicts). A `409` of another kind, such as "is not running", has none.
+ */
+export function conflictsOf(error: unknown): RunConflict[] | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const conflicts = isObject(error.body) ? error.body.conflicts : undefined;
+  if (!Array.isArray(conflicts) || conflicts.length === 0 || !conflicts.every(isRunConflict)) {
+    return null;
+  }
+  return conflicts;
+}

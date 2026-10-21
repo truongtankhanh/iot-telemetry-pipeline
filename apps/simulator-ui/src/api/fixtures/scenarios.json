@@ -1,0 +1,224 @@
+{
+  "scenarios": [
+    {
+      "name": "server-room-overheat",
+      "description": "Row A runs hot for a minute, then recovers.",
+      "source": "built-in",
+      "imported": false,
+      "anomalies": [
+        {
+          "deviceId": "dc-env-01",
+          "metric": "temperature_c",
+          "value": 29.2,
+          "startAt": 20,
+          "duration": 60
+        }
+      ],
+      "lengthS": 80,
+      "needsStart": [],
+      "lastRunAt": null,
+      "running": false,
+      "expected": {
+        "available": true,
+        "intervalS": 2,
+        "horizonS": 80,
+        "alerts": [
+          {
+            "ruleId": "server-room-hot",
+            "title": "Server room temperature high",
+            "severity": "high",
+            "deviceId": "dc-env-01",
+            "metric": "temperature_c",
+            "opensAtS": 24,
+            "opensMargin": false,
+            "clearsAtS": 80,
+            "clearsUncertain": false
+          }
+        ],
+        "quiet": [],
+        "series": [
+          {
+            "deviceId": "dc-env-01",
+            "metric": "temperature_c",
+            "stepS": 2,
+            "points": [
+              22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 29.2, 29.2, 29.2, 29.2,
+              29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2,
+              29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 22.5
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "crowded-lecture",
+      "description": "Lecture Hall A fills up and CO₂ climbs.",
+      "source": "built-in",
+      "imported": false,
+      "anomalies": [
+        {
+          "deviceId": "lha-air-01",
+          "metric": "co2_ppm",
+          "value": 1450,
+          "startAt": 20,
+          "duration": 90
+        }
+      ],
+      "lengthS": 110,
+      "needsStart": [],
+      "lastRunAt": null,
+      "running": false,
+      "expected": {
+        "available": true,
+        "intervalS": 2,
+        "horizonS": 110,
+        "alerts": [
+          {
+            "ruleId": "indoor-co2",
+            "title": "Poor air quality (CO₂)",
+            "severity": "medium",
+            "deviceId": "lha-air-01",
+            "metric": "co2_ppm",
+            "opensAtS": 24,
+            "opensMargin": false,
+            "clearsAtS": 110,
+            "clearsUncertain": true
+          }
+        ],
+        "quiet": [],
+        "series": [
+          {
+            "deviceId": "lha-air-01",
+            "metric": "co2_ppm",
+            "stepS": 2,
+            "points": [
+              988.1, 988.1, 988.1, 988.1, 988.1, 988.1, 988.1, 988.1, 988.1, 988.1, 1450.0, 1450.0,
+              1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0,
+              1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0,
+              1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0,
+              1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0, 1450.0,
+              1450.0, 1450.0, 1450.0, 988.5
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "bad-afternoon",
+      "description": "Three things go wrong, one after another.",
+      "source": "custom",
+      "imported": false,
+      "anomalies": [
+        {
+          "deviceId": "hub-power-01",
+          "metric": "power_kw",
+          "value": 190,
+          "startAt": 10,
+          "duration": 55
+        },
+        {
+          "deviceId": "dc-env-01",
+          "metric": "temperature_c",
+          "value": 29.2,
+          "startAt": 30,
+          "duration": 60
+        },
+        {
+          "deviceId": "lha-air-01",
+          "metric": "temperature_c",
+          "value": 30,
+          "startAt": 60,
+          "duration": 40
+        }
+      ],
+      "lengthS": 100,
+      "needsStart": [
+        {
+          "deviceId": "hub-power-01",
+          "state": "stopped"
+        }
+      ],
+      "lastRunAt": "2026-10-21T08:00:00.000Z",
+      "running": false,
+      "expected": {
+        "available": true,
+        "intervalS": 2,
+        "horizonS": 100,
+        "alerts": [
+          {
+            "ruleId": "power-over-contract",
+            "title": "Power draw above contracted capacity",
+            "severity": "low",
+            "deviceId": "hub-power-01",
+            "metric": "power_kw",
+            "opensAtS": 12,
+            "opensMargin": false,
+            "clearsAtS": 66,
+            "clearsUncertain": true
+          },
+          {
+            "ruleId": "server-room-hot",
+            "title": "Server room temperature high",
+            "severity": "high",
+            "deviceId": "dc-env-01",
+            "metric": "temperature_c",
+            "opensAtS": 34,
+            "opensMargin": false,
+            "clearsAtS": 90,
+            "clearsUncertain": false
+          }
+        ],
+        "quiet": [
+          {
+            "deviceId": "lha-air-01",
+            "metric": "temperature_c",
+            "why": "no-rule"
+          }
+        ],
+        "series": [
+          {
+            "deviceId": "hub-power-01",
+            "metric": "power_kw",
+            "stepS": 2,
+            "points": [
+              153.8, 153.8, 153.8, 153.8, 153.8, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0,
+              190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0,
+              190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 190.0, 153.8, 153.8, 153.8,
+              153.8, 153.8, 153.8, 153.8, 153.8, 153.8, 153.8, 153.8, 153.8, 153.8, 153.8, 153.8,
+              153.8, 153.8, 153.8
+            ]
+          },
+          {
+            "deviceId": "dc-env-01",
+            "metric": "temperature_c",
+            "stepS": 2,
+            "points": [
+              22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5,
+              22.5, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2,
+              29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2, 29.2,
+              29.2, 29.2, 29.2, 22.5, 22.5, 22.5, 22.5, 22.5, 22.5
+            ]
+          },
+          {
+            "deviceId": "lha-air-01",
+            "metric": "temperature_c",
+            "stepS": 2,
+            "points": [
+              25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4,
+              25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4, 25.4,
+              25.4, 25.4, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0,
+              30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 25.5
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "file": "broken.json",
+      "reason": "is not valid JSON"
+    }
+  ],
+  "intervalMs": 2000
+}
