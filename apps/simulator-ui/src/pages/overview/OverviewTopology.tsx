@@ -15,13 +15,13 @@ import topology from '../topology/topology.module.css';
 import { useDownstreamPulses } from '../topology/useDownstreamPulses';
 import { useTopologyModel } from '../topology/useTopologyModel';
 import styles from './overview.module.css';
-import type { OverviewQuery } from './useOverviewParams';
+import type { OverviewPatch, OverviewQuery } from './useOverviewParams';
 
 export interface OverviewTopologyProps {
   /** The page's clock, renewed each second. */
   now: number;
   query: OverviewQuery;
-  onQuery: (patch: Partial<OverviewQuery>) => void;
+  onQuery: (patch: OverviewPatch) => void;
 }
 
 /**

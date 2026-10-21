@@ -8,6 +8,7 @@ import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
 import { uiIcons } from '../ui/icons';
 import { AlertFeed } from './overview/AlertFeed';
+import { EventTimeline } from './overview/EventTimeline';
 import { OverviewKpis } from './overview/OverviewKpis';
 import { SimulationControls } from './overview/SimulationControls';
 import { useOverviewKpis } from './overview/useOverviewKpis';
@@ -134,6 +135,8 @@ export function Overview() {
           />
         </div>
       </div>
+
+      <EventTimeline query={query.events} onQuery={(events) => update({ events })} now={now} />
     </div>
   );
 }

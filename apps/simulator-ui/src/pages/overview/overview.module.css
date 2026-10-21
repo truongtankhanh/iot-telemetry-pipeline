@@ -408,3 +408,251 @@
 .phaseSummary span:last-child {
   color: var(--text-secondary);
 }
+
+/* ---- the event timeline ---- */
+
+.timelineBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.filterField {
+  display: inline-flex;
+  flex: 1 1 320px;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  min-width: 240px;
+  padding: 0 10px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  color: var(--text-secondary);
+}
+
+.filterField:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.filterField input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.customRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+}
+
+.customRow label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.customRow input {
+  height: 30px;
+  padding: 0 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-1);
+  color: var(--text-primary);
+  color-scheme: dark;
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.customRow input:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 1px;
+}
+
+.timelinePages {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* The strip of events per stretch: bars drawn at the strip's own pixel width, and two handles over them. */
+.strip {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.stripSvg {
+  display: block;
+}
+
+.stripBase {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.stripBar {
+  fill: var(--flow);
+  fill-opacity: 0.9;
+}
+
+.stripSelection {
+  fill: var(--tint-accent);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.stripText {
+  fill: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-variant-numeric: tabular-nums;
+}
+
+.stripHandle {
+  position: absolute;
+  top: 14px;
+  width: 12px;
+  height: 38px;
+  margin-left: -6px;
+  background: var(--text-primary);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.stripHandle:hover {
+  box-shadow: var(--neon-accent);
+}
+
+.stripHandle:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+  box-shadow: var(--neon-flow);
+}
+
+/* The table of events. */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.events {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+}
+
+.events th {
+  padding: 6px 10px;
+  text-align: left;
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.events td {
+  padding: 8px 10px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.event:hover {
+  background: rgba(71, 215, 255, 0.06);
+}
+
+.event[data-fresh='true'] {
+  background: var(--tint-accent);
+}
+
+.eventToggle {
+  width: 36px;
+  padding-right: 0;
+}
+
+.eventTime {
+  width: 100px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.eventMessage {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-1);
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  color: var(--text-primary);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 1px;
+}
+
+.iconButton[aria-expanded='true'] {
+  color: var(--text-primary);
+}
+
+.iconButton[aria-expanded='true'] .chevron {
+  transform: rotate(90deg);
+}
+
+.eventDetails td {
+  background: var(--surface-0);
+}
+
+.eventFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.eventFields dt {
+  font-size: var(--fs-min);
+  color: var(--text-tertiary);
+}
+
+.eventFields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

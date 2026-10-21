@@ -5,7 +5,7 @@ import type { StateView } from '../../api/types';
 import { axeViolations } from '../../test-axe';
 import { viewWithDevices } from '../fleet/fleetTestSupport';
 import { graphNode, installReactFlowStubs } from '../topology/topologyTestSupport';
-import { address, renderOverview } from './overviewTestSupport';
+import { address, observations, renderOverview } from './overviewTestSupport';
 
 // The Overview draws the topology, which needs the stand-ins React Flow asks of a browser.
 let restoreStubs: () => void;
@@ -489,5 +489,80 @@ describe('the live topology', () => {
     );
     expect(await screen.findByText(/No device matches “nothing-like-this”/)).toBeInTheDocument();
     expect(graphNode('stage:broker')).not.toBeNull();
+  });
+});
+
+describe('the event timeline on the page', () => {
+  /** A minute apart, the newest 30 s ago. */
+  const recent = (count: number) => observations(count, Date.now() - 30_000);
+  const card = () => screen.getByRole('region', { name: 'Event timeline' });
+  const pager = () => within(card()).getByRole('navigation', { name: 'Events pages' });
+
+  it('sits under the rest, and says what the simulator saw', async () => {
+    renderOverview({ events: recent(75) });
+    expect(card()).toHaveTextContent('60 events · last hour');
+    expect(pager()).toHaveTextContent('Events 1–10 of 60, newest first');
+  });
+
+  it('keeps the place when the page is reloaded: page, size and range come from the address', () => {
+    renderOverview({ events: recent(75), path: '/?page=3&size=10&range=3h' });
+    expect(pager()).toHaveTextContent('Events 21–30 of 75');
+    expect(within(card()).getByRole('radio', { name: '3h' })).toBeChecked();
+    expect(within(pager()).getByRole('button', { name: 'Page 3' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('writes its place beside the controls’ and the graph’s, and takes only its own out', async () => {
+    const user = userEvent.setup();
+    renderOverview({ events: recent(75), path: '/?scenario=bad-afternoon&group=zone&gq=air' });
+    await user.click(within(pager()).getByRole('button', { name: 'Page 2' }));
+    expect(address()).toBe('/?scenario=bad-afternoon&group=zone&gq=air&page=2');
+
+    await user.click(within(pager()).getByRole('button', { name: 'Page 1' }));
+    expect(address()).toBe('/?scenario=bad-afternoon&group=zone&gq=air');
+  });
+
+  it('falls back to the default for a value of the address that is not allowed', () => {
+    renderOverview({
+      events: recent(75),
+      path: '/?page=-3&size=7&range=1y&source=Everything',
+    });
+    expect(pager()).toHaveTextContent('Events 1–10 of 60');
+  });
+
+  it('still pages with a hundred devices, whose graph shows zone groups', async () => {
+    renderOverview({
+      view: viewWithDevices(100),
+      seed: false,
+      events: observations(250, Date.now() - 30_000),
+      path: '/?range=12h&size=100',
+    });
+    await waitFor(() => expect(graphNode('stage:broker')).not.toBeNull());
+    expect(document.querySelectorAll('.react-flow__node[data-id^="device:"]')).toHaveLength(0);
+
+    expect(pager()).toHaveTextContent('Events 1–100 of 250');
+    const user = userEvent.setup();
+    await user.click(within(pager()).getByRole('button', { name: 'Page 3' }));
+    expect(pager()).toHaveTextContent('Events 201–250 of 250');
+    expect(address()).toBe('/?range=12h&size=100&page=3');
+  });
+
+  it('does not break when an event is of a kind this page does not know', () => {
+    renderOverview({
+      events: [
+        {
+          id: 1,
+          at: new Date(Date.now() - 30_000).toISOString(),
+          kind: 'something-new' as never,
+          data: {},
+        },
+      ],
+    });
+    // "Other" is also a choice of the source select: ask the table.
+    const rows = within(within(card()).getByRole('table', { name: 'Events' }));
+    expect(rows.getByText('Other')).toBeInTheDocument();
+    expect(rows.getByText('something-new')).toBeInTheDocument();
   });
 });
