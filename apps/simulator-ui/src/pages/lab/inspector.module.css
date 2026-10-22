@@ -1,0 +1,138 @@
+/* The execution inspector: the right zone of the Lab. It scrolls inside itself. */
+.inspector {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.title {
+  margin: 0;
+  padding: 16px 16px 8px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faint {
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+
+/* ---- the log ---- */
+.logBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.logTools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.logRow {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  line-height: 1.35;
+}
+
+.time {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.run {
+  padding: 7px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.runButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  text-align: left;
+  cursor: pointer;
+}
+
+.runButton:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.paging {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- the target stepper, the rules and the trace ---- */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepLabel {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 10px;
+  border-radius: var(--radius-2);
+  background: var(--tint-accent);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.trace {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.traceHead {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}

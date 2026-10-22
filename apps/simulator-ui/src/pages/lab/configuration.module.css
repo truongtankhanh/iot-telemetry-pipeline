@@ -1,0 +1,245 @@
+/* The configuration column: the sections of "Configure a fault", the tiles, the value and its slider, and the two buttons. */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sec {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  line-height: 1.35;
+}
+
+/* ---- the tiles ---- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+}
+
+.tile input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.tile:hover:not([data-disabled='true']) {
+  color: var(--text-primary);
+  background: rgba(71, 215, 255, 0.1);
+}
+
+.tile[data-on='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.tile[data-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tile:has(input:focus-visible) {
+  outline: 2px solid var(--flow);
+  outline-offset: 1px;
+}
+
+/* ---- the value ---- */
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bigValue {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--warning);
+  text-shadow: 0 0 12px rgba(255, 194, 61, 0.45);
+}
+
+.bigValue small {
+  margin-left: 3px;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+  text-shadow: none;
+}
+
+.lines {
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+  text-align: right;
+}
+
+.slider {
+  position: relative;
+  padding: 6px 0;
+}
+
+.slider input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.slider input:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.mark {
+  position: absolute;
+  top: 2px;
+  width: 2px;
+  height: 8px;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.mark[data-kind='raise'] {
+  background: var(--sev-high);
+}
+
+.mark[data-kind='clear'] {
+  background: var(--status-resolved);
+}
+
+/* ---- the fields ---- */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+}
+
+.input:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.input[data-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  outline: none;
+}
+
+.unit {
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-min);
+}
+
+/* ---- the buttons ---- */
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.blocker {
+  margin: 0;
+  min-height: 1.35em;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  line-height: 1.35;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.buttons > * {
+  flex: 1;
+}

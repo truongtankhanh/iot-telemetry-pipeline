@@ -536,3 +536,36 @@ customs are capped, nothing is removed), and a second implementation in the brow
 - **For the Studio half:** types and `getExpected` against `apps/simulator-ui/src/api/fixtures/expectations.json` (a body of the route, with
   the key check in `control-routes.test.ts`); debounce the preview; say that an injection does not start a device and that the times are a
   best case ("about"); check the engine's anomalies for an overlap before injecting.
+
+## Amendment, 2026-10-21: Lab as built (SIM-10, Studio half)
+
+The Simulation lab ([frame 12](../design/simulator/mockups/12-simulation-lab.dc.html) and [frame 19](../design/simulator/mockups/19-simulation-lab-100.dc.html))
+adds no dependency and no route to the simulator: it uses `POST` and `DELETE /api/anomalies`, `GET /api/state` and the preview route of the amendment above.
+
+- **Add to timeline and Inject are two actions.** _Add to timeline_ keeps the faults in a draft held by the page (decision D4: a draft is not
+  state of the simulator, so leaving the page drops it); _Inject_ sends them. A fault on several devices is one request per device, staggered
+  by the form's offset. A request that is refused stops the rest and the page offers to remove the ones already accepted. The ids the
+  simulator answers with are kept, so a fault can be removed; faults the page did not send (a scenario's, a run's) are listed as loose
+  anomalies from the engine's own list and removed the same way.
+- **The start is absolute (D1).** Before injecting, the page reads `GET /api/state` again and sets `startAt = engine.elapsedS + offset`, so a
+  fault does not drift while the person reads the form. The preview asks with the same numbers (`startAt` as seconds from now), which is why
+  the strip and the dock agree with what the engine then plays.
+- **Overlap is refused in the page (D2).** The engine allows two faults on one metric of one device only when their windows do not meet;
+  the page names the fault in the way ("d001 already has a fault on temperature_c from 20 s to 80 s from now") instead of leaving it to a
+  refusal.
+- **Eight tiles, one selectable.** Only Breach has an engine behind it; the other fault tiles read "Comes with SIM-12" and cannot be chosen. The
+  stop condition is Timed or Manual (a manual stop is a long duration the person removes); "Alert clears" is shown disabled until the Lab can
+  observe it.
+- **The trace names the stages Studio can observe**: it has no "Broker ack" stage (the consumer's acknowledgement is not measured; ADR-0002).
+  Rule evaluation is the Topology's (`RuleEvaluationFor`).
+- **Zone codes, not names.** The simulator knows `zoneCode`; the catalogue that names a zone is the command center's and the Lab does not read
+  it. There are no catalogue assets and no Topology | Twin switch (the twin is SIM-18).
+- **The address carries the view**: `scope`, `target`, `zone`, `tab`, `page`, `log` and `logPage`, so a view can be shared. The form's values
+  and the draft are not in the address.
+- **The workspace is bounded to the viewport** (`calc(100vh - var(--header-h) - 52px)`, at least 640 px): each zone scrolls inside itself,
+  so a long zone list or log never moves the canvas or the dock. Above 60 devices the canvas shows the zone list and the pipeline in a box of
+  a fixed height and the chosen zone's devices in a table under them (10 a page).
+- **Run and Stop are in the bar (D3)**, through the Overview's `useSimulationControls` and its replace dialog; the Lab starts no second
+  mechanism for the engine's run.
+- **Not checked by the tests** (jsdom computes no layout): the zones at 1920 px, the wall scale (`zoom`) with the viewport height, and the canvas
+  filling its zone. They are a hand check, with the ticket's run against an ingest on `apps/simulator/fixtures/devices-100`.

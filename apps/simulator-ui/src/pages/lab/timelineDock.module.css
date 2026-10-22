@@ -1,0 +1,203 @@
+/* The timeline dock: a ruler, a lane for each device or zone, the alerts lane and the playhead, drawn at true width. */
+.dock {
+  flex: none;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  padding: 10px 20px 12px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 6px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.summary {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.link {
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.scroll {
+  max-height: 232px;
+  overflow: auto;
+}
+
+.svg {
+  display: block;
+  max-width: none;
+}
+
+.empty,
+.note {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.note {
+  font-size: var(--fs-min);
+}
+
+/* ---- the picture ---- */
+.rulerBg {
+  fill: var(--surface-2);
+}
+
+.gridMajor {
+  stroke: rgba(166, 184, 197, 0.18);
+}
+
+.gridMinor {
+  stroke: rgba(166, 184, 197, 0.3);
+}
+
+.tickLabel {
+  fill: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+}
+
+.laneLine {
+  stroke: rgba(166, 184, 197, 0.25);
+}
+
+.laneName {
+  fill: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.laneSub {
+  fill: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+}
+
+.curve {
+  fill: none;
+  stroke: var(--flow);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 3px rgba(71, 215, 255, 0.55));
+}
+
+.raise {
+  stroke: var(--sev-high);
+  stroke-opacity: 0.7;
+  stroke-dasharray: 5 4;
+}
+
+.raiseLabel {
+  fill: var(--sev-high);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+}
+
+.block {
+  fill: var(--tint-accent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 5px rgba(149, 155, 255, 0.5));
+}
+
+.block[data-pending='true'],
+.bar[data-pending='true'] {
+  fill: none;
+  stroke-dasharray: 5 4;
+  filter: none;
+}
+
+.blockLabel {
+  fill: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.bar {
+  fill: var(--tint-accent);
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}
+
+.window {
+  fill: rgba(255, 143, 58, 0.22);
+  stroke: var(--sev-high);
+  stroke-opacity: 0.9;
+}
+
+.windowLabel {
+  fill: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 500;
+}
+
+.dot[data-kind='raise'] {
+  fill: var(--sev-high);
+}
+
+.dot[data-kind='clear'] {
+  fill: var(--success);
+}
+
+.played {
+  fill: rgba(71, 215, 255, 0.05);
+}
+
+.playhead {
+  stroke: var(--flow);
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 4px rgba(71, 215, 255, 0.8));
+}
+
+.pill {
+  fill: var(--flow);
+}
+
+.pillText {
+  fill: var(--accent-ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playhead {
+    filter: none;
+  }
+}

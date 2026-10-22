@@ -15,6 +15,7 @@ const device = (selected = false): DeviceNodeData => ({
   reading: '29.3 °C',
   reason: null,
   selected,
+  targeted: false,
   dimmed: false,
   ariaLabel: 'Data center — row A, temperature_c 29.3 °C, anomaly',
 });

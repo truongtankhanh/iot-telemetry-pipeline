@@ -4,7 +4,7 @@ import { kindIdentity } from '../../lib/deviceIdentity';
 import type { DeviceNodeData } from '../../lib/topology';
 import { useAnimationSlot } from '../../ui/animationBudgetContext';
 import { Icon } from '../../ui/Icon';
-import { deviceGlyphs } from '../../ui/icons';
+import { deviceGlyphs, uiIcons } from '../../ui/icons';
 import { StateMark } from './StateMark';
 import styles from './topology.module.css';
 
@@ -28,6 +28,7 @@ function DeviceNodeView({ data }: NodeProps<DeviceFlowNode>) {
       data-kind="device"
       data-state={data.state}
       data-selected={data.selected ? 'true' : undefined}
+      data-targeted={data.targeted ? 'true' : undefined}
       data-dimmed={data.dimmed ? 'true' : undefined}
       data-animated={animated ? 'true' : undefined}
       title={data.reason ?? data.name}
@@ -47,6 +48,11 @@ function DeviceNodeView({ data }: NodeProps<DeviceFlowNode>) {
         <StateMark state={data.state} word={data.word} />
       </span>
       <span className={styles.value}>{data.reading ?? '—'}</span>
+      {data.targeted ? (
+        <span className={styles.target} title="Target of the fault">
+          <Icon glyph={uiIcons.target} size="sm" />
+        </span>
+      ) : null}
     </div>
   );
 }

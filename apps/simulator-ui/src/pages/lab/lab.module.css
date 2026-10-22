@@ -1,0 +1,126 @@
+/* The Simulation lab: a workspace bounded to the viewport, so a zone that has more than fits scrolls inside itself and the
+   pipeline, the bar and the dock stay where they are. Below 1100 px it is one column and the page scrolls. */
+.lab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  /* The shell's main has 24 px above and 28 px below its content. */
+  height: calc(100vh - var(--header-h) - 52px);
+  min-height: 640px;
+}
+
+.lab[data-stale='true'] .workspace {
+  opacity: 0.6;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 4px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-page-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 340px;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.left {
+  padding: 16px;
+  border-right: 1px solid var(--border-subtle);
+  overflow-y: auto;
+}
+
+.center {
+  padding: 16px 20px;
+  background: var(--surface-0);
+  overflow: hidden;
+}
+
+.right {
+  border-left: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.zoneTitle {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* What the last command did, or how far a send has got. */
+.notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.notice[data-tone='bad'] {
+  border-color: var(--danger);
+  background: var(--tint-bad);
+}
+
+.notice[data-tone='ok'] {
+  border-color: rgba(61, 240, 174, 0.5);
+}
+
+.noticeText {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.waiting {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1100px) {
+  .lab {
+    height: auto;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .left,
+  .right {
+    border: 0;
+    overflow: visible;
+  }
+}

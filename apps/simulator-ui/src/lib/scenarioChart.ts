@@ -78,7 +78,7 @@ export const xOf = (axis: ChartAxis, t: number): number =>
  * parts between them. It runs past the end of the picture by `room` (a fraction), which is where a label to the right
  * of the last flag goes.
  */
-function timeAxis(
+export function timeAxis(
   horizonS: number,
   room: number,
   box: Pick<ChartAxis, 'left' | 'right' | 'top' | 'bottom'>,
@@ -90,7 +90,7 @@ function timeAxis(
   return { ...box, majorS, maxS: Math.max(1, Math.ceil(wanted / majorS)) * majorS };
 }
 
-function ticksOf(axis: ChartAxis): ChartTick[] {
+export function ticksOf(axis: ChartAxis): ChartTick[] {
   const ticks: ChartTick[] = [];
   const minorS = axis.majorS / 3;
   for (let t = 0; t <= axis.maxS + 1e-9; t += minorS) {

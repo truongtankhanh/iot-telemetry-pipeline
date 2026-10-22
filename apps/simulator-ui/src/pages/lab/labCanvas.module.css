@@ -1,0 +1,141 @@
+/* The middle zone of the Lab: the canvas card, the expected-impact strip and the faults on the engine. */
+.canvasCard {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.canvasBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.canvasTitle {
+  margin: 0 8px 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Above 60 devices: the list and the pipeline have a fixed height, so scrolling the list or the table moves neither. */
+.scaleBody {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 12px;
+  flex: none;
+  height: 300px;
+  min-height: 0;
+}
+
+.tableWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The graph takes what the card leaves; React Flow needs a box with a real height. */
+.graph {
+  position: relative;
+  flex: 1;
+  min-height: 260px;
+}
+
+.graph > div[data-compact='true'] {
+  height: 100%;
+  min-height: 0;
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+/* ---- expected impact ---- */
+.impact,
+.active {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+}
+
+.impact[data-stale='true'] {
+  opacity: 0.7;
+}
+
+.impactRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.impactTitle {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.impactMessage {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.impactNotes {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  line-height: 1.4;
+}
+
+/* ---- faults on the engine ---- */
+.activeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.activeList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activeRow {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.faint {
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+}

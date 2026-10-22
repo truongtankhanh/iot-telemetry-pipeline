@@ -66,6 +66,19 @@ describe('a device node', () => {
     expect(node).toHaveAttribute('data-dimmed', 'true');
     expect(node).not.toHaveAttribute('data-animated');
   });
+
+  it('is ringed, with a mark, when the Lab aims a fault at it, and no other device is', async () => {
+    renderGraph(flowOf(undefined, { targets: new Set(['dc-env-02']) }));
+    await waitFor(() => expect(nodeCount()).toBe(18));
+    expect(inner('device:dc-env-02', 'device')).toHaveAttribute('data-targeted', 'true');
+    expect(
+      within(graphNode('device:dc-env-02') as HTMLElement).getByTitle('Target of the fault'),
+    ).toBeInTheDocument();
+    expect(inner('device:dc-env-01', 'device')).not.toHaveAttribute('data-targeted');
+    expect(
+      within(graphNode('device:dc-env-01') as HTMLElement).queryByTitle('Target of the fault'),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('a zone node', () => {

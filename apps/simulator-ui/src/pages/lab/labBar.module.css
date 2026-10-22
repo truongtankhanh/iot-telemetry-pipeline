@@ -1,0 +1,117 @@
+/* The bar of the Lab: the title, the picker, the controls and how far along it is. */
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  min-height: 48px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-page-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.buttons {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.elapsed {
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.track {
+  width: 200px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.track i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--flow));
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--text-primary);
+  background: var(--tint-accent);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.hint,
+.bad {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.bad {
+  color: var(--danger);
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--surface-1);
+  font-size: var(--fs-body);
+}
+
+.notice[data-tone='bad'] {
+  border-color: var(--danger);
+  background: var(--tint-bad);
+}
+
+.noticeText {
+  flex: 1 1 240px;
+  min-width: 0;
+}

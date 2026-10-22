@@ -1,0 +1,226 @@
+/* Above 60 devices: the list of zones, the pipeline drawn once, and the table of the zone chosen. */
+.listBox {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.listHead {
+  flex: none;
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--text-secondary);
+}
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.zone[data-state='stale'] {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+}
+
+.zone[data-state='anomaly'] {
+  border-color: var(--warning);
+}
+
+.zone[data-targeted='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.zone[aria-pressed='true'] {
+  background: var(--accent-soft);
+}
+
+.zone:hover {
+  background: rgba(71, 215, 255, 0.1);
+}
+
+.zone:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 1px;
+}
+
+.zoneTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.code {
+  font-size: var(--fs-body);
+}
+
+.line {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.stack {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.stack i {
+  display: block;
+  height: 100%;
+}
+
+.stack i[data-state='healthy'] {
+  background: var(--success);
+}
+
+.stack i[data-state='anomaly'] {
+  background: var(--warning);
+}
+
+.stack i[data-state='stale'] {
+  background: var(--text-tertiary);
+}
+
+.stack i[data-state='down'] {
+  background: var(--danger);
+}
+
+/* ---- the pipeline ---- */
+.pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.stage[data-state='anomaly'] {
+  border-color: var(--warning);
+}
+
+.stage[data-state='down'] {
+  border-color: var(--danger);
+  border-style: dashed;
+}
+
+.stage[data-state='stale'],
+.stage[data-dimmed='true'] {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+}
+
+.stageHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.stageFigure {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+/* ---- the table ---- */
+.tableCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+}
+
+.tableHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.tableTitle {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.device {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.faint {
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+}
+
+.spacer {
+  flex: 1 1 0;
+}
