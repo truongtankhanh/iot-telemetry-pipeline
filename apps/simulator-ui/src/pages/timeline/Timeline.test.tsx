@@ -85,8 +85,9 @@ describe('Timeline: building a scenario', () => {
         { deviceId: 'dc-env-01', metric: 'temperature_c', value: 29.2, startAt: 0, duration: 30 },
       ],
     });
-    expect(location()).toBe('/lab/timeline?scenario=fresh');
-    expect(screen.getByRole('heading', { level: 1, name: 'fresh' })).toBeInTheDocument();
+    // The router applies the new address a moment after the message is drawn: wait for it.
+    await waitFor(() => expect(location()).toBe('/lab/timeline?scenario=fresh'));
+    expect(await screen.findByRole('heading', { level: 1, name: 'fresh' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
   });
@@ -115,7 +116,9 @@ describe('Timeline: building a scenario', () => {
 
     expect(await screen.findByText('Saved server-room-overheat-copy.')).toBeInTheDocument();
     expect(simulator.callsTo('PUT', '/api/scenarios/server-room-overheat-copy')).toHaveLength(1);
-    expect(location()).toBe('/lab/timeline?scenario=server-room-overheat-copy');
+    await waitFor(() =>
+      expect(location()).toBe('/lab/timeline?scenario=server-room-overheat-copy'),
+    );
   });
 
   it('keeps the work when the page is left and opened again', async () => {
@@ -247,8 +250,10 @@ describe('Timeline: a saved scenario', () => {
 
     expect(await screen.findByText('Deleted bad-afternoon.')).toBeInTheDocument();
     expect(simulator.callsTo('DELETE', '/api/scenarios/bad-afternoon')).toHaveLength(1);
-    expect(location()).toBe('/lab/timeline');
-    expect(screen.getByRole('heading', { level: 1, name: 'New scenario' })).toBeInTheDocument();
+    await waitFor(() => expect(location()).toBe('/lab/timeline'));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'New scenario' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

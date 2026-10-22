@@ -66,11 +66,12 @@ describe('useEditorCommands: save', () => {
       anomalies: [hot],
     });
     expect(r.store.getState().view?.scenarios).toContain('fresh');
-    const { editor, location } = r.result.current;
+    // The router applies the new address a moment after the save: wait for it, then look at the rest.
+    await waitFor(() => expect(r.result.current.location.search).toBe('?scenario=fresh'));
+    const { editor } = r.result.current;
     expect(editor.kind).toBe('saved');
     expect(editor.dirty).toBe(false);
     expect(editor.message).toEqual({ tone: 'ok', text: 'Saved fresh.' });
-    expect(location.search).toBe('?scenario=fresh');
     expect(r.drafts.get('new')).toBeUndefined();
     await waitFor(() =>
       expect(r.simulator.callsTo('GET', '/api/scenarios').length).toBeGreaterThan(1),

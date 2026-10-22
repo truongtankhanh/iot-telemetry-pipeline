@@ -182,7 +182,7 @@ describe('Lab: the link to the timeline editor', () => {
     expect(handed?.doc.entries.map((entry) => entry.anomaly)).toMatchObject([
       { deviceId: 'd001', metric: 'temperature_c', startAt: 20, duration: 60 },
     ]);
-    expect(location()).toBe('/lab/timeline');
+    await waitFor(() => expect(location()).toBe('/lab/timeline'));
   });
 
   it('hands nothing over when the timeline is empty, and leaves a scenario being edited there alone', async () => {
@@ -195,7 +195,7 @@ describe('Lab: the link to the timeline editor', () => {
     await user.click(screen.getByRole('link', { name: 'Open timeline editor' }));
 
     expect(drafts.get('new')).toBe(mine);
-    expect(location()).toBe('/lab/timeline');
+    await waitFor(() => expect(location()).toBe('/lab/timeline'));
   });
 });
 
