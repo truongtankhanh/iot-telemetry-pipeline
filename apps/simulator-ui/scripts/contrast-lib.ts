@@ -170,6 +170,8 @@ export const PAIRS: Pair[] = [
     { fg: '--text-primary', bg: tint, over: '--surface-1', min: TEXT },
   ]),
   { fg: '--accent-ink', bg: '--accent', min: TEXT },
+  // The Lab's playhead pill: the time in dark ink on the flow colour.
+  { fg: '--accent-ink', bg: '--flow', min: TEXT },
   // Boundaries that carry meaning (an input, a selected option).
   ...cross(['--border-strong'], ['--surface-0', '--surface-1'], UI),
 ];

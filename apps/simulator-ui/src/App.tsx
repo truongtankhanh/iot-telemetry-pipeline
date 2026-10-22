@@ -57,6 +57,10 @@ const Scenarios = lazy(() =>
   import('./pages/scenarios/Scenarios').then((module) => ({ default: module.Scenarios })),
 );
 
+// The Lab is its own chunk: it brings the target picker, the zone list, the timeline dock and the graph, which no other
+// page needs together.
+const Lab = lazy(() => import('./pages/lab/Lab').then((module) => ({ default: module.Lab })));
+
 const TITLE = 'Simulator Studio';
 
 // One array for the life of the window: the shortcuts and the palette's items are derived from it.
@@ -116,6 +120,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Alerts />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/lab"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Lab />
           </Suspense>
         }
       />

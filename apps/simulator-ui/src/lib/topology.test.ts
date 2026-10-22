@@ -32,6 +32,7 @@ interface Options {
   expanded?: string[];
   selection?: Selection | null;
   link?: 'live' | 'lost';
+  targets?: ReadonlySet<string>;
   change?: (view: StateView) => void;
 }
 
@@ -84,6 +85,7 @@ function topology(view: StateView, options: Options = {}): Topology {
     expanded: new Set(options.expanded ?? []),
     selection: options.selection ?? null,
     link: options.link ?? 'live',
+    ...(options.targets ? { targets: options.targets } : {}),
   });
 }
 
@@ -495,5 +497,38 @@ describe('bounds', () => {
     expect(t.bounds.x + t.bounds.w).toBeGreaterThanOrEqual(
       STAGE_BOXES.commandCenter.x + STAGE_BOXES.commandCenter.w,
     );
+  });
+});
+
+describe('the targets of the Lab', () => {
+  it('marks the devices the fault is aimed at, and no other, and names them for a screen reader', () => {
+    const t = campus({ targets: new Set(['dc-env-01', 'lib-air-01']) });
+    expect(deviceData(t, 'dc-env-01').targeted).toBe(true);
+    expect(deviceData(t, 'lib-air-01').targeted).toBe(true);
+    expect(deviceData(t, 'dc-env-02').targeted).toBe(false);
+    expect(deviceData(t, 'dc-env-01').ariaLabel).toMatch(/, target of the fault$/);
+    expect(deviceData(t, 'dc-env-02').ariaLabel).not.toMatch(/target of the fault/);
+  });
+
+  it('marks nothing when there are no targets, which is what the other pages have', () => {
+    for (const t of [campus(), campus({ targets: new Set() })]) {
+      expect(ofType(t, 'device').every((n) => (n.data as DeviceNodeData).targeted === false)).toBe(
+        true,
+      );
+    }
+  });
+
+  it('opens the zone of a target in a graph of zones, and keeps the target out of the "+ n more"', () => {
+    // 30 devices in 2 zones of 15: past the preview of 6, so a zone shows the worst six and "+ n more".
+    const view = crowd(30, 2);
+    const last = 'dev-029'; // the last device of zone Z-01 (odd positions go to Z-01)
+    const plain = topology(view, { group: 'zone' });
+    expect(zoneData(plain, 'Z-01').mode).toBe('closed');
+
+    const aimed = topology(view, { group: 'zone', targets: new Set([last]) });
+    expect(zoneData(aimed, 'Z-01').mode).toBe('open');
+    expect(zoneData(aimed, 'Z-02').mode).toBe('closed');
+    expect(deviceData(aimed, last).targeted).toBe(true);
+    expect(zoneData(aimed, 'Z-01').more).toBe(15 - ofType(aimed, 'device').length);
   });
 });

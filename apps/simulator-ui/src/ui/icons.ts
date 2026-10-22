@@ -9,6 +9,7 @@ import {
   Bell,
   Boxes,
   Building2,
+  Bug,
   Calendar,
   ChartColumn,
   Check,
@@ -17,14 +18,17 @@ import {
   CircleAlert,
   CircleCheck,
   CircleQuestionMark,
+  Clock,
   Cloud,
   Command,
   ChevronDown,
   Copy,
   CornerDownLeft,
+  Crosshair,
   Cpu,
   Database,
   Download,
+  Droplet,
   Droplets,
   ExternalLink,
   Filter,
@@ -50,13 +54,16 @@ import {
   RotateCcw,
   Scale,
   Search,
+  Send,
   Server,
+  Shuffle,
   Shield,
   Square,
   StepForward,
   Terminal,
   Thermometer,
   TriangleAlert,
+  Unlink,
   Unplug,
   Wind,
   X,
@@ -66,6 +73,7 @@ import type { Severity } from '../api/types';
 import type { DeviceGlyph, MetricIconName } from '../lib/deviceIdentity';
 import type { TrailGlyph } from '../lib/alertTrail';
 import type { EventGlyph } from '../lib/eventRows';
+import type { FaultTile } from '../lib/labFault';
 import type { StageId } from '../lib/pipeline';
 import type { NavIconName } from '../lib/routes';
 
@@ -117,6 +125,19 @@ export const severityIcons: Record<Severity, Glyph> = {
   low: Info,
 };
 
+/** The glyph of each fault tile in the Lab (frame 12). */
+export const faultGlyphs: Record<FaultTile, Glyph> = {
+  breach: Thermometer,
+  silent: Square,
+  drop: Droplet,
+  delay: Clock,
+  burst: Send,
+  malformed: Bug,
+  duplicate: Copy,
+  reorder: Shuffle,
+  'link-loss': Unlink,
+};
+
 /** Generic interface glyphs. */
 export const uiIcons = {
   search: Search,
@@ -146,6 +167,7 @@ export const uiIcons = {
   download: Download,
   calendar: Calendar,
   filter: Filter,
+  target: Crosshair,
 } satisfies Record<string, Glyph>;
 
 /** The glyph of each stage of the pipeline in the topology. */

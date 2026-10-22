@@ -23,6 +23,8 @@ export const ZONE_NODE_LIMIT = 60;
 /** A zone opened in place past 12 devices shows this many at once, worst first, and "+ n more". */
 export const ZONE_PREVIEW = 6;
 
+const NO_TARGETS: ReadonlySet<string> = new Set();
+
 export type Tier = 'devices' | 'zones' | 'counts';
 
 export const tierOf = (deviceCount: number): Tier =>
@@ -58,6 +60,8 @@ export type DeviceNodeData = {
   /** For an anomaly: what is beyond which line. */
   reason: string | null;
   selected: boolean;
+  /** The Lab's fault is aimed at this device: a ring and a mark, and the word in its name for a screen reader. */
+  targeted: boolean;
   dimmed: boolean;
   ariaLabel: string;
 };
@@ -133,6 +137,8 @@ export interface TopologyInput {
   expanded: ReadonlySet<string>;
   selection: Selection | null;
   link: LinkState;
+  /** Devices the Lab's fault is aimed at: ringed, and their zone is open. Absent on the pages that have no target. */
+  targets?: ReadonlySet<string>;
 }
 
 export interface Topology {
@@ -272,6 +278,7 @@ const EDGE_ORDER: Record<EdgeState, number> = { warn: 0, bad: 1, ok: 2, flowing:
  */
 export function buildTopology(input: TopologyInput): Topology {
   const { rows, stages, search, problemsOnly, expanded, selection, link } = input;
+  const targets = input.targets ?? NO_TARGETS;
   const tier = tierOf(rows.length);
   const grouping: Grouping =
     tier === 'counts' ? 'zone' : (input.group ?? (tier === 'devices' ? 'all' : 'zone'));
@@ -312,6 +319,8 @@ export function buildTopology(input: TopologyInput): Topology {
       selection !== null &&
       ((selection.type === 'zone' && selection.id === code) ||
         (selection.type === 'device' && members.some((row) => row.device.id === selection.id)));
+    // The Lab opens the zone of a target, so the device it is aimed at is on show.
+    const targetedHere = members.some((row) => targets.has(row.device.id));
     // A filter hides the zones it leaves empty; a selection keeps its own zone in view.
     if (filterActive && inZone.length === 0 && !selectedHere) continue;
 
@@ -319,7 +328,8 @@ export function buildTopology(input: TopologyInput): Topology {
       (grouping === 'all' && tier !== 'counts') ||
       expanded.has(code) ||
       (filterActive && inZone.length > 0) ||
-      selectedHere;
+      selectedHere ||
+      (targetedHere && tier !== 'counts');
     if (!open) {
       placed.push({
         code,
@@ -338,6 +348,11 @@ export function buildTopology(input: TopologyInput): Topology {
       const wanted =
         selection?.type === 'device' ? inZone.find((r) => r.device.id === selection.id) : undefined;
       if (wanted !== undefined && !shown.includes(wanted)) shown = [...shown, wanted];
+      // A device the fault is aimed at is never one of the "+ n more".
+      shown = [
+        ...shown,
+        ...inZone.filter((row) => targets.has(row.device.id) && !shown.includes(row)),
+      ];
     }
     placed.push({ code, mode: 'open', shown, more: inZone.length - shown.length, members });
   }
@@ -405,6 +420,7 @@ export function buildTopology(input: TopologyInput): Topology {
       const state = deviceTopologyState(row.status.kind);
       const reading = primaryReading(row);
       const selected = selection?.type === 'device' && selection.id === row.device.id;
+      const targeted = targets.has(row.device.id);
       nodes.push({
         id: `device:${row.device.id}`,
         type: 'device',
@@ -425,8 +441,9 @@ export function buildTopology(input: TopologyInput): Topology {
           reading: reading?.text ?? null,
           reason: row.status.reason,
           selected,
+          targeted,
           dimmed,
-          ariaLabel: `${row.name}, ${reading ? `${reading.metric} ${reading.text}` : 'no reading'}, ${row.status.word.toLowerCase()}`,
+          ariaLabel: `${row.name}, ${reading ? `${reading.metric} ${reading.text}` : 'no reading'}, ${row.status.word.toLowerCase()}${targeted ? ', target of the fault' : ''}`,
         },
       });
       edges.push({

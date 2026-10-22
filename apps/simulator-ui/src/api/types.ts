@@ -383,3 +383,31 @@ export interface ObservationsPage {
   /** `null` on the last page. */
   next: number | null;
 }
+
+// ---- The Lab (SIM-10) ----
+// A manual mirror of `ExpectationPreview` in `apps/simulator/src/control-routes.ts`. `fixtures/expectations.json` is a
+// `POST /api/expectations` body: the key lists of `client.test.ts` and of `apps/simulator/src/control-routes.test.ts` are
+// the check, from both sides.
+
+/**
+ * The answer of `POST /api/expectations`: what the rules should do with a list of anomalies that is in no scenario (the
+ * fault being configured), worked out as the library does for a scenario. Times are seconds from now.
+ */
+export interface ExpectationPreview {
+  expected: Expected;
+  /** Devices the anomalies name that are not running now; the times assume they start with the fault, as a run would. */
+  needsStart: ScenarioNeed[];
+  /** The engine's publish interval in ms. */
+  intervalMs: number;
+}
+
+/**
+ * An anomaly to add to the engine (`POST /api/anomalies`): `startAt` is on the engine's anomaly clock
+ * (`engine.elapsedS`), `startIn` is seconds from the moment the simulator receives it; give one, or neither for now.
+ */
+export type AnomalyRequest = Omit<Anomaly, 'startAt'> & { startAt?: number; startIn?: number };
+
+/** The answer of `POST /api/anomalies`: the state, and the id the engine gave the anomaly (to remove it again). */
+export interface AnomalyAnswer extends StateView {
+  id: string;
+}

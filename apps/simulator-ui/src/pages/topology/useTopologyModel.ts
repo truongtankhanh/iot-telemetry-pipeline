@@ -44,6 +44,8 @@ export interface TopologyModelInput {
   query: TopologyQuery;
   /** The zones the viewer opened. */
   expanded: ReadonlySet<string>;
+  /** Devices the Lab's fault is aimed at; the other pages leave it out. */
+  targets?: ReadonlySet<string>;
 }
 
 export interface TopologyModel {
@@ -62,7 +64,7 @@ export interface TopologyModel {
  * not change, which is what makes a state update re-render only the nodes that changed (D4 of the plan).
  */
 export function useTopologyModel(input: TopologyModelInput): TopologyModel | null {
-  const { view, link, lastAlertSink, publishRate, now, query, expanded } = input;
+  const { view, link, lastAlertSink, publishRate, now, query, expanded, targets } = input;
   const history = useHistoryStore();
   const rows = useFleetRows(view, now);
   const rates = useIngestRates(view?.metrics);
@@ -88,6 +90,7 @@ export function useTopologyModel(input: TopologyModelInput): TopologyModel | nul
     expanded,
     selection: query.selection,
     link,
+    ...(targets === undefined ? {} : { targets }),
   });
   return {
     topology,

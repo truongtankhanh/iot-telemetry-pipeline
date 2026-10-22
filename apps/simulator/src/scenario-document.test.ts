@@ -5,6 +5,7 @@ import {
   MAX_ANOMALIES,
   MAX_DESCRIPTION_LENGTH,
   MAX_DURATION_S,
+  parseAnomalies,
   parseScenarioDocument,
   toAnomalies,
   toAnomalyFlag,
@@ -263,6 +264,80 @@ describe('parseScenarioDocument', () => {
         true,
       );
     });
+  });
+});
+
+describe('parseAnomalies', () => {
+  const parseList = (input: unknown, max = 100) => parseAnomalies(input, { devices: DEVICES, max });
+
+  /** `count` anomalies on one device and metric that follow each other without overlapping. */
+  const sequence = (count: number) =>
+    Array.from({ length: count }, (_, i) => anomaly({ startAt: i * 10, duration: 10 }));
+
+  /** The reason of a refusal; fails the test when the list was accepted. */
+  function listReason(input: unknown, max = 100): string {
+    const result = parseList(input, max);
+    assert.equal(result.ok, false, 'the list was accepted');
+    return result.ok ? '' : result.reason;
+  }
+
+  it('accepts a list and keeps exactly the fields of each anomaly', () => {
+    assert.deepEqual(parseList([anomaly(), anomaly({ deviceId: 'dc-env-02', shape: 'ramp' })]), {
+      ok: true,
+      anomalies: [
+        { deviceId: 'dc-env-01', metric: 'temperature_c', value: 29.2, startAt: 20, duration: 60 },
+        {
+          deviceId: 'dc-env-02',
+          metric: 'temperature_c',
+          value: 29.2,
+          startAt: 20,
+          duration: 60,
+          shape: 'ramp',
+        },
+      ],
+    });
+  });
+
+  it('takes the cap as a parameter and names it', () => {
+    assert.equal(parseList(sequence(100)).ok, true);
+    assert.equal(listReason(sequence(101)), 'anomalies must be a list of 1 to 100 anomalies');
+    assert.equal(listReason(sequence(4), 3), 'anomalies must be a list of 1 to 3 anomalies');
+  });
+
+  it('refuses an empty list and what is not a list', () => {
+    for (const input of [[], undefined, null, {}, 'text']) {
+      assert.equal(listReason(input), 'anomalies must be a list of 1 to 100 anomalies');
+    }
+  });
+
+  it('gives an item the refusal a scenario file gives it, word for word', () => {
+    const bad = [
+      [anomaly({ value: 90 })],
+      [anomaly({ deviceId: 'ghost' })],
+      [anomaly({ metric: 'power_kw' })],
+      [anomaly(), anomaly({ startAt: -1 })],
+      [anomaly({ duration: MAX_DURATION_S + 1 })],
+      [anomaly({ shape: 'wave' })],
+      [anomaly({ shap: 'ramp' })],
+    ];
+    for (const anomalies of bad) {
+      assert.equal(listReason(anomalies), reasonOf(document({ anomalies })));
+    }
+  });
+
+  it('refuses windows that play at once, and names both', () => {
+    assert.equal(
+      listReason([anomaly(), anomaly({ startAt: 50, duration: 10, value: 30 })]),
+      'anomalies[1] overlaps anomalies[0] on dc-env-01 temperature_c',
+    );
+  });
+
+  it('leaves the cap of a scenario file where it was', () => {
+    assert.equal(parse(document({ anomalies: sequence(MAX_ANOMALIES) })).ok, true);
+    assert.equal(
+      reasonOf(document({ anomalies: sequence(MAX_ANOMALIES + 1) })),
+      `anomalies must be a list of 1 to ${MAX_ANOMALIES} anomalies`,
+    );
   });
 });
 

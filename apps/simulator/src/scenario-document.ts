@@ -118,6 +118,34 @@ function overlap(anomalies: Anomaly[]): string | undefined {
   return undefined;
 }
 
+export type AnomaliesParse = { ok: true; anomalies: Anomaly[] } | { ok: false; reason: string };
+
+/**
+ * Validates a list of anomalies on its own: 1 to `max` of them, each checked against the registry and the ranges of
+ * the telemetry contract, and none overlapping another on one device and metric. A scenario file holds at most
+ * `MAX_ANOMALIES`; the cap is a parameter because the Lab's preview takes more (a fault on every device of a large
+ * registry). Never throws; the reason names the item and the field.
+ */
+export function parseAnomalies(
+  input: unknown,
+  options: { devices: readonly DeviceSpec[]; max: number },
+): AnomaliesParse {
+  if (!Array.isArray(input) || input.length < 1 || input.length > options.max) {
+    return { ok: false, reason: `anomalies must be a list of 1 to ${options.max} anomalies` };
+  }
+
+  const parsed: Anomaly[] = [];
+  for (const [index, raw] of input.entries()) {
+    const result = parseAnomalyAt(raw, index, options.devices);
+    if (!result.ok) return result;
+    parsed.push(result.anomaly);
+  }
+  const clash = overlap(parsed);
+  if (clash !== undefined) return { ok: false, reason: clash };
+
+  return { ok: true, anomalies: parsed };
+}
+
 /**
  * Validates a scenario document against the limits of the format, the registry (`devices`) and the ranges of
  * the telemetry contract. Never throws: the answer is the scenario, or the reason for the first check that
@@ -141,20 +169,10 @@ export function parseScenarioDocument(
   if (typeof description !== 'string' || description.length > MAX_DESCRIPTION_LENGTH) {
     return fail(`description must be text of at most ${MAX_DESCRIPTION_LENGTH} characters`);
   }
-  if (!Array.isArray(anomalies) || anomalies.length < 1 || anomalies.length > MAX_ANOMALIES) {
-    return fail(`anomalies must be a list of 1 to ${MAX_ANOMALIES} anomalies`);
-  }
+  const list = parseAnomalies(anomalies, { devices: options.devices, max: MAX_ANOMALIES });
+  if (!list.ok) return fail(list.reason);
 
-  const parsed: Anomaly[] = [];
-  for (const [index, raw] of anomalies.entries()) {
-    const result = parseAnomalyAt(raw, index, options.devices);
-    if (!result.ok) return fail(result.reason);
-    parsed.push(result.anomaly);
-  }
-  const clash = overlap(parsed);
-  if (clash !== undefined) return fail(clash);
-
-  return { ok: true, scenario: { name, description, anomalies: parsed } };
+  return { ok: true, scenario: { name, description, anomalies: list.anomalies } };
 }
 
 /** Seconds from the start of the scenario to the end of its last anomaly. */

@@ -326,6 +326,65 @@ describe('expectedAlerts: the tick grid', () => {
   });
 });
 
+describe('expectedAlerts: the total budget', () => {
+  // Three signals over 80 s at 2 s: each is 80 / 2 + 10 = 50 ticks, 150 in all.
+  const three = [
+    anomaly(),
+    anomaly({ metric: 'humidity_pct', value: 70 }),
+    anomaly({ deviceId: 'dc-env-02' }),
+  ];
+  const withOptions = (anomalies: Anomaly[], overrides: Partial<ExpectationOptions>) =>
+    expectedAlerts(
+      { name: 'case', description: '', anomalies },
+      {
+        devices: ALL_DEVICES,
+        rules: RULES,
+        intervalMs: 2000,
+        intervalMsOf: () => 2000,
+        needsStart: new Set(),
+        baseMs: T0,
+        ...overrides,
+      },
+    );
+
+  it('answers as it does without a limit when the sum is within it', () => {
+    assert.deepEqual(withOptions(three, { maxTotalTicks: 150 }), withOptions(three, {}));
+  });
+
+  it('says it cannot work it out when the sum is over it, and gives the sum and the limit', () => {
+    const result = withOptions(three, { maxTotalTicks: 149 });
+    assert.deepEqual(result, {
+      available: false,
+      reason:
+        'Too many readings to work out the alerts of 3 anomalies on 3 signals over 80 s: 150 against a limit of 149',
+    });
+  });
+
+  it('counts a signal once, however many anomalies it has', () => {
+    const twoOnOne = [anomaly(), anomaly({ startAt: 80, duration: 10, value: 30 })];
+    // One signal over 90 s: 90 / 2 + 10 = 55 ticks.
+    assert.equal(withOptions(twoOnOne, { maxTotalTicks: 55 }).available, true);
+    assert.equal(withOptions(twoOnOne, { maxTotalTicks: 54 }).available, false);
+  });
+
+  it('leaves a scenario without a limit as it was', () => {
+    assert.equal(withOptions(three, {}).available, true);
+  });
+
+  it('keeps the limit of one signal, whatever the total allows', () => {
+    const result = withOptions([anomaly({ startAt: 0, duration: 100 })], {
+      intervalMs: 1,
+      intervalMsOf: () => 1,
+      maxTotalTicks: 1_000_000,
+    });
+    assert.equal(result.available, false);
+    assert.match(
+      result.available ? '' : result.reason,
+      /^A publish interval of 1 ms is too short to work out the alerts of a 100 s scenario/,
+    );
+  });
+});
+
 describe('expectedAlerts: several alerts', () => {
   it('lists them by the time they open, then device and rule', () => {
     const result = expect([

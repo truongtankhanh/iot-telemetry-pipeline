@@ -1,5 +1,9 @@
 import type {
   AlertsPage,
+  Anomaly,
+  AnomalyAnswer,
+  AnomalyRequest,
+  ExpectationPreview,
   ImportAnswer,
   ObservationEvent,
   ObservationsPage,
@@ -429,4 +433,63 @@ export async function getObservations(
     );
   }
   return { events: body, next };
+}
+
+// ---- The Lab: faults on the engine, and what the rules would do with them (SIM-10) ----
+
+/**
+ * Adds one anomaly to the engine. The simulator checks it (device, metric, a duration above 0) and refuses with the
+ * reason, which the `ApiError` carries; it does not start a stopped device, and it does not look for another anomaly on
+ * the same device and metric (the engine plays the first one that matches), so the caller checks that. The answer is the
+ * new state and the id.
+ */
+export function addAnomaly(
+  request: AnomalyRequest,
+  options: RequestOptions = {},
+): Promise<AnomalyAnswer> {
+  return sendCommandFor<AnomalyAnswer>(
+    'POST',
+    '/api/anomalies',
+    request,
+    options,
+    (body) => typeof body.id === 'string',
+  );
+}
+
+/** Removes an anomaly by the id `addAnomaly` gave; `404` from the simulator when it is gone already. */
+export const removeAnomaly = (id: string, options: RequestOptions = {}) =>
+  sendCommand('DELETE', `/api/anomalies/${encodeURIComponent(id)}`, undefined, options);
+
+/**
+ * `POST /api/expectations`: what the rules should do with these anomalies, times in seconds from now. It changes
+ * nothing on the simulator (a `POST` only because the body is a list). A refusal carries the reason ("anomalies[1]
+ * overlaps anomalies[0] on …"); a body that is not the documented answer fails loudly.
+ */
+export async function getExpected(
+  anomalies: readonly Anomaly[],
+  options: RequestOptions = {},
+): Promise<ExpectationPreview> {
+  const response = await send(
+    '/api/expectations',
+    {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anomalies }),
+    },
+    options,
+  );
+  const body = await readJson(response);
+  if (
+    !isObject(body) ||
+    !isObject(body.expected) ||
+    typeof body.expected.available !== 'boolean' ||
+    !Array.isArray(body.needsStart) ||
+    typeof body.intervalMs !== 'number'
+  ) {
+    throw new ApiError(
+      response.status,
+      'The simulator answered with an expectation Studio does not understand',
+    );
+  }
+  return body as unknown as ExpectationPreview;
 }

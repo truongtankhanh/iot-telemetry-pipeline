@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import alertsPageFixture from './fixtures/alerts-page.json';
+import expectationsFixture from './fixtures/expectations.json';
 import observationsFixture from './fixtures/observations.json';
 import scenariosFixture from './fixtures/scenarios.json';
 import { stateViewFixture as fixture } from './fixtures/stateView';
 import {
+  addAnomaly,
   ApiError,
   conflictsOf,
   getAlerts,
+  getExpected,
   getObservations,
   getScenarios,
   getState,
@@ -14,6 +17,7 @@ import {
   importScenario,
   pauseDevice,
   releaseValue,
+  removeAnomaly,
   resetEngine,
   runScenario,
   setDeviceInterval,
@@ -22,7 +26,12 @@ import {
   stopDevice,
   stopScenario,
 } from './client';
-import { OBSERVATION_KINDS, type ScenarioLibraryView, type ScenarioRunView } from './types';
+import {
+  type ExpectationPreview,
+  OBSERVATION_KINDS,
+  type ScenarioLibraryView,
+  type ScenarioRunView,
+} from './types';
 
 // A real `GET /api/state` body (see types.ts for how both sides are kept in step).
 const view = fixture;
@@ -836,5 +845,182 @@ describe('stepEngine and resetEngine', () => {
     expect(failure).toBeInstanceOf(ApiError);
     expect((failure as ApiError).status).toBe(409);
     expect((failure as ApiError).message).toMatch(/simulated clock/);
+  });
+});
+
+describe('the expectation fixture', () => {
+  const preview = expectationsFixture as unknown as ExpectationPreview;
+
+  it('declares the same keys as the types, section by section (the simulator compares the same file)', () => {
+    expect(keys(preview)).toEqual(['expected', 'intervalMs', 'needsStart']);
+    expect(keys(preview.needsStart[0]!)).toEqual(['deviceId', 'state']);
+    const expected = preview.expected;
+    if (!expected.available) throw new Error('the fixture has rules');
+    expect(keys(expected)).toEqual([
+      'alerts',
+      'available',
+      'horizonS',
+      'intervalS',
+      'quiet',
+      'series',
+    ]);
+    expect(keys(expected.alerts[0]!)).toEqual([
+      'clearsAtS',
+      'clearsUncertain',
+      'deviceId',
+      'metric',
+      'opensAtS',
+      'opensMargin',
+      'ruleId',
+      'severity',
+      'title',
+    ]);
+    expect(keys(expected.series[0]!)).toEqual(['deviceId', 'metric', 'points', 'stepS']);
+  });
+});
+
+describe('addAnomaly and removeAnomaly', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+  const sent = (fn: ReturnType<typeof reply>) => {
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    return { url, init, headers: init.headers as Record<string, string> };
+  };
+  const request = {
+    deviceId: 'dc-env-01',
+    metric: 'temperature_c' as const,
+    value: 29.2,
+    startAt: 120.5,
+    duration: 60,
+    shape: 'step' as const,
+  };
+
+  it('posts the anomaly as JSON and answers the new state and the id', async () => {
+    const fetchFn = reply({ ...view, id: 'a7' }, { status: 201 });
+    const answer = await addAnomaly(request, { fetch: asFetch(fetchFn) });
+
+    expect(answer.id).toBe('a7');
+    expect(answer.engine.devices.length).toBe(view.engine.devices.length);
+    const { url, init, headers } = sent(fetchFn);
+    expect(url).toBe('/api/anomalies');
+    expect(init.method).toBe('POST');
+    expect(headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(init.body as string)).toEqual(request);
+  });
+
+  it('fails loudly on an answer without the id', async () => {
+    const fetchFn = reply(view, { status: 201 });
+    await expect(addAnomaly(request, { fetch: asFetch(fetchFn) })).rejects.toThrow(
+      /state Studio does not understand/,
+    );
+  });
+
+  it('carries the reason of a refusal, and reports a simulator that does not answer', async () => {
+    const refused = reply(
+      { statusCode: 400, error: 'Bad Request', message: 'Device "ghost" has no metric "x"' },
+      { status: 400 },
+    );
+    const failure = await addAnomaly(request, { fetch: asFetch(refused) }).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(400);
+    expect((failure as ApiError).message).toMatch(/has no metric/);
+
+    const down = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    const outage = await addAnomaly(request, { fetch: asFetch(down) }).catch((e: unknown) => e);
+    expect((outage as ApiError).status).toBe(0);
+  });
+
+  it('deletes an anomaly by its percent-encoded id and answers the new state', async () => {
+    const fetchFn = reply(view);
+    const state = await removeAnomaly('a 7/1', { fetch: asFetch(fetchFn) });
+
+    expect(state.devices.length).toBe(view.devices.length);
+    const { url, init } = sent(fetchFn);
+    expect(url).toBe('/api/anomalies/a%207%2F1');
+    expect(init.method).toBe('DELETE');
+  });
+
+  it('says 404 for an anomaly that is gone', async () => {
+    const gone = reply(
+      { statusCode: 404, error: 'Not Found', message: 'Unknown anomaly "a7"' },
+      { status: 404 },
+    );
+    const failure = await removeAnomaly('a7', { fetch: asFetch(gone) }).catch((e: unknown) => e);
+    expect((failure as ApiError).status).toBe(404);
+  });
+});
+
+describe('getExpected', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+  const anomalies = [
+    {
+      deviceId: 'dc-env-01',
+      metric: 'temperature_c' as const,
+      value: 29.2,
+      startAt: 20,
+      duration: 60,
+    },
+  ];
+
+  it('posts the anomalies as a list and returns the answer as the simulator sent it', async () => {
+    const fetchFn = reply(expectationsFixture);
+    const answer = await getExpected(anomalies, { fetch: asFetch(fetchFn) });
+
+    expect(answer).toEqual(expectationsFixture);
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/expectations');
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+    expect(JSON.parse(init.body as string)).toEqual({ anomalies });
+  });
+
+  it('keeps an answer that says the rules cannot be used', async () => {
+    const body = {
+      expected: { available: false, reason: 'cannot read rules.json (ENOENT)' },
+      needsStart: [],
+      intervalMs: 2000,
+    };
+    const answer = await getExpected(anomalies, { fetch: asFetch(reply(body)) });
+    expect(answer.expected).toEqual(body.expected);
+  });
+
+  it('carries the reason of a refusal', async () => {
+    const refused = reply(
+      {
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'anomalies[1] overlaps anomalies[0] on dc-env-01 temperature_c',
+      },
+      { status: 400 },
+    );
+    const failure = await getExpected(anomalies, { fetch: asFetch(refused) }).catch(
+      (e: unknown) => e,
+    );
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).message).toMatch(/overlaps/);
+  });
+
+  it('fails loudly on a body that is not the documented answer', async () => {
+    for (const body of [{}, { expected: {}, needsStart: [], intervalMs: 2000 }, []]) {
+      await expect(getExpected(anomalies, { fetch: asFetch(reply(body)) })).rejects.toThrow(
+        /expectation Studio does not understand/,
+      );
+    }
+  });
+
+  it('reports a simulator that does not answer with status 0, and passes an abort on', async () => {
+    const down = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    const outage = await getExpected(anomalies, { fetch: asFetch(down) }).catch((e: unknown) => e);
+    expect((outage as ApiError).status).toBe(0);
+
+    const aborted = vi.fn(async () => {
+      throw new DOMException('aborted', 'AbortError');
+    });
+    await expect(getExpected(anomalies, { fetch: asFetch(aborted) })).rejects.toMatchObject({
+      name: 'AbortError',
+    });
   });
 });

@@ -412,3 +412,9 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
     Ingest and Engine (the last two are the build's: `dependency` and `tick-error` observations). The graph's search is `gq` in the
     address, so the timeline's filter keeps `q`; the two scales (12 and 60 devices) are the Topology's. Not built here: the Twin view of
     the card (SIM-18). Frame 11 stays as drawn until it is redrawn.
+16. **Frames 12 and 19 differ from the build.** _Settled in SIM-10 (2026-10-21)._ The build shows zone codes (`BLD-01`, `SIM-Z03`), not
+    zone names, because the simulator does not know the catalogue; it has no catalogue asset rows and no _Topology | Twin_ switch (SIM-18).
+    The trace and the log have no "Broker ack", "Rule raised" or "Anomaly started" rows (not observed by Studio; see question 15). Of
+    the eight fault tiles only Breach can be chosen; the rest read "Comes with SIM-12". The stop condition offers Timed and Manual
+    ("Alert clears" is disabled). Run and Stop are in the bar, and the log's filters are shown at every size. Frames 12 and 19 stay as
+    drawn until they are redrawn.

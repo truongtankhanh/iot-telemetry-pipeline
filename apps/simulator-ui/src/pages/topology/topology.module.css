@@ -130,6 +130,25 @@
   box-shadow: var(--neon-accent);
 }
 
+/* The Lab's fault is aimed at this device: an accent ring outside the border, and a mark (never the ring alone). */
+.node[data-targeted='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.node .target {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
 /* Old data: dashed and without light. The words stay readable, so no opacity. */
 .node[data-dimmed='true'] {
   border-style: dashed;
