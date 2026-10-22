@@ -10,6 +10,7 @@ import type {
   PagedAlert,
   RunAnswer,
   RunConflict,
+  SaveAnswer,
   ScenarioItem,
   ScenarioLibraryView,
   StateView,
@@ -339,6 +340,26 @@ export function importScenario(
     isScenarioItem(body.scenario),
   );
 }
+
+/**
+ * Saves a custom scenario: the simulator validates the document like a file (the contract's ranges included), writes
+ * `<name>.json` in its scenarios folder and answers with the card. The name in the path is the document's own, so the
+ * two cannot disagree. A refusal is the simulator's: `400` with the field named, `409` for a built-in, a scenario that is
+ * running, the 201st scenario or a file that was not loaded, `500` when the folder cannot be written; the `ApiError`
+ * carries the status and the reason.
+ */
+export function saveScenario(
+  document: { name: string },
+  options: RequestOptions = {},
+): Promise<SaveAnswer> {
+  return sendCommandFor<SaveAnswer>('PUT', scenarioPath(document.name), document, options, (body) =>
+    isScenarioItem(body.scenario),
+  );
+}
+
+/** Removes a custom scenario and its file; `404` when there is none, `409` for a built-in or one that is running. */
+export const deleteScenario = (name: string, options: RequestOptions = {}) =>
+  sendCommand('DELETE', scenarioPath(name), undefined, options);
 
 function isRunConflict(item: unknown): item is RunConflict {
   if (!isObject(item)) return false;

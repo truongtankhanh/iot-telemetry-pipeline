@@ -346,6 +346,12 @@ export interface ImportAnswer extends StateView {
   scenario: ScenarioItem;
 }
 
+/**
+ * The answer of `PUT /api/scenarios/:name` (`201` for a new name, `200` for a replacement): the same body as an import's,
+ * the state and the scenario as a card shows it, now a file in the scenarios folder.
+ */
+export type SaveAnswer = ImportAnswer;
+
 // ---- The observation log (SIM-09) ----
 // A manual mirror of `ObservationEvent` in `apps/simulator/src/observation-store.ts`. `fixtures/observations.json` is a
 // `GET /api/observations` body with one event of every kind: the key lists of `client.test.ts` and of

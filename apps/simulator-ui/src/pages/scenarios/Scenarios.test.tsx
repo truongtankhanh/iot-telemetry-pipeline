@@ -501,3 +501,84 @@ describe('Scenarios: a link that points at a scenario', () => {
     expect(address()).toBe('/lab/scenarios');
   });
 });
+
+describe('Scenarios: the editor’s commands', () => {
+  it('ends the list with a card that starts a new scenario, on the last page only', async () => {
+    renderScenarios();
+    await cardsShown();
+    expect(screen.getByRole('link', { name: /^New scenario/ })).toHaveAttribute(
+      'href',
+      '/lab/timeline',
+    );
+  });
+
+  it('shows the new-scenario card on the last page of a long list and not on the others', async () => {
+    const { unmount } = renderScenarios({ library: library38() });
+    await cardsShown();
+    expect(screen.queryByRole('link', { name: /^New scenario/ })).not.toBeInTheDocument();
+    unmount();
+
+    renderScenarios({ library: library38(), path: '/lab/scenarios?page=7' });
+    await cardsShown();
+    expect(screen.getByRole('link', { name: /^New scenario/ })).toBeInTheDocument();
+  });
+
+  it('asks before it deletes, deletes the scenario and its card, and tells it', async () => {
+    const user = userEvent.setup();
+    const { simulator } = renderScenarios();
+    await user.click(await screen.findByRole('button', { name: 'Delete bad-afternoon' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete bad-afternoon?' });
+    expect(dialog).toHaveTextContent('removes bad-afternoon and its file');
+    expect(simulator.callsTo('DELETE', '/api/scenarios/bad-afternoon')).toEqual([]);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText('Deleted bad-afternoon.')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('article', { name: 'bad-afternoon' })).not.toBeInTheDocument(),
+    );
+    expect(simulator.callsTo('DELETE', '/api/scenarios/bad-afternoon')).toHaveLength(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('changes nothing on Cancel or Escape, and gives the focus back to the Delete button', async () => {
+    const user = userEvent.setup();
+    const { simulator } = renderScenarios();
+    await user.click(await screen.findByRole('button', { name: 'Delete bad-afternoon' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Delete bad-afternoon' }));
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Delete bad-afternoon' })).toHaveFocus();
+    expect(simulator.callsTo('DELETE', '/api/scenarios/bad-afternoon')).toEqual([]);
+  });
+
+  it('says what the simulator said when it refuses to delete, on the card', async () => {
+    const user = userEvent.setup();
+    const { simulator } = renderScenarios();
+    simulator.failDelete({ status: 500, message: 'cannot remove bad-afternoon.json (EACCES)' });
+    await user.click(await screen.findByRole('button', { name: 'Delete bad-afternoon' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
+
+    const card = await screen.findByRole('article', { name: 'bad-afternoon' });
+    expect(await within(card).findByRole('alert')).toHaveTextContent(
+      'cannot remove bad-afternoon.json (EACCES)',
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('offers no Delete for a built-in scenario', async () => {
+    renderScenarios();
+    const card = await screen.findByRole('article', { name: 'server-room-overheat' });
+    expect(within(card).queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
+    expect(
+      within(card).getByRole('link', { name: 'Duplicate server-room-overheat' }),
+    ).toBeInTheDocument();
+  });
+});

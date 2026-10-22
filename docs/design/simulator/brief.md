@@ -399,8 +399,7 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
     A scenario on one device and one metric gets the value chart, any other the lane chart, at most four lanes and a line
     "+ n more devices, m anomalies". The time axis runs to the next numbered tick past the end (and a quarter more on the value
     chart, for the label of the clear). A clear that may come later than shown reads "about 110 s or later", and one that was not
-    found "clear time not known"; with no rules each card says why and draws no chart. Not built: **Edit**, **Duplicate** and
-    **New scenario** (with its dashed card) belong to the editor (SIM-11); **Follow** and the Fleet's running-scenario strip wait
+    found "clear time not known"; with no rules each card says why and draws no chart. **Edit**, **Duplicate**, **Export** and **Delete**, and the dashed **New scenario** card, were added by SIM-11 (question 17). Not built: **Follow** and the Fleet's running-scenario strip wait
     for a page that can take the person there (the Digital twin, SIM-09's controls); the pager is the Fleet's, without the
     first and last buttons; **Import JSON** is in the toolbar, not the header, and opens a file picker. Running a scenario over
     something that already plays on its devices asks first. Frame 03 stays as drawn until it is redrawn.
@@ -420,3 +419,17 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
     the eight fault tiles only Breach can be chosen; the rest read "Comes with SIM-12". The stop condition offers Timed and Manual
     ("Alert clears" is disabled). Run and Stop are in the bar, and the log's filters are shown at every size. Frames 12 and 19 stay as
     drawn until they are redrawn.
+17. **Frame 05 differs from the build.** _Settled in SIM-11 (2026-10-23)._ The build shows zone codes, not zone names, and no catalogue
+    rows (as in questions 14 and 16). A new anomaly is added by the **Add anomaly** button, a plain **A**, or a double-click on a lane
+    that already has one; dragging on an empty part of a lane to draw a new block is not built (a lane exists only where an anomaly
+    does, and the button picks the device). **Length** (120, 180 and 300 s) is the window the picture shows, not a limit of the
+    document: it widens by itself when a later start or a longer duration is typed in, a longer scenario shows its own window, and a
+    drag stops at the edge of the window instead of widening it under the pointer. The inspector's preview is the Scenarios cards'
+    chart (the value against the raise and clear lines, the amber part beyond the raise line, the alert and the clear as flags);
+    the band between the two lines is not tinted and the start and the end are said in a line under the chart, not marked on it.
+    The frame has no description field, no Delete, no Export and no state for a scenario that is new or a copy: the build adds a
+    **Description** (200 characters), **Export JSON**, **Delete** (after asking) and a **Name** field for a new scenario or a copy
+    (a saved scenario's name is shown, not edited: duplicate it, or save it under another name). **Run now** saves a scenario that is
+    new or changed before it runs it, and a scenario that is running cannot be saved over or deleted (the editor offers Stop). The
+    work in progress is kept for the session when the page is left, and a reload asks first. The Lab's "Open timeline editor" hands
+    the page's own timeline over as a new scenario. Frame 05 stays as drawn until it is redrawn.

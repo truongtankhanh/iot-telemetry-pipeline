@@ -260,6 +260,153 @@ describe('buildDock: grouped by zone (frame 19)', () => {
   });
 });
 
+describe('buildDock: what the timeline editor asks for', () => {
+  it('carries the id of each fault on its block and marks the selected one, and only when ids are given', () => {
+    const two = [anomaly(), anomaly({ metric: 'humidity_pct', value: 70 })];
+    const dock = buildDock(
+      base({
+        anomalies: two,
+        pending: [anomaly({ deviceId: 'dc-env-01', startAt: 100, duration: 5 })],
+        ids: ['x1', 'x2'],
+        selectedId: 'x2',
+        expected: null,
+      }),
+    );
+    const blocks = dock.lanes.flatMap((lane) => lane.blocks);
+    expect(blocks.map((b) => [b.id, b.selected])).toEqual([
+      ['x1', false],
+      [undefined, undefined], // the fault being configured has no id
+      ['x2', true],
+    ]);
+
+    const plain = buildDock(base({ anomalies: two, expected: null }));
+    for (const block of plain.lanes.flatMap((lane) => lane.blocks)) {
+      expect('id' in block).toBe(false);
+      expect('selected' in block).toBe(false);
+    }
+  });
+
+  it('spans the window it is given and not what the faults need', () => {
+    expect(buildDock(base({ windowS: 120 })).axis.maxS).toBe(120);
+    expect(buildDock(base({ windowS: 300 })).axis.maxS).toBe(300);
+    expect(buildDock(base({ windowS: 180 })).horizonS).toBe(180);
+    expect(buildDock(base()).axis.maxS).toBe(90); // 80 s of faults and alerts, numbered every 30 s
+  });
+
+  it('makes a device lane taller on request and leaves a group lane alone', () => {
+    expect(buildDock(base({ laneHeight: 64 })).lanes[0]!.height).toBe(64);
+    expect(buildDock(base()).lanes[0]!.height).toBe(48);
+  });
+
+  it('marks the part of the curve that is inside a fault, only when asked', () => {
+    const dock = buildDock(base({ markInside: true }));
+    const curve = dock.lanes[0]!.curve!;
+    expect(curve.inside).toHaveLength(1);
+    const xs = curve.inside![0]!.split(' ').map((p) => Number(p.split(',')[0]));
+    expect(xs[0]).toBe(xOf(dock.axis, 20));
+    expect(xs.at(-1)).toBe(xOf(dock.axis, 80));
+    expect('inside' in buildDock(base()).lanes[0]!.curve!).toBe(false);
+  });
+
+  describe('opening a zone out into its devices', () => {
+    const zones = ['A', 'B', 'C'];
+    const devices = Array.from({ length: 12 }, (_, i) =>
+      device(`d${String(i).padStart(2, '0')}`, zones[i < 6 ? 0 : i < 9 ? 1 : 2]),
+    );
+    const anomalies = devices.map((d, i) =>
+      anomaly({ deviceId: d.id, startAt: 20 + 2 * i, duration: 70 }),
+    );
+    const grouped = (change: Partial<DockInput> = {}) =>
+      buildDock(base({ anomalies, devices, grouped: true, expected: null, ...change }));
+
+    it('follows an open zone’s group lane with a lane for each of its devices, in order', () => {
+      const dock = grouped({ expanded: new Set(['B']) });
+      expect(dock.lanes.map((l) => [l.kind, l.label, l.zone])).toEqual([
+        ['group', 'A', 'A'],
+        ['group', 'B', 'B'],
+        ['device', 'd06', 'B'],
+        ['device', 'd07', 'B'],
+        ['device', 'd08', 'B'],
+        ['group', 'C', 'C'],
+      ]);
+      expect(dock.lanes.map((l) => l.expanded)).toEqual([
+        false,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        false,
+      ]);
+      expect(dock.lanes.filter((l) => l.kind === 'group').every((l) => l.expandable)).toBe(true);
+      expect(dock.lanes[2]!.blocks).toHaveLength(1);
+      expect(dock.lanes[2]!.bars).toEqual([]);
+    });
+
+    it('stacks the lanes, whatever their heights', () => {
+      const dock = grouped({ expanded: new Set(['A', 'C']) });
+      for (const [i, lane] of dock.lanes.entries()) {
+        if (i === 0) continue;
+        expect(lane.y).toBe(dock.lanes[i - 1]!.y + dock.lanes[i - 1]!.height);
+      }
+      const last = dock.lanes.at(-1)!;
+      expect(dock.height).toBeGreaterThan(last.y + last.height);
+    });
+
+    it('says nothing about opening when it is not asked, and draws the groups as before', () => {
+      const dock = grouped();
+      expect(dock.lanes.map((l) => [l.kind, l.label])).toEqual([
+        ['group', 'A'],
+        ['group', 'B'],
+        ['group', 'C'],
+      ]);
+      expect(dock.lanes.some((l) => 'expandable' in l)).toBe(false);
+    });
+  });
+
+  describe('each alert on a row of its own', () => {
+    const two = available(
+      [alert('dc-env-02', 30, null), alert('dc-env-01', 24, 80)],
+      [series('dc-env-01')],
+    );
+
+    it('lists the alerts in the order they open, with where they raise and clear', () => {
+      const dock = buildDock(base({ alertRows: true, expected: two }));
+      const rows = dock.alerts!.rows!;
+      expect(rows.map((r) => [r.deviceId, r.raiseText, r.clearText, r.openToEnd])).toEqual([
+        ['dc-env-01', '24 s', '80 s', false],
+        ['dc-env-02', '30 s', null, true],
+      ]);
+      expect(rows[0]!.raiseX).toBe(xOf(dock.axis, 24));
+      expect(rows[0]!.clearX).toBe(xOf(dock.axis, 80));
+      expect(rows[1]!.clearX).toBeNull();
+      expect(rows[1]!.y).toBe(rows[0]!.y + 30);
+    });
+
+    it('makes the lane tall enough for its rows, and the picture with it', () => {
+      const rows = buildDock(base({ alertRows: true, expected: two }));
+      const window = buildDock(base({ expected: two }));
+      expect(rows.alerts!.height).toBe(2 * 30 + 12);
+      expect(window.alerts!.height).toBe(52);
+      expect(rows.height - window.height).toBe(2 * 30 + 12 - 52);
+      expect(window.alerts!.rows).toBeUndefined();
+    });
+
+    it('keeps an alert that falls after the picture inside it and open to the edge', () => {
+      const dock = buildDock(
+        base({
+          alertRows: true,
+          windowS: 30,
+          anomalies: [anomaly({ startAt: 0, duration: 10 })],
+          expected: available([alert('dc-env-01', 60, 90)]),
+        }),
+      );
+      const [row] = dock.alerts!.rows!;
+      expect(row).toMatchObject({ beyond: true, clearX: null, openToEnd: true });
+      expect(row!.raiseX).toBe(dock.axis.right);
+    });
+  });
+});
+
 describe('barProgress', () => {
   const item = { name: 'overheat', lengthS: 80 } as unknown as ScenarioItem;
   const run: ScenarioRunView = {

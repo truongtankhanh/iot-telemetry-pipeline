@@ -1,0 +1,73 @@
+/* The timeline editor page: the layout around the header, the canvas and the inspector. Their parts have modules of their own. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* The link to the simulator is lost: what is shown is the last data, dimmed. */
+.page[data-stale='true'] .workspace {
+  opacity: 0.6;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+
+.main,
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.notice,
+.error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  font-size: var(--fs-body);
+}
+
+.notice[data-tone='ok'] {
+  box-shadow: inset 2px 0 0 var(--success);
+}
+
+.notice[data-tone='note'] {
+  border-color: var(--warning);
+  box-shadow: inset 2px 0 0 var(--warning);
+}
+
+.notice[data-tone='bad'],
+.error {
+  border-color: var(--danger);
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.noticeText {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.waiting {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}

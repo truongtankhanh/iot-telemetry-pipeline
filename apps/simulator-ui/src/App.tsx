@@ -61,6 +61,11 @@ const Scenarios = lazy(() =>
 // page needs together.
 const Lab = lazy(() => import('./pages/lab/Lab').then((module) => ({ default: module.Lab })));
 
+// The timeline editor is its own chunk: it brings the editor's canvas, inspector and hooks, which no other page needs.
+const Timeline = lazy(() =>
+  import('./pages/timeline/Timeline').then((module) => ({ default: module.Timeline })),
+);
+
 const TITLE = 'Simulator Studio';
 
 // One array for the life of the window: the shortcuts and the palette's items are derived from it.
@@ -136,6 +141,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Scenarios />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/lab/timeline"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Timeline />
           </Suspense>
         }
       />

@@ -604,3 +604,43 @@ move the storage without changing the document. The timeline editor needs a save
   save or a delete (they are not events of the system under test); no route validates without saving (`POST /api/expectations` already refuses a bad
   list of anomalies with the field named, and the save validates the whole document); the Compose and Kubernetes volume for the folder is not wired
   (the README says to mount one).
+
+## Amendment, 2026-10-23: Timeline editor as built (SIM-11, Studio half)
+
+The timeline editor ([frame 05](../design/simulator/mockups/05-timeline-editor.dc.html)) at `/lab/timeline` builds, saves and runs a custom scenario.
+It adds no dependency and no route to the simulator: it uses `PUT` and `DELETE /api/scenarios/:name` and `POST /api/expectations` (the
+amendment of 2026-10-22 and the one before it), and the shared `GET /api/scenarios` read.
+
+- **The working copy lives outside React, for the session** (`state/editorDrafts.ts`, provided by `StudioProvider`). The app is on the plain
+  router (`<Routes>`), where `useBlocker` is not available (it needs a data router), so navigation inside the app cannot be held back by an "unsaved
+  changes" prompt. Alternatives considered: page state only (the Lab's draft is that, and is lost on any navigation: right for a form, wrong for work that
+  took ten minutes); moving the whole app to a data router (a cross-cutting change for one page). A copy is stored under a key for a saved scenario, for a
+  duplicate and for the new scenario, on its first edit; leaving the page and coming back finds it, Discard drops it, a reload loses it and `beforeunload`
+  asks while any copy holds work.
+- **The model is pure** (`lib/timelineEditor.ts`, `timelineValidation.ts`, `timelineGeometry.ts`, `editorAlerts.ts`, `timelineDefaults.ts`,
+  `thresholdPreview.ts`, `timelineExport.ts`), and the page's hooks only read and write it. The ranges come from the telemetry contract through
+  `rangeOf` and the name pattern is the simulator's; the simulator stays the authority and its refusal is shown in its own words.
+- **Collisions.** Two anomalies may not play at once on one device and metric (the simulator refuses a document with two). A drag or a resize stops at the
+  neighbour's edge and says so; a typed number that would overlap is not applied and the reason is next to the field; a number out of the contract's range is
+  kept and marked, because it may be half typed, and the scenario cannot be saved until it is fixed.
+- **Run now saves first** when the scenario is new or changed, then runs it (the simulator half decided that a run plays a library scenario). A scenario that
+  is running cannot be saved over or deleted (`409`), so Save and Delete are off and Run becomes Stop. A run that would play over something asks, with the
+  Scenarios page's dialog.
+- **The drawing is shared with the Lab's dock** (`pages/lab/TimelinePicture.tsx`, extracted from `TimelineDock`; `buildDock` gained optional inputs that are off
+  by default, so the dock is unchanged and its tests are the check). The editor adds the selection, grips, keyboard and pointer editing, zones that open into
+  their devices above 12 anomalies, the neon value line with the amber part inside a fault, a spark on the selected lane (inside the animation budget, never
+  under `prefers-reduced-motion`) and one row for each expected alert.
+- **Windows.** 120, 180 and 300 s are the part of the scenario that is shown, not a limit of the document. The window widens by itself for a later start or a
+  longer duration typed in; it does not widen during a drag, which would rescale the picture under the pointer.
+- **Keyboard.** A block is a button with one tab stop among them; the arrows move it by the snap step (5 s, or 1 s with the switch off), Shift moves its end,
+  Shift and Alt its start, Up and Down go to the previous and the next block, Delete removes it. A plain `A` adds an anomaly. The inspector reaches everything the
+  pointer does.
+- **Managing scenarios** on the Scenarios page: Edit (custom), Duplicate (any, built-ins included, opens a copy), Export JSON (made in the browser, the same bytes
+  the simulator writes), Delete (custom, not running, after asking) and the dashed New scenario card. The Lab's "Open timeline editor" hands the page's own timeline
+  over as a new scenario that is not saved yet, replacing a new scenario that was being edited.
+- **Not built, left as they were:** a drag on an empty lane to size a new block (a lane exists only where an anomaly does; a double-click, the button and `A` add);
+  a tinted hysteresis band and start/end marks on the preview (the card chart shows both lines and the amber part; the start and the end are in a line of
+  text); undo and redo; selecting several blocks; touch-sized grips; a view of the scenario as `--anomaly` flags (the simulator documents the flag).
+- **What jsdom cannot check** (a hand check): the look at 1920 px and the wall scale, the neon filter and the spark, the feel of the drag with the snap, reduced
+  motion, the page-leaving prompt, and the whole flow against a real simulator (build, save, reload, run, open the file in `apps/simulator/scenarios/`, run the same
+  anomalies with `--anomaly`).

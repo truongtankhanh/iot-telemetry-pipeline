@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import scenariosFixture from '../../api/fixtures/scenarios.json';
 import type { Anomaly, ScenarioLibraryView } from '../../api/types';
+import { fromAnomalies } from '../../lib/timelineEditor';
+import { EditorDrafts } from '../../state/editorDrafts';
 import { axeViolations } from '../../test-axe';
 import { installReactFlowStubs } from '../topology/topologyTestSupport';
 import { labFleet, renderLab } from './labTestSupport';
@@ -162,6 +164,38 @@ describe('Lab: a breach on one device', () => {
     expect(await screen.findByText('Injected 1 fault.')).toBeInTheDocument();
     expect(simulator.callsTo('POST', '/api/anomalies')).toHaveLength(1);
     expect(screen.getByText('Injected a timeline of 1 fault')).toBeInTheDocument();
+  });
+});
+
+describe('Lab: the link to the timeline editor', () => {
+  it('hands the timeline over as a new scenario that is not saved yet', async () => {
+    const user = userEvent.setup();
+    const { drafts } = renderLab({ path: '/lab?target=d001' });
+    await user.click(button('Add to timeline'));
+    expect(drafts.get('new')).toBeUndefined();
+
+    await user.click(screen.getByRole('link', { name: 'Open timeline editor' }));
+
+    const handed = drafts.get('new');
+    expect(handed?.base).toBeNull();
+    expect(handed?.doc.name).toBe('');
+    expect(handed?.doc.entries.map((entry) => entry.anomaly)).toMatchObject([
+      { deviceId: 'd001', metric: 'temperature_c', startAt: 20, duration: 60 },
+    ]);
+    expect(location()).toBe('/lab/timeline');
+  });
+
+  it('hands nothing over when the timeline is empty, and leaves a scenario being edited there alone', async () => {
+    const user = userEvent.setup();
+    const drafts = new EditorDrafts();
+    const mine = { doc: fromAnomalies([]), base: null };
+    drafts.set('new', mine);
+    renderLab({ path: '/lab?target=d001', drafts });
+
+    await user.click(screen.getByRole('link', { name: 'Open timeline editor' }));
+
+    expect(drafts.get('new')).toBe(mine);
+    expect(location()).toBe('/lab/timeline');
   });
 });
 

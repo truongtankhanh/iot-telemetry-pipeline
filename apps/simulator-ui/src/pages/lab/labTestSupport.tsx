@@ -19,6 +19,7 @@ import type {
   ScenarioLibraryView,
   StateView,
 } from '../../api/types';
+import { EditorDrafts } from '../../state/editorDrafts';
 import { ObservationLog } from '../../state/observationLog';
 import { StudioProvider } from '../../state/StudioProvider';
 import { createStudioStore, type LinkState, type StudioStore } from '../../state/store';
@@ -268,12 +269,15 @@ export interface RenderLabOptions {
   link?: LinkState;
   /** Observations the log already holds. */
   events?: ObservationEvent[];
+  /** The timeline editor's working copies, to look at what the Lab handed over. */
+  drafts?: EditorDrafts;
 }
 
 export type LabHarness = RenderResult & {
   store: StudioStore;
   simulator: FakeLabSimulator;
   observations: ObservationLog;
+  drafts: EditorDrafts;
 };
 
 /** The Lab in a router (starting at `path`), a store and an observation log, with `fetch` replaced by the fake simulator. */
@@ -286,11 +290,12 @@ export function renderLab(options: RenderLabOptions = {}): LabHarness {
   const store = createStudioStore();
   store.getState().setLink(link, Date.now());
   if (state) store.getState().setView(structuredClone(state), Date.now());
+  const drafts = options.drafts ?? new EditorDrafts();
   const observations = new ObservationLog({ notifyEveryMs: 0 });
   observations.seed(events);
 
   const result = render(
-    <StudioProvider store={store} observations={observations}>
+    <StudioProvider store={store} observations={observations} drafts={drafts}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/lab" element={<Lab />} />
@@ -299,5 +304,5 @@ export function renderLab(options: RenderLabOptions = {}): LabHarness {
       </MemoryRouter>
     </StudioProvider>,
   );
-  return { ...result, store, simulator, observations };
+  return { ...result, store, simulator, observations, drafts };
 }

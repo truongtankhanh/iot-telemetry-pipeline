@@ -22,6 +22,7 @@ import { Pill } from './Pill';
 import { Segmented } from './Segmented';
 import { SelectField } from './SelectField';
 import { SeverityBadge } from './SeverityBadge';
+import { Switch } from './Switch';
 import { tabId } from './tabId';
 import { Tabs } from './Tabs';
 
@@ -507,6 +508,43 @@ describe('Pager', () => {
       expect(nav).toHaveTextContent(/Rows 1–25 of 312/);
       expect(within(nav).getByLabelText('Rows per page')).toBeInTheDocument();
     });
+  });
+});
+
+describe('Switch', () => {
+  it('is a switch with the words beside it as its name, and reports the new state', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Switch label="Snap to 5 s" checked={false} onChange={onChange} />);
+    const toggle = screen.getByRole('switch', { name: 'Snap to 5 s' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText('Snap to 5 s')).toBeVisible();
+    await user.click(toggle);
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('says it is on, and toggles with Space from the keyboard', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Switch label="Snap" checked onChange={onChange} />);
+    expect(screen.getByRole('switch', { name: 'Snap' })).toBeChecked();
+    await user.tab();
+    await user.keyboard(' ');
+    expect(onChange).toHaveBeenCalledWith(false);
+  });
+
+  it('does nothing while it is disabled', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Switch label="Snap" checked={false} onChange={onChange} disabled />);
+    await user.click(screen.getByRole('switch', { name: 'Snap' }));
+    expect(screen.getByRole('switch', { name: 'Snap' })).toBeDisabled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('has no accessibility violation', async () => {
+    const { container } = render(<Switch label="Snap to 5 s" checked onChange={() => {}} />);
+    expect(await axeViolations(container)).toEqual([]);
   });
 });
 

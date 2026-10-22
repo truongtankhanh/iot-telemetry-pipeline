@@ -196,8 +196,181 @@
   font-weight: 600;
 }
 
+/* ---- the editor's extras: neon value line, selection, grips, alert rows, zone toggles ---- */
+
+/* The value line in three layers (wide halo, glow, bright core); the part inside a fault turns amber. */
+.curveHalo,
+.curveGlow,
+.insideHalo,
+.insideGlow,
+.inside {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.curveHalo {
+  stroke: var(--flow);
+  stroke-width: 7;
+  stroke-opacity: 0.12;
+}
+
+.curveGlow {
+  stroke: var(--flow);
+  stroke-width: 3.6;
+  stroke-opacity: 0.3;
+}
+
+.insideHalo {
+  stroke: var(--warning);
+  stroke-width: 8;
+  stroke-opacity: 0.16;
+}
+
+.insideGlow {
+  stroke: var(--warning);
+  stroke-width: 4;
+  stroke-opacity: 0.4;
+}
+
+.inside {
+  stroke: var(--warn-core);
+  stroke-width: 1.8;
+  filter: drop-shadow(0 0 3px rgba(255, 194, 61, 0.8));
+}
+
+/* The spark: a short bright dot that runs along the selected lane's line. It is only drawn while the screen's animation
+   budget allows, and never under reduced motion. */
+.spark {
+  fill: var(--flow-core);
+  filter: drop-shadow(0 0 4px var(--flow));
+  offset-rotate: 0deg;
+  animation: sparkRun 3.2s linear infinite;
+}
+
+@keyframes sparkRun {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
+.curve,
+.curveHalo,
+.curveGlow,
+.insideHalo,
+.insideGlow,
+.inside,
+.raise {
+  pointer-events: none;
+}
+
+.canvasHit {
+  fill: transparent;
+}
+
+.laneHit {
+  fill: transparent;
+}
+
+.rulerHit {
+  fill: transparent;
+  cursor: ew-resize;
+}
+
+.editable {
+  cursor: grab;
+  outline: none;
+}
+
+.editable[data-dragging='true'] {
+  cursor: grabbing;
+}
+
+.block[data-selected='true'] {
+  fill: var(--accent-soft);
+  stroke: var(--flow-core);
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 8px rgba(149, 155, 255, 0.85));
+}
+
+.editable:focus-visible .block {
+  stroke: var(--flow);
+  stroke-width: 3;
+}
+
+.bar[data-selected='true'] {
+  stroke: var(--flow-core);
+}
+
+.grip {
+  fill: var(--flow-core);
+  stroke: var(--surface-0);
+  stroke-width: 1;
+  cursor: ew-resize;
+  filter: drop-shadow(0 0 4px var(--flow));
+}
+
+.zoneToggle {
+  cursor: pointer;
+  outline: none;
+}
+
+.zoneHit {
+  fill: transparent;
+}
+
+.zoneToggle:focus-visible .zoneHit {
+  stroke: var(--flow);
+  stroke-width: 2;
+}
+
+.chevron {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.alertRule {
+  fill: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.alertBar {
+  fill: rgba(255, 143, 58, 0.22);
+  stroke: var(--sev-high);
+  stroke-opacity: 0.9;
+}
+
+.alertBar[data-open='true'] {
+  stroke-dasharray: 6 4;
+}
+
+.openArrow {
+  fill: none;
+  stroke: var(--sev-high);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dotTime {
+  fill: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .playhead {
     filter: none;
+  }
+
+  .spark {
+    display: none;
   }
 }

@@ -42,6 +42,8 @@ const RULER_HEIGHT = 30;
 const DEVICE_LANE = 48;
 const GROUP_LANE = 34;
 const ALERTS_LANE = 52;
+const ALERT_ROW = 30;
+const ALERT_ROWS_PADDING = 12;
 const BOTTOM = 8;
 const MIN_HORIZON_S = 30;
 const CHAR_PX = 7.4;
@@ -59,6 +61,10 @@ export interface DockBlock {
   /** Configured but not added yet: drawn as an outline. */
   pending: boolean;
   title: string;
+  /** The id given for this fault in `DockInput.ids` (the editor's entry id); absent without ids. */
+  id?: string;
+  /** The fault is the one in `DockInput.selectedId`; absent without a selection. */
+  selected?: boolean;
 }
 
 /** A group lane draws one thin bar for each device, stacked, so a zone of many devices stays one row. */
@@ -69,6 +75,8 @@ export interface DockBar {
   height: number;
   pending: boolean;
   title: string;
+  id?: string;
+  selected?: boolean;
 }
 
 export interface DockCurve {
@@ -77,6 +85,8 @@ export interface DockCurve {
   /** Where the rule's raise line falls in this lane; `null` when no rule watches the signal or it is off the picture. */
   raiseY: number | null;
   raiseLabel: string | null;
+  /** With `markInside`: the part of the curve inside a fault, one `x,y x,y …` polyline for each (drawn amber). */
+  inside?: string[];
 }
 
 export interface DockLane {
@@ -94,6 +104,31 @@ export interface DockLane {
   curve: DockCurve | null;
   /** "20–90 s" at the end of a group's bars. */
   span: { text: string; x: number } | null;
+  /** The zone of a group lane, and of a device lane opened out of one (grouped timelines only). */
+  zone?: string;
+  /** A group lane that can be opened out into a lane for each device (only with `expanded` given). */
+  expandable?: boolean;
+  /** The group lane is open: the lanes of its devices follow it. */
+  expanded?: boolean;
+}
+
+/** One expected alert on a row of its own (the editor's alerts lane). */
+export interface AlertRowModel {
+  key: string;
+  ruleId: string;
+  title: string;
+  severity: Severity;
+  deviceId: string;
+  y: number;
+  raiseX: number;
+  raiseText: string;
+  /** Where it clears; `null` when it clears after the picture or its time is not known. */
+  clearX: number | null;
+  clearText: string | null;
+  /** The alert is still open at the right edge of the picture: drawn as an open bar. */
+  openToEnd: boolean;
+  /** The alert opens after the picture ends. */
+  beyond: boolean;
 }
 
 export interface AlertsLane {
@@ -105,6 +140,8 @@ export interface AlertsLane {
   label: string;
   /** "raised 24–46 s · clear 80–102 s" for more than one alert. */
   summary: string | null;
+  /** With `alertRows`: each alert on its own row, in the order they open. */
+  rows?: AlertRowModel[];
 }
 
 export interface DockModel {
@@ -136,16 +173,31 @@ export interface DockInput {
   grouped: boolean;
   /** Seconds into the timeline for the playhead; `null` for none. */
   elapsedS: number | null;
+  /** One id for each of `anomalies`, in the same order (the editor's entry ids): blocks and bars carry theirs. */
+  ids?: readonly string[];
+  /** The id of the fault that is selected; its block and bar are marked. */
+  selectedId?: string | null;
+  /** The seconds the picture spans. Without it the picture spans what the faults and the expected alerts need (30 s at least). */
+  windowS?: number;
+  /** Zones opened out into a lane for each device (a grouped timeline only); every group lane is then `expandable`. */
+  expanded?: ReadonlySet<string>;
+  /** The height of a device lane in pixels (48 without it). */
+  laneHeight?: number;
+  /** Mark the part of each curve that is inside a fault (`DockCurve.inside`). */
+  markInside?: boolean;
+  /** Describe each expected alert on a row of its own (`AlertsLane.rows`), not only as one window. */
+  alertRows?: boolean;
 }
 
 interface Placed {
   anomaly: Anomaly;
   pending: boolean;
+  id?: string;
 }
 
 const end = (anomaly: Anomaly) => anomaly.startAt + anomaly.duration;
 
-function blockOf(placed: Placed, axis: ChartAxis): DockBlock {
+function blockOf(placed: Placed, axis: ChartAxis, selectedId: string | null): DockBlock {
   const { anomaly, pending } = placed;
   const x = xOf(axis, anomaly.startAt);
   const width = Math.max(2, round1(xOf(axis, end(anomaly)) - x));
@@ -160,11 +212,13 @@ function blockOf(placed: Placed, axis: ChartAxis): DockBlock {
     label: width >= label.length * CHAR_PX + 12 ? label : null,
     pending,
     title: `${anomaly.deviceId} ${anomaly.metric} ${label} from ${seconds(anomaly.startAt)} for ${seconds(anomaly.duration)}${pending ? ' (not added yet)' : ''}`,
+    ...(placed.id === undefined ? {} : { id: placed.id, selected: placed.id === selectedId }),
   };
 }
 
 function curveOf(
   lane: { deviceId: string; metric: string },
+  members: readonly Placed[],
   input: DockInput,
   axis: ChartAxis,
   top: number,
@@ -190,10 +244,20 @@ function curveOf(
     .join(' ');
   const raiseY =
     rule !== null && rule.raise >= lo && rule.raise <= hi ? round1(y(rule.raise)) : null;
+  const inside = input.markInside
+    ? members.flatMap(({ anomaly }) => {
+        const part = series.points
+          .map((value, i) => ({ t: i * series.stepS, value }))
+          .filter(({ t }) => t >= anomaly.startAt && t <= end(anomaly))
+          .map(({ t, value }) => `${xOf(axis, t)},${round1(y(value))}`);
+        return part.length >= 2 ? [part.join(' ')] : [];
+      })
+    : null;
   return {
     points,
     raiseY,
     raiseLabel: rule === null || raiseY === null ? null : `raise ${rule.raise}`,
+    ...(inside === null ? {} : { inside }),
   };
 }
 
@@ -202,6 +266,7 @@ function alertsLane(
   axis: ChartAxis,
   horizonS: number,
   y: number,
+  detailed: boolean,
 ): AlertsLane | null {
   if (alerts.length === 0) return null;
   const opens = alerts.map((a) => a.opensAtS);
@@ -219,7 +284,7 @@ function alertsLane(
   const only = alerts.length === 1 ? alerts[0]! : null;
   return {
     y,
-    height: ALERTS_LANE,
+    height: detailed ? alertRowsHeight(alerts.length) : ALERTS_LANE,
     window: { x, width: Math.max(2, round1(xOf(axis, to) - x)) },
     dots,
     label: only
@@ -233,37 +298,102 @@ function alertsLane(
               : 'no clear found'
           }`
         : null,
+    ...(detailed ? { rows: alertRowsOf(alerts, axis, y) } : {}),
   };
+}
+
+const alertRowsHeight = (count: number) => count * ALERT_ROW + ALERT_ROWS_PADDING;
+
+/** Each alert on a row of its own, in the order they open: where it raises, where it clears, or that it is still open at the edge. */
+function alertRowsOf(
+  alerts: readonly ExpectedAlert[],
+  axis: ChartAxis,
+  y: number,
+): AlertRowModel[] {
+  return [...alerts]
+    .sort((a, b) => a.opensAtS - b.opensAtS || a.deviceId.localeCompare(b.deviceId))
+    .map((alert, index): AlertRowModel => {
+      const clears = alert.clearsAtS;
+      const beyond = alert.opensAtS > axis.maxS;
+      return {
+        key: `${alert.ruleId}|${alert.deviceId}|${alert.metric}|${alert.opensAtS}`,
+        ruleId: alert.ruleId,
+        title: alert.title,
+        severity: alert.severity,
+        deviceId: alert.deviceId,
+        y: y + ALERT_ROWS_PADDING / 2 + index * ALERT_ROW,
+        raiseX: Math.min(xOf(axis, alert.opensAtS), axis.right),
+        raiseText: seconds(alert.opensAtS),
+        clearX: clears !== null && clears <= axis.maxS ? xOf(axis, clears) : null,
+        clearText: clears === null ? null : seconds(clears),
+        openToEnd: clears === null || clears > axis.maxS,
+        beyond,
+      };
+    });
+}
+
+interface LaneSpec {
+  key: string;
+  kind: 'device' | 'group';
+  members: Placed[];
+  zone?: string;
+}
+
+const signalKey = (anomaly: Anomaly) => `${anomaly.deviceId}\u0000${anomaly.metric}`;
+
+function group<T>(items: readonly T[], keyOf: (item: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    const list = groups.get(key);
+    if (list) list.push(item);
+    else groups.set(key, [item]);
+  }
+  return groups;
 }
 
 /** The dock's picture for these faults. */
 export function buildDock(input: DockInput): DockModel {
   const width = Math.max(MIN_WIDTH, Math.round(input.width));
   const placed: Placed[] = [
-    ...input.anomalies.map((anomaly) => ({ anomaly, pending: false })),
+    ...input.anomalies.map((anomaly, i): Placed => {
+      const id = input.ids?.[i];
+      return { anomaly, pending: false, ...(id === undefined ? {} : { id }) };
+    }),
     ...input.pending.map((anomaly) => ({ anomaly, pending: true })),
   ];
+  const selectedId = input.selectedId ?? null;
   const expectedHorizon = input.expected?.available ? input.expected.horizonS : 0;
-  const horizonS = Math.max(MIN_HORIZON_S, expectedHorizon, ...placed.map((p) => end(p.anomaly)));
+  const horizonS =
+    input.windowS ?? Math.max(MIN_HORIZON_S, expectedHorizon, ...placed.map((p) => end(p.anomaly)));
 
-  // The lanes: one for each device and metric, or one for each zone.
+  // The lanes: one for each device and metric, or one for each zone (a zone can be opened out into its devices).
   const zoneOf = (deviceId: string) =>
     input.devices.find((d) => d.id === deviceId)?.zoneCode ?? deviceId;
-  const groups = new Map<string, Placed[]>();
-  for (const p of placed) {
-    const key = input.grouped
-      ? zoneOf(p.anomaly.deviceId)
-      : `${p.anomaly.deviceId}\u0000${p.anomaly.metric}`;
-    const list = groups.get(key);
-    if (list) list.push(p);
-    else groups.set(key, [p]);
+  const specs: LaneSpec[] = [];
+  if (!input.grouped) {
+    for (const [key, members] of group(placed, (p) => signalKey(p.anomaly))) {
+      specs.push({ key, kind: 'device', members });
+    }
+  } else {
+    for (const [zone, members] of group(placed, (p) => zoneOf(p.anomaly.deviceId))) {
+      specs.push({ key: zone, kind: 'group', members, zone });
+      if (input.expanded?.has(zone)) {
+        for (const [key, inner] of group(members, (p) => signalKey(p.anomaly))) {
+          specs.push({ key: `${zone}/${key}`, kind: 'device', members: inner, zone });
+        }
+      }
+    }
   }
-  const keys = [...groups.keys()].slice(0, LANE_MAX);
+  const shown = specs.slice(0, LANE_MAX);
 
-  const laneHeight = input.grouped ? GROUP_LANE : DEVICE_LANE;
-  const lanesBottom = RULER_HEIGHT + keys.length * laneHeight;
-  const hasAlerts = input.expected?.available === true && input.expected.alerts.length > 0;
-  const height = lanesBottom + (hasAlerts ? ALERTS_LANE : 0) + BOTTOM;
+  const deviceLane = input.laneHeight ?? DEVICE_LANE;
+  const heightOf = (spec: LaneSpec) => (spec.kind === 'group' ? GROUP_LANE : deviceLane);
+  const lanesBottom = shown.reduce((y, spec) => y + heightOf(spec), RULER_HEIGHT);
+  const alertCount = input.expected?.available === true ? input.expected.alerts.length : 0;
+  const alertsHeight =
+    alertCount === 0 ? 0 : input.alertRows ? alertRowsHeight(alertCount) : ALERTS_LANE;
+  const height = lanesBottom + alertsHeight + BOTTOM;
 
   const axis = timeAxis(horizonS, 0, {
     left: LEFT,
@@ -272,24 +402,29 @@ export function buildDock(input: DockInput): DockModel {
     bottom: height,
   });
 
-  const lanes = keys.map((key, row): DockLane => {
-    const members = groups.get(key)!;
+  let y = RULER_HEIGHT;
+  const lanes = shown.map((spec): DockLane => {
+    const { members } = spec;
     const first = members[0]!.anomaly;
-    const y = RULER_HEIGHT + row * laneHeight;
-    if (!input.grouped) {
+    const laneHeight = heightOf(spec);
+    const top = y;
+    y += laneHeight;
+    const zoneField = spec.zone === undefined ? {} : { zone: spec.zone };
+    if (spec.kind === 'device') {
       const device = input.devices.find((d) => d.id === first.deviceId);
       return {
-        key,
+        key: spec.key,
         kind: 'device',
         label: first.deviceId,
         sub: first.metric,
         shape: kindIdentity(device?.kind ?? '').shape,
-        y,
+        y: top,
         height: laneHeight,
-        blocks: members.map((m) => blockOf(m, axis)),
+        blocks: members.map((m) => blockOf(m, axis, selectedId)),
         bars: [],
-        curve: curveOf(first, input, axis, y + 8, y + laneHeight - 8),
+        curve: curveOf(first, members, input, axis, top + 8, top + laneHeight - 8),
         span: null,
+        ...zoneField,
       };
     }
     const devicesIn = new Set(members.map((m) => m.anomaly.deviceId));
@@ -305,32 +440,37 @@ export function buildDock(input: DockInput): DockModel {
       return {
         x,
         width: Math.max(2, round1(xOf(axis, end(m.anomaly)) - x)),
-        y: round1(y + 4 + i * step),
+        y: round1(top + 4 + i * step),
         height: barHeight,
         pending: m.pending,
         title: `${m.anomaly.deviceId} ${m.anomaly.metric} ${m.anomaly.value} from ${seconds(m.anomaly.startAt)} for ${seconds(m.anomaly.duration)}`,
+        ...(m.id === undefined ? {} : { id: m.id, selected: m.id === selectedId }),
       };
     });
     const startAll = Math.min(...members.map((m) => m.anomaly.startAt));
     const endAll = Math.max(...members.map((m) => end(m.anomaly)));
     return {
-      key,
+      key: spec.key,
       kind: 'group',
-      label: key,
+      label: spec.key,
       sub: `${devicesIn.size} ${devicesIn.size === 1 ? 'device' : 'devices'}${metrics.size === 1 ? ` · ${[...metrics][0]}` : ''}`,
       shape: null,
-      y,
+      y: top,
       height: laneHeight,
       blocks: [],
       bars,
       curve: null,
       span: { text: `${round1(startAll)}–${round1(endAll)} s`, x: xOf(axis, endAll) + 8 },
+      ...zoneField,
+      ...(input.expanded === undefined
+        ? {}
+        : { expandable: true, expanded: input.expanded.has(spec.key) }),
     };
   });
 
   const alerts =
     input.expected?.available === true
-      ? alertsLane(input.expected.alerts, axis, horizonS, lanesBottom)
+      ? alertsLane(input.expected.alerts, axis, horizonS, lanesBottom, input.alertRows === true)
       : null;
   const alertsNote = alerts !== null ? null : alertsNoteOf(input.expected);
 
@@ -339,7 +479,7 @@ export function buildDock(input: DockInput): DockModel {
   const description =
     placed.length === 0
       ? 'The timeline is empty.'
-      : `Timeline of ${Math.round(axis.maxS)} seconds: ${placed.length} ${placed.length === 1 ? 'anomaly' : 'anomalies'} on ${devicesCount} ${devicesCount === 1 ? 'device' : 'devices'}${input.grouped ? ` in ${keys.length} ${keys.length === 1 ? 'group' : 'groups'}` : ''}.${
+      : `Timeline of ${Math.round(axis.maxS)} seconds: ${placed.length} ${placed.length === 1 ? 'anomaly' : 'anomalies'} on ${devicesCount} ${devicesCount === 1 ? 'device' : 'devices'}${input.grouped ? ` in ${shown.filter((spec) => spec.kind === 'group').length} ${shown.filter((spec) => spec.kind === 'group').length === 1 ? 'group' : 'groups'}` : ''}.${
           alerts === null
             ? ''
             : ` ${alerts.label}${alerts.summary === null ? '' : `, ${alerts.summary}`}.`
