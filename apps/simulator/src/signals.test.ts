@@ -39,6 +39,42 @@ describe('parseAnomaly', () => {
   it('rejects malformed specs', () => {
     assert.throws(() => parseAnomaly('dc-env-01:temperature_c:hot'), /Invalid anomaly/);
   });
+
+  it('reads an optional sixth field as the shape', () => {
+    for (const shape of ['step', 'ramp', 'spike'] as const) {
+      assert.deepEqual(parseAnomaly(`dc-env-01:temperature_c:29.5:20:60:${shape}`), {
+        deviceId: 'dc-env-01',
+        metric: 'temperature_c',
+        value: 29.5,
+        startAt: 20,
+        duration: 60,
+        shape,
+      });
+    }
+  });
+
+  it('keeps the meaning of a five-field spec: a step with no shape', () => {
+    assert.equal('shape' in parseAnomaly('dc-env-01:temperature_c:29.5:20:60'), false);
+  });
+
+  it('refuses an unknown or empty shape and a seventh field, naming the shapes', () => {
+    assert.throws(
+      () => parseAnomaly('dc-env-01:temperature_c:29.5:20:60:wave'),
+      /shape must be one of step, ramp, spike/,
+    );
+    assert.throws(
+      () => parseAnomaly('dc-env-01:temperature_c:29.5:20:60:'),
+      /shape must be one of/,
+    );
+    assert.throws(
+      () => parseAnomaly('dc-env-01:temperature_c:29.5:20:60:ramp:extra'),
+      /Invalid anomaly/,
+    );
+  });
+
+  it('refuses a spec with fewer than five fields', () => {
+    assert.throws(() => parseAnomaly('dc-env-01:temperature_c:29.5:20'), /Invalid anomaly/);
+  });
 });
 
 describe('sample', () => {

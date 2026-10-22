@@ -63,3 +63,28 @@ export function createShortcuts(
     return null;
   };
 }
+
+/**
+ * The timeline editor's own shortcut: a plain `A` adds an anomaly (the brief's "`A` add anomaly in the editor"). It belongs
+ * to that page, which listens for it while it is open, not to the shell. Like every single-key shortcut it is ignored in a field
+ * and with a modifier held. `g` then `a` is the shell's "go to Alerts", so an `A` within a second of a `g` is not this one.
+ */
+export function createAddAnomalyShortcut(
+  options: { now?: () => number; goWindowMs?: number } = {},
+): (event: KeyEventLike) => boolean {
+  const now = options.now ?? Date.now;
+  const goWindowMs = options.goWindowMs ?? 1000;
+  let goPressedAt: number | null = null;
+
+  return (event) => {
+    const at = now();
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    if (event.metaKey || event.ctrlKey || event.altKey || isEditableTarget(event.target)) {
+      goPressedAt = null;
+      return false;
+    }
+    const afterGo = goPressedAt !== null && at - goPressedAt <= goWindowMs;
+    goPressedAt = key === 'g' ? at : null;
+    return key === 'a' && !afterGo;
+  };
+}

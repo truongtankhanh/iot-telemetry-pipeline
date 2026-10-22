@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import scenariosFixture from '../../api/fixtures/scenarios.json';
 import { stateViewFixture } from '../../api/fixtures/stateView';
@@ -26,6 +27,7 @@ function commands(overrides: Partial<ScenarioCommands> = {}): ScenarioCommands {
     confirmReplace: vi.fn(async () => {}),
     cancelReplace: vi.fn(),
     stop: vi.fn(async () => {}),
+    remove: vi.fn(async () => {}),
     importFile: vi.fn(async () => {}),
     ...overrides,
   };
@@ -33,7 +35,12 @@ function commands(overrides: Partial<ScenarioCommands> = {}): ScenarioCommands {
 
 function renderCard(
   item: ScenarioItem,
-  options: { commands?: ScenarioCommands; selected?: boolean; running?: boolean } = {},
+  options: {
+    commands?: ScenarioCommands;
+    selected?: boolean;
+    running?: boolean;
+    onDelete?: (name: string) => void;
+  } = {},
 ) {
   const view = structuredClone(stateViewFixture);
   if (options.running) {
@@ -54,15 +61,18 @@ function renderCard(
   store.getState().setView(view, 1);
   const cmd = options.commands ?? commands();
   const result = render(
-    <StudioProvider store={store}>
-      <ScenarioCard
-        item={item}
-        rules={view.rules}
-        devices={view.devices}
-        selected={options.selected ?? false}
-        commands={cmd}
-      />
-    </StudioProvider>,
+    <MemoryRouter>
+      <StudioProvider store={store}>
+        <ScenarioCard
+          item={item}
+          rules={view.rules}
+          devices={view.devices}
+          selected={options.selected ?? false}
+          commands={cmd}
+          {...(options.onDelete === undefined ? {} : { onDelete: options.onDelete })}
+        />
+      </StudioProvider>
+    </MemoryRouter>,
   );
   return { ...result, commands: cmd };
 }
@@ -175,5 +185,90 @@ describe('ScenarioCard: accessibility', () => {
     idle.unmount();
     const running = renderCard(overheat, { running: true });
     expect(await axeViolations(running.container)).toEqual([]);
+  });
+});
+
+describe('ScenarioCard: the editor’s commands', () => {
+  it('leads a built-in to a copy, says why it cannot be edited, and offers no delete', () => {
+    renderCard(overheat, { onDelete: vi.fn() });
+    expect(
+      screen.getByRole('button', {
+        name: 'Edit server-room-overheat (built-in; duplicate it to change)',
+      }),
+    ).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Duplicate server-room-overheat' })).toHaveAttribute(
+      'href',
+      '/lab/timeline?duplicate=server-room-overheat',
+    );
+    expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Export server-room-overheat as JSON' }),
+    ).toBeEnabled();
+  });
+
+  it('leads a custom scenario to the editor, for editing and for a copy', () => {
+    renderCard(afternoon);
+    expect(screen.getByRole('link', { name: 'Edit bad-afternoon' })).toHaveAttribute(
+      'href',
+      '/lab/timeline?scenario=bad-afternoon',
+    );
+    expect(screen.getByRole('link', { name: 'Duplicate bad-afternoon' })).toHaveAttribute(
+      'href',
+      '/lab/timeline?duplicate=bad-afternoon',
+    );
+  });
+
+  it('asks the page to delete a custom scenario, and shows no Delete without a page that confirms', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    const { unmount } = renderCard(afternoon, { onDelete });
+    await user.click(screen.getByRole('button', { name: 'Delete bad-afternoon' }));
+    expect(onDelete).toHaveBeenCalledWith('bad-afternoon');
+    unmount();
+
+    renderCard(afternoon);
+    expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
+  });
+
+  it('cannot delete a scenario that is running, and says so', () => {
+    renderCard(afternoon, { running: true, onDelete: vi.fn() });
+    expect(
+      screen.getByRole('button', { name: 'Delete bad-afternoon (stop it first)' }),
+    ).toBeDisabled();
+  });
+
+  it('exports the document as a JSON file named after the scenario', async () => {
+    const user = userEvent.setup();
+    const blobs: Blob[] = [];
+    const names: string[] = [];
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return 'blob:studio/1';
+    });
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      names.push(this.download);
+    });
+    renderCard(afternoon);
+    await user.click(screen.getByRole('button', { name: 'Export bad-afternoon as JSON' }));
+    expect(names).toEqual(['bad-afternoon.json']);
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(blobs[0] as Blob);
+    });
+    expect(JSON.parse(text)).toEqual({
+      name: afternoon.name,
+      description: afternoon.description,
+      anomalies: afternoon.anomalies,
+    });
+    expect(Object.keys(JSON.parse(text) as object)).toEqual(['name', 'description', 'anomalies']);
+  });
+
+  it('has no accessibility violation with the commands in place', async () => {
+    const { container } = renderCard(afternoon, { onDelete: vi.fn() });
+    expect(await axeViolations(container)).toEqual([]);
   });
 });

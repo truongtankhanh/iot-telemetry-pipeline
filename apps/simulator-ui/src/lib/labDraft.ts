@@ -4,7 +4,8 @@ import { seconds } from './scenarioExpectation';
 /**
  * The Lab's timeline draft: the faults added with _Add to timeline_, kept in the page until they are injected together
  * (decision D4: page state; leaving the Lab drops it). Times are seconds from the moment the timeline is injected, the
- * same "from now" the form uses. Saving a draft as a scenario is the editor's (SIM-11), not this file's.
+ * same "from now" the form uses. Saving a draft as a scenario is the editor's (SIM-11): the dock's link to it hands the
+ * draft over as a new scenario that is not saved yet (`Lab.tsx`).
  */
 
 export interface DraftEntry {

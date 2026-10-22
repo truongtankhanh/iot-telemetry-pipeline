@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { DeviceInfo, RulesView, ScenarioItem } from '../../api/types';
 import { paginate } from '../../lib/fleetQuery';
 import { SCENARIO_SIZES, type ScenarioSortKey } from '../../lib/scenarioQuery';
@@ -14,6 +14,8 @@ import { toneIcons } from '../../ui/icons';
 import { PageHeader } from '../../ui/PageHeader';
 import { Pager } from '../../ui/Pager';
 import { tabId } from '../../ui/tabId';
+import { DeleteDialog } from './DeleteDialog';
+import { NewScenarioCard } from './NewScenarioCard';
 import { ReplaceDialog } from './ReplaceDialog';
 import { ScenarioCard } from './ScenarioCard';
 import styles from './scenarios.module.css';
@@ -45,8 +47,9 @@ const SORT_NOTES: Record<ScenarioSortKey, string> = {
  * no copy of either.
  *
  * Running a scenario over something that is already playing on its devices is asked about first (the simulator says what
- * is in the way). Importing is a file picker; a scenario the simulator refuses is told with its reason. Edit,
- * Duplicate and New scenario belong to the editor (SIM-11) and are not here.
+ * is in the way). Importing is a file picker; a scenario the simulator refuses is told with its reason. Each card also leads
+ * to the editor (Edit, Duplicate), exports its JSON and, for a custom scenario that is not playing, deletes it after asking; the
+ * dashed card that ends the list starts a new scenario.
  */
 export function Scenarios() {
   const hasView = useStudio((state) => state.view !== null);
@@ -62,6 +65,8 @@ export function Scenarios() {
     [update],
   );
   const commands = useScenarioCommands({ onChanged: library.refresh, onImported });
+  // The custom scenario the person asked to delete, until they confirm or cancel.
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const items = library.library?.scenarios ?? NO_ITEMS;
   const result = useMemo(() => applyScenarioQuery(items, query), [items, query]);
@@ -213,6 +218,7 @@ export function Scenarios() {
         ) : items.length === 0 ? (
           <div className={styles.empty} role="status">
             The library is empty: no scenario could be read.
+            <NewScenarioCard />
           </div>
         ) : result.rows.length === 0 ? (
           <div className={styles.empty} role="status">
@@ -232,8 +238,10 @@ export function Scenarios() {
                   devices={devices}
                   selected={item.name === pointed}
                   commands={commands}
+                  onDelete={setDeleting}
                 />
               ))}
+              {page.page >= page.pageCount ? <NewScenarioCard /> : null}
             </div>
             <Pager
               page={page.page}
@@ -257,6 +265,16 @@ export function Scenarios() {
           busy={commands.isBusy(commands.pending.name, 'run')}
           onConfirm={() => void commands.confirmReplace()}
           onCancel={commands.cancelReplace}
+        />
+      )}
+
+      {deleting === null ? null : (
+        <DeleteDialog
+          name={deleting}
+          busy={commands.isBusy(deleting, 'delete')}
+          returnLabel={`Delete ${deleting}`}
+          onConfirm={() => void commands.remove(deleting).then(() => setDeleting(null))}
+          onCancel={() => setDeleting(null)}
         />
       )}
     </div>

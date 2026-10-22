@@ -49,20 +49,42 @@ export interface Anomaly {
   shape?: AnomalyShape;
 }
 
-/** Parses `device:metric:value:startAt:duration`, e.g. `dc-env-01:temperature_c:29.5:20:60`. */
+/**
+ * Parses `device:metric:value:startAt:duration[:shape]`, e.g. `dc-env-01:temperature_c:29.5:20:60` or
+ * `dc-env-01:temperature_c:29.5:20:60:ramp`. Without the sixth field the anomaly is a step, as it always was.
+ * It checks the shape of the text and that the numbers are finite; whether the device or the value fit is the
+ * engine's (`addAnomaly`) or the scenario validator's business, not this function's.
+ */
 export function parseAnomaly(text: string): Anomaly {
-  const [deviceId, metric, value, startAt, duration] = text.split(':');
+  const usage = 'expected device:metric:value:startAt:duration[:shape]';
+  const parts = text.split(':');
+  const [deviceId, metric, value, startAt, duration, shape] = parts;
   const numbers = [value, startAt, duration].map(Number);
-  if (!deviceId || !metric || numbers.some((n) => !Number.isFinite(n))) {
-    throw new Error(`Invalid anomaly "${text}" — expected device:metric:value:startAt:duration`);
+  if (
+    parts.length < 5 ||
+    parts.length > 6 ||
+    !deviceId ||
+    !metric ||
+    numbers.some((n) => !Number.isFinite(n))
+  ) {
+    throw new Error(`Invalid anomaly "${text}" — ${usage}`);
   }
-  return {
+  const anomaly: Anomaly = {
     deviceId,
     metric: metric as MetricName,
     value: numbers[0]!,
     startAt: numbers[1]!,
     duration: numbers[2]!,
   };
+  if (shape !== undefined) {
+    if (!ANOMALY_SHAPES.includes(shape as AnomalyShape)) {
+      throw new Error(
+        `Invalid anomaly "${text}" — the shape must be one of ${ANOMALY_SHAPES.join(', ')}`,
+      );
+    }
+    anomaly.shape = shape as AnomalyShape;
+  }
+  return anomaly;
 }
 
 function profileOf(device: DeviceSpec, metric: MetricName): Profile {

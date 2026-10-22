@@ -186,11 +186,12 @@ export function toAnomalies(scenario: ScenarioDocument): Anomaly[] {
 }
 
 /**
- * The `--anomaly` flag (`device:metric:value:startAt:duration`) for an anomaly, or `undefined` when the flag
- * cannot say it: it has no field for a shape, so a `ramp` or a `spike` has no flag.
+ * The `--anomaly` flag (`device:metric:value:startAt:duration[:shape]`) for an anomaly. A step, with or without a
+ * `shape`, is written with five fields (the flag's default); `ramp` and `spike` add the sixth, so every valid
+ * scenario document can be played from the command line.
  */
-export function toAnomalyFlag(anomaly: Anomaly): string | undefined {
-  if (anomaly.shape !== undefined && anomaly.shape !== 'step') return undefined;
-  const { deviceId, metric, value, startAt, duration } = anomaly;
-  return `${deviceId}:${metric}:${value}:${startAt}:${duration}`;
+export function toAnomalyFlag(anomaly: Anomaly): string {
+  const { deviceId, metric, value, startAt, duration, shape } = anomaly;
+  const flag = `${deviceId}:${metric}:${value}:${startAt}:${duration}`;
+  return shape === undefined || shape === 'step' ? flag : `${flag}:${shape}`;
 }

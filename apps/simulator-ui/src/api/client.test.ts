@@ -8,6 +8,7 @@ import {
   addAnomaly,
   ApiError,
   conflictsOf,
+  deleteScenario,
   getAlerts,
   getExpected,
   getObservations,
@@ -20,6 +21,7 @@ import {
   removeAnomaly,
   resetEngine,
   runScenario,
+  saveScenario,
   setDeviceInterval,
   startDevice,
   stepEngine,
@@ -704,6 +706,83 @@ describe('scenarios', () => {
         (e: unknown) => e,
       );
       expect((failure as ApiError).message).toMatch(/does not understand/);
+    });
+  });
+
+  describe('saveScenario', () => {
+    const document = {
+      name: 'bad-afternoon',
+      description: '',
+      anomalies: [
+        { deviceId: 'dc-env-01', metric: 'temperature_c', value: 29.2, startAt: 45, duration: 60 },
+      ],
+    };
+
+    it('puts the document as it is on the path of its own name and answers the state and the card', async () => {
+      const fetchFn = reply({ ...view, scenario: item }, { status: 201 });
+      const result = await saveScenario(document, { fetch: asFetch(fetchFn) });
+      expect(result.scenario.name).toBe('server-room-overheat');
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/scenarios/bad-afternoon',
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(document),
+      });
+    });
+
+    it('encodes a name in the path', async () => {
+      const fetchFn = reply({ ...view, scenario: item });
+      await saveScenario({ ...document, name: 'a/b' }, { fetch: asFetch(fetchFn) });
+      expect(sent(fetchFn).url).toBe('/api/scenarios/a%2Fb');
+    });
+
+    it('carries the status and the reason of each refusal', async () => {
+      for (const [status, reason] of [
+        [400, 'anomalies[0].value 900 is outside the range of temperature_c (-40 to 85 °C)'],
+        [409, '"bad-afternoon" is running; stop it first'],
+        [409, '"overheat" is a built-in scenario and is read-only; save a copy under another name'],
+        [500, 'cannot write bad-afternoon.json in the scenarios folder (EROFS)'],
+      ] as const) {
+        const failure = await saveScenario(document, {
+          fetch: asFetch(refusal(status, reason)),
+        }).catch((e: unknown) => e);
+        expect(failure).toBeInstanceOf(ApiError);
+        expect((failure as ApiError).status).toBe(status);
+        expect((failure as ApiError).message).toBe(reason);
+      }
+    });
+
+    it('fails loudly on an answer without the scenario', async () => {
+      const failure = await saveScenario(document, { fetch: asFetch(reply(view)) }).catch(
+        (e: unknown) => e,
+      );
+      expect((failure as ApiError).message).toMatch(/does not understand/);
+    });
+  });
+
+  describe('deleteScenario', () => {
+    it('is a DELETE with no body, as JSON, and answers the new state', async () => {
+      const fetchFn = reply(view);
+      expect(await deleteScenario('bad-afternoon', { fetch: asFetch(fetchFn) })).toEqual(view);
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/scenarios/bad-afternoon',
+        method: 'DELETE',
+        headers: JSON_HEADERS,
+        body: undefined,
+      });
+    });
+
+    it('says what the simulator said when the scenario cannot be removed', async () => {
+      for (const [status, reason] of [
+        [404, 'Unknown scenario "x"'],
+        [409, '"x" is running; stop it first'],
+      ] as const) {
+        const failure = await deleteScenario('x', {
+          fetch: asFetch(refusal(status, reason)),
+        }).catch((e: unknown) => e);
+        expect((failure as ApiError).status).toBe(status);
+        expect((failure as ApiError).message).toBe(reason);
+      }
     });
   });
 

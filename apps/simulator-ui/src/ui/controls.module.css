@@ -159,3 +159,87 @@
 .item:hover {
   background: rgba(71, 215, 255, 0.1);
 }
+
+/* ---- the switch: a native checkbox (role switch) drawn as a track and a thumb ---- */
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.switch[data-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Visually hidden, still the focus target. */
+.switchInput {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 36px;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.switchTrack {
+  flex: none;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-0);
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition:
+    transform 0.12s,
+    background 0.12s;
+}
+
+.switchInput:checked + .switchTrack {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switchInput:checked + .switchTrack .switchThumb {
+  transform: translateX(16px);
+  background: var(--accent-ink);
+}
+
+.switchInput:focus-visible + .switchTrack {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.switch:hover:not([data-disabled='true']) .switchText {
+  color: var(--text-primary);
+}
+
+.switchText {
+  line-height: 1.2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switchTrack,
+  .switchThumb {
+    transition: none;
+  }
+}

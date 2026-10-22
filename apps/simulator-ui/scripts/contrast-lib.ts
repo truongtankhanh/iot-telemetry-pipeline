@@ -172,6 +172,10 @@ export const PAIRS: Pair[] = [
   { fg: '--accent-ink', bg: '--accent', min: TEXT },
   // The Lab's playhead pill: the time in dark ink on the flow colour.
   { fg: '--accent-ink', bg: '--flow', min: TEXT },
+  // The timeline editor: the lit core of a line and the grips of the selected block against the card, and the primary text
+  // on the tile of the chosen shape (the accent tint over the card).
+  ...cross(['--flow-core', '--warn-core'], ['--surface-0', '--surface-1'], UI),
+  { fg: '--text-primary', bg: '--accent-soft', over: '--surface-1', min: TEXT },
   // Boundaries that carry meaning (an input, a selected option).
   ...cross(['--border-strong'], ['--surface-0', '--surface-1'], UI),
 ];

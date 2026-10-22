@@ -13,8 +13,11 @@ import { sanitizeLabQuery } from '../../lib/labQuery';
 import { resolveTargets } from '../../lib/labTargets';
 import { barProgress, CUSTOM_PICK } from '../../lib/labTimeline';
 import { seconds } from '../../lib/scenarioExpectation';
+import { fromAnomalies } from '../../lib/timelineEditor';
 import { formatClockTime } from '../../lib/time';
 import { LabSwitcher } from '../../shell/LabSwitcher';
+import { draftKey } from '../../state/editorDrafts';
+import { useEditorDrafts } from '../../state/editorDraftsContext';
 import { useNow } from '../../state/useNow';
 import { useStudio } from '../../state/studioContext';
 import { Button } from '../../ui/Button';
@@ -74,6 +77,7 @@ export function Lab() {
   const injection = useInjection();
   const impact = useExpectedImpact(fault.plan.anomalies);
   const controls = useSimulationControls();
+  const drafts = useEditorDrafts();
 
   // What the bar and the dock follow: the page's own timeline ("Custom fault") or a scenario of the library.
   const [pick, setPick] = useState(CUSTOM_PICK);
@@ -93,6 +97,13 @@ export function Lab() {
     } else {
       setDraftNotice({ tone: 'bad', text: result.reason });
     }
+  };
+
+  // The link to the timeline editor takes the page's own timeline with it, as a new scenario that is not saved yet. A new
+  // scenario that was already being edited there is replaced: the person asked for this one.
+  const openEditor = () => {
+    if (draft.length === 0) return;
+    drafts.set(draftKey.new, { doc: fromAnomalies(draftAnomalies(draft)), base: null });
   };
 
   const scenarioItem =
@@ -298,6 +309,7 @@ export function Lab() {
         busy={progress.running}
         onInject={() => void injection.injectTimeline(timeline)}
         onClear={() => setDraft(EMPTY_DRAFT)}
+        {...(custom ? { onOpenEditor: openEditor } : {})}
       />
     </div>
   );

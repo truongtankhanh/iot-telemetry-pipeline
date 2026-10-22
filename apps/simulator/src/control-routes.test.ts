@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { describe, it } from 'node:test';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { after, describe, it } from 'node:test';
 import { AlertObserver, type IngestAlert } from './alert-observer.ts';
 import { BrokerLink } from './broker-link.ts';
 import { systemClock } from './clock.ts';
@@ -22,8 +32,9 @@ import {
 } from './observation-store.ts';
 import { type RulesView, rulesUnavailable } from './rules-source.ts';
 import type { ScenarioDocument } from './scenario-document.ts';
-import { ScenarioLibrary } from './scenario-library.ts';
+import { loadScenarioFolder, ScenarioLibrary } from './scenario-library.ts';
 import { ScenarioRuns } from './scenario-runs.ts';
+import { FolderScenarioStore, type ScenarioStore, serializeScenario } from './scenario-store.ts';
 import type { DeviceSpec } from './signals.ts';
 import { DEVICES, setupEngine, T0 } from './test-support.ts';
 
@@ -94,9 +105,22 @@ const INGEST = {
 
 /** The routes over an engine on a manual clock, started, with the engine's pieces to look at. */
 async function setup(
-  options: { started?: boolean; wallClock?: boolean; rules?: RulesView; broken?: boolean } = {},
+  options: {
+    started?: boolean;
+    wallClock?: boolean;
+    rules?: RulesView;
+    broken?: boolean;
+    /** Where the library saves scenarios; without it the library cannot save. */
+    scenarioStore?: ScenarioStore;
+  } = {},
 ) {
-  const { started = true, wallClock = false, rules = RULES, broken = false } = options;
+  const {
+    started = true,
+    wallClock = false,
+    rules = RULES,
+    broken = false,
+    scenarioStore,
+  } = options;
   const { engine, publisher } = setupEngine(wallClock ? { clock: systemClock } : {});
   if (started && !wallClock) await engine.start();
   const store = new ObservationStore();
@@ -105,6 +129,7 @@ async function setup(
   const library = new ScenarioLibrary({
     builtIn: broken ? [OVERHEAT, BOTH, BROKEN] : [OVERHEAT, BOTH],
     devices: broken ? [...DEVICES, GHOST] : DEVICES,
+    ...(scenarioStore ? { store: scenarioStore } : {}),
   });
   const runs = new ScenarioRuns({
     engine,
@@ -1018,6 +1043,245 @@ describe('POST /api/scenarios/import', () => {
       409,
       /already exists/,
     );
+  });
+});
+
+const scenarioRoot = mkdtempSync(join(tmpdir(), 'control-routes-scenarios-'));
+after(() => rmSync(scenarioRoot, { recursive: true, force: true }));
+let scenarioFolders = 0;
+/** The path of a folder for one case; it does not exist yet. */
+const newScenarioFolder = () => join(scenarioRoot, `case-${scenarioFolders++}`);
+
+describe('PUT and DELETE /api/scenarios/:name', () => {
+  const hot: ScenarioDocument = {
+    name: 'hot',
+    description: 'Row B runs hot too.',
+    anomalies: [
+      { deviceId: 'dc-env-02', metric: 'temperature_c', value: 30, startAt: 5, duration: 20 },
+    ],
+  };
+  const put = (call: Awaited<ReturnType<typeof setup>>['call'], name: string, body?: unknown) =>
+    call('PUT', `/api/scenarios/${name}`, body);
+  const del = (call: Awaited<ReturnType<typeof setup>>['call'], name: string) =>
+    call('DELETE', `/api/scenarios/${name}`);
+
+  /** The routes with a library that saves into a folder of its own. */
+  async function withFolder() {
+    const dir = newScenarioFolder();
+    const harness = await setup({ scenarioStore: new FolderScenarioStore(dir) });
+    return { ...harness, dir };
+  }
+
+  it('saves a new scenario as a file, answers with its card, and what is saved runs as drawn', async () => {
+    const { call, engine, recorded, dir } = await withFolder();
+
+    const response = await put(call, 'hot', hot);
+
+    assert.equal(response.status, 201);
+    const card = (response.body as { scenario: Item }).scenario;
+    assert.equal(card.name, 'hot');
+    assert.equal(card.source, 'custom');
+    assert.equal(card.imported, false);
+    assert.deepEqual(
+      card.expected.alerts?.map((a) => [a.deviceId, a.opensAtS, a.clearsAtS]),
+      [['dc-env-02', 10, 26]],
+    );
+    assert.deepEqual(view(response).scenarios, ['overheat', 'both', 'hot']);
+    assert.equal(readFileSync(join(dir, 'hot.json'), 'utf8'), serializeScenario(hot));
+
+    assert.equal((await post(call, '/api/scenarios/hot/run')).status, 200);
+    assert.deepEqual(
+      engine.snapshot().anomalies.map((a) => a.anomaly),
+      hot.anomalies,
+    );
+    // A save is not an event of the system under test (decision Q6): nothing is recorded for it.
+    assert.deepEqual(
+      recorded.map((r) => r.kind),
+      ['scenario-run'],
+    );
+  });
+
+  it('is read back by a simulator that starts later: saved, reloaded, the same document', async () => {
+    const { call, dir } = await withFolder();
+    assert.equal((await put(call, 'hot', hot)).status, 201);
+
+    const reloaded = new ScenarioLibrary({
+      builtIn: [],
+      folder: loadScenarioFolder(dir, { devices: DEVICES }),
+      devices: DEVICES,
+    });
+    assert.deepEqual(reloaded.rejected, []);
+    assert.deepEqual(reloaded.get('hot')?.scenario, hot);
+    assert.equal(reloaded.get('hot')?.imported, false);
+  });
+
+  it('replaces a scenario with 200 and the new document, in the file it was in', async () => {
+    const { call, dir } = await withFolder();
+    assert.equal((await put(call, 'hot', hot)).status, 201);
+
+    const response = await put(call, 'hot', { ...hot, description: 'Changed.' });
+
+    assert.equal(response.status, 200);
+    assert.equal((response.body as { scenario: Item }).scenario.description, 'Changed.');
+    assert.deepEqual(view(response).scenarios, ['overheat', 'both', 'hot']);
+    assert.equal(JSON.parse(readFileSync(join(dir, 'hot.json'), 'utf8')).description, 'Changed.');
+    assert.deepEqual(readdirSync(dir), ['hot.json']);
+  });
+
+  it('turns an imported scenario into a file when it is saved', async () => {
+    const { call, dir } = await withFolder();
+    assert.equal((await post(call, '/api/scenarios/import', hot)).status, 201);
+    assert.equal(existsSync(dir), false);
+
+    const response = await put(call, 'hot', hot);
+
+    assert.equal(response.status, 200);
+    assert.equal((response.body as { scenario: Item }).scenario.imported, false);
+    assert.equal(existsSync(join(dir, 'hot.json')), true);
+  });
+
+  it('wants the name of the path in the body, and writes nothing otherwise', async () => {
+    const { call, dir } = await withFolder();
+    assertEnvelope(await put(call, 'hot', { ...hot, name: 'cold' }), 400, /must be "hot"/);
+    assertEnvelope(await put(call, 'hot'), 400, /must be "hot"/);
+    assertEnvelope(await put(call, 'hot', [hot]), 400, /must be a JSON object/);
+    assert.equal(existsSync(dir), false);
+  });
+
+  it('refuses an invalid document with the reason, and writes nothing', async () => {
+    const { call, dir } = await withFolder();
+    const tooHot = { ...hot, anomalies: [{ ...hot.anomalies[0], value: 900 }] };
+
+    assertEnvelope(
+      await put(call, 'hot', tooHot),
+      400,
+      /^anomalies\[0\]\.value 900 is outside the range of temperature_c \(-40 to 85 °C\)$/,
+    );
+    assertEnvelope(await put(call, 'import', { ...hot, name: 'import' }), 400, /reserved/);
+    assert.equal(existsSync(dir), false);
+    assert.deepEqual(view(await call('GET', '/api/state')).scenarios, ['overheat', 'both']);
+  });
+
+  it('cannot be made to write outside the folder with a name', async () => {
+    const { call, dir } = await withFolder();
+    for (const name of ['..%2Fescape', '..%2F..%2Fescape', 'a%2Fb', 'Upper', 'dot.json']) {
+      const decoded = decodeURIComponent(name);
+      assertEnvelope(await put(call, name, { ...hot, name: decoded }), 400, undefined);
+    }
+    assert.equal(existsSync(dir), false);
+    assert.equal(
+      readdirSync(scenarioRoot).some((entry) => entry.includes('escape')),
+      false,
+    );
+  });
+
+  it('refuses a built-in, for a save and for a delete', async () => {
+    const { call } = await withFolder();
+    assertEnvelope(
+      await put(call, 'overheat', OVERHEAT),
+      409,
+      /built-in scenario and is read-only/,
+    );
+    assertEnvelope(await del(call, 'overheat'), 409, /built-in scenario and is read-only/);
+    assert.deepEqual(view(await call('GET', '/api/state')).scenarios, ['overheat', 'both']);
+  });
+
+  it('refuses to change or remove a scenario that is running, until it is stopped', async () => {
+    const { call, dir } = await withFolder();
+    assert.equal((await put(call, 'hot', hot)).status, 201);
+    assert.equal((await post(call, '/api/scenarios/hot/run')).status, 200);
+
+    assertEnvelope(
+      await put(call, 'hot', { ...hot, description: 'x' }),
+      409,
+      /is running; stop it first/,
+    );
+    assertEnvelope(await del(call, 'hot'), 409, /is running; stop it first/);
+    assert.equal(
+      JSON.parse(readFileSync(join(dir, 'hot.json'), 'utf8')).description,
+      hot.description,
+    );
+
+    assert.equal((await post(call, '/api/scenarios/hot/stop')).status, 200);
+    assert.equal((await put(call, 'hot', { ...hot, description: 'x' })).status, 200);
+    assert.equal((await del(call, 'hot')).status, 200);
+    assert.equal(existsSync(join(dir, 'hot.json')), false);
+  });
+
+  it('refuses the 201st custom scenario and still replaces one of the 200', async () => {
+    const { call } = await withFolder();
+    for (let i = 0; i < 200; i++) {
+      assert.equal((await put(call, `s${i}`, { ...hot, name: `s${i}` })).status, 201, `s${i}`);
+    }
+    assertEnvelope(
+      await put(call, 'one-more', { ...hot, name: 'one-more' }),
+      409,
+      /already 200 custom scenarios/,
+    );
+    assert.equal((await put(call, 's7', { ...hot, name: 's7', description: 'again' })).status, 200);
+  });
+
+  it('does not overwrite a file in the folder that the library did not load', async () => {
+    const { call, dir } = await withFolder();
+    mkdirSync(dir);
+    writeFileSync(join(dir, 'hot.json'), '{ not json');
+
+    assertEnvelope(await put(call, 'hot', hot), 409, /already in the scenarios folder/);
+
+    assert.equal(readFileSync(join(dir, 'hot.json'), 'utf8'), '{ not json');
+    assert.deepEqual(view(await call('GET', '/api/state')).scenarios, ['overheat', 'both']);
+  });
+
+  it('says 500 with the reason when the folder cannot be written, and keeps the library as it was', async () => {
+    const dir = newScenarioFolder();
+    writeFileSync(dir, 'a file where the folder should be');
+    const { call } = await setup({ scenarioStore: new FolderScenarioStore(dir) });
+
+    assertEnvelope(
+      await put(call, 'hot', hot),
+      500,
+      /^cannot write hot\.json in the scenarios folder \([A-Z]+\)$/,
+    );
+
+    assert.deepEqual(view(await call('GET', '/api/state')).scenarios, ['overheat', 'both']);
+  });
+
+  it('says 500 when the simulator has no folder to save to', async () => {
+    const { call } = await setup();
+    assertEnvelope(await put(call, 'hot', hot), 500, /^no scenarios folder is in use$/);
+  });
+
+  it('deletes the file and the scenario, and 404s the second time', async () => {
+    const { call, dir } = await withFolder();
+    assert.equal((await put(call, 'hot', hot)).status, 201);
+
+    const response = await del(call, 'hot');
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(view(response).scenarios, ['overheat', 'both']);
+    assert.equal(existsSync(join(dir, 'hot.json')), false);
+    assertEnvelope(await del(call, 'hot'), 404, /Unknown scenario "hot"/);
+    assertEnvelope(await post(call, '/api/scenarios/hot/run'), 404);
+  });
+
+  it('deletes an imported scenario without touching the disk', async () => {
+    const { call, dir } = await withFolder();
+    assert.equal((await post(call, '/api/scenarios/import', hot)).status, 201);
+
+    const response = await del(call, 'hot');
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(view(response).scenarios, ['overheat', 'both']);
+    assert.equal(existsSync(dir), false);
+  });
+
+  it('lists PUT and DELETE as the methods of a scenario’s path', async () => {
+    const { call } = await setup();
+    for (const method of ['GET', 'POST']) {
+      const response = await call(method, '/api/scenarios/overheat');
+      assertEnvelope(response, 405);
+      assert.equal(response.headers?.Allow, 'PUT, DELETE', method);
+    }
   });
 });
 

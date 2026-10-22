@@ -1,0 +1,115 @@
+/* The head of the editor: breadcrumb, name and description on the left, the actions on the right. */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.crumb {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-page-title);
+  font-weight: 600;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  /* As the other pages' titles: the one place a page glows, at 24 px and up. */
+  background: linear-gradient(90deg, #e6fbff, #b9beff);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 8px rgba(149, 155, 255, 0.45));
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  max-width: 640px;
+}
+
+.label {
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.input {
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-2);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.help,
+.error {
+  grid-column: 2;
+  font-size: var(--fs-min);
+  color: var(--text-secondary);
+}
+
+.help[data-over='true'],
+.error {
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+}
+
+.why {
+  margin: 0;
+  max-width: 320px;
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}

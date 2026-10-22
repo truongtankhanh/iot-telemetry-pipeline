@@ -89,6 +89,8 @@ export interface FakeScenariosSimulator {
   failLibrary(error: { status: number; message: string } | null): void;
   /** Make every run answer with a refusal, or `null` for normal service again. */
   failRun(error: { status: number; message: string } | null): void;
+  /** Make every `DELETE` of a scenario answer with a refusal, or `null` for normal service again. */
+  failDelete(error: { status: number; message: string } | null): void;
   fetch: ReturnType<typeof vi.fn>;
 }
 
@@ -101,6 +103,7 @@ export function fakeScenariosSimulator(
   const conflicts = new Map<string, RunConflict[]>();
   let libraryFailure: { status: number; message: string } | null = null;
   let runFailure: { status: number; message: string } | null = null;
+  let deleteFailure: { status: number; message: string } | null = null;
   let nextRun = 1;
 
   const find = (name: string) => sim.library.scenarios.find((s) => s.name === name);
@@ -208,6 +211,32 @@ export function fakeScenariosSimulator(
     return respond(201, { ...sim.state, scenario: item });
   };
 
+  const remove = (name: string) => {
+    if (deleteFailure) {
+      return respond(
+        deleteFailure.status,
+        envelope(deleteFailure.status, 'Refused', deleteFailure.message),
+      );
+    }
+    const item = find(name);
+    if (!item) return respond(404, envelope(404, 'Not Found', `Unknown scenario "${name}"`));
+    if (item.source === 'built-in') {
+      return respond(
+        409,
+        envelope(409, 'Conflict', `"${name}" is a built-in scenario and is read-only`),
+      );
+    }
+    if (sim.state.runs.some((r) => r.scenario === name)) {
+      return respond(409, envelope(409, 'Conflict', `"${name}" is running; stop it first`));
+    }
+    sim.library = {
+      ...sim.library,
+      scenarios: sim.library.scenarios.filter((candidate) => candidate.name !== name),
+    };
+    sim.state = { ...sim.state, scenarios: sim.library.scenarios.map((s) => s.name) };
+    return respond(200, sim.state);
+  };
+
   const send = vi.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
     const path = new URL(url, 'http://localhost').pathname;
@@ -224,6 +253,8 @@ export function fakeScenariosSimulator(
         : respond(200, sim.library);
     }
     if (method === 'POST' && path === '/api/scenarios/import') return importScenario(body);
+    const one = /^\/api\/scenarios\/([^/]+)$/.exec(path);
+    if (method === 'DELETE' && one) return remove(decodeURIComponent(one[1] as string));
     const command = /^\/api\/scenarios\/([^/]+)\/(run|stop)$/.exec(path);
     if (method === 'POST' && command) {
       const name = decodeURIComponent(command[1] as string);
@@ -243,6 +274,9 @@ export function fakeScenariosSimulator(
     },
     failRun: (error) => {
       runFailure = error;
+    },
+    failDelete: (error) => {
+      deleteFailure = error;
     },
     fetch: send,
   };

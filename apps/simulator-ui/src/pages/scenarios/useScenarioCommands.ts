@@ -1,5 +1,11 @@
 import { useCallback, useState } from 'react';
-import { conflictsOf, importScenario, runScenario, stopScenario } from '../../api/client';
+import {
+  conflictsOf,
+  deleteScenario,
+  importScenario,
+  runScenario,
+  stopScenario,
+} from '../../api/client';
 import type { ImportAnswer, ReplacedRun, RunAnswer, RunConflict, StateView } from '../../api/types';
 import { nameList, startedNotice } from '../../lib/scenarioStart';
 import { useStudioStore } from '../../state/studioContext';
@@ -134,6 +140,22 @@ export function useScenarioCommands({ onChanged, onImported }: ScenarioCommandsO
     [store, track, onChanged],
   );
 
+  /** Removes a custom scenario and its file. The simulator refuses a built-in and a scenario that is running; its reason is shown on the card. */
+  const remove = useCallback(
+    (name: string) =>
+      track(`${name}:delete`, async () => {
+        try {
+          store.getState().setView(await deleteScenario(name), Date.now());
+          setErrors((was) => without(was, name));
+          setNotice({ tone: 'ok', text: `Deleted ${name}.` });
+        } catch (error) {
+          setErrors((was) => ({ ...was, [name]: message(error) }));
+        }
+        onChanged();
+      }),
+    [store, track, onChanged],
+  );
+
   const importFile = useCallback(
     (file: File) =>
       track('import', async () => {
@@ -165,7 +187,7 @@ export function useScenarioCommands({ onChanged, onImported }: ScenarioCommandsO
 
   return {
     /** True while a command of the scenario is on its way, or only `action` when given. */
-    isBusy: (name: string, action?: 'run' | 'stop') =>
+    isBusy: (name: string, action?: 'run' | 'stop' | 'delete') =>
       action === undefined
         ? [...busy].some((key) => key.startsWith(`${name}:`))
         : busy.has(`${name}:${action}`),
@@ -180,6 +202,7 @@ export function useScenarioCommands({ onChanged, onImported }: ScenarioCommandsO
     confirmReplace: () => (pending === null ? Promise.resolve() : runWith(pending.name, true)),
     cancelReplace: () => setPending(null),
     stop,
+    remove,
     importFile,
   };
 }

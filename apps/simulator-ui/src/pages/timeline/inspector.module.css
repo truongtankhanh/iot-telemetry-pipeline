@@ -1,0 +1,224 @@
+/* The editor's inspector, the threshold preview and the expected-alerts table. Tokens only; text 13 px or more. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.signal {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label,
+.shapes legend {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+}
+
+.input:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.input[data-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  outline: none;
+}
+
+.unit {
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+}
+
+.select {
+  height: 34px;
+  padding: 0 8px;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+}
+
+.select:focus-visible {
+  outline: none;
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.select[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.error,
+.hint {
+  margin: 0;
+  font-size: var(--fs-min);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.hint {
+  color: var(--text-tertiary);
+}
+
+/* Step, ramp, spike: three radio tiles. The radio is hidden; the tile has the focus ring and the mark. */
+.shapes {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.tile input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.tile:hover {
+  color: var(--text-primary);
+  border-color: var(--flow);
+}
+
+.tile[data-checked='true'] {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.tile:focus-within {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.glyph {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.raises {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.preview[data-stale='true'],
+.alerts[data-stale='true'] {
+  opacity: 0.6;
+}
+
+.previewLine {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.basis {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.notes {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}

@@ -15,6 +15,7 @@ import { IngestPoller } from './ingest-poller.ts';
 import { loadRules } from './rules-source.ts';
 import { toAnomalies } from './scenario-document.ts';
 import { loadScenarioFolder, ScenarioLibrary } from './scenario-library.ts';
+import { FolderScenarioStore } from './scenario-store.ts';
 import { BUILT_IN_SCENARIOS } from './scenarios.ts';
 import { type Anomaly, parseAnomaly } from './signals.ts';
 
@@ -26,8 +27,9 @@ const HELP = `Usage: node src/main.ts [options]
                         RULES_FILE, else ../ingest/config/rules.json); a file that cannot be
                         read is reported, not fatal
   --interval <ms>       publish interval per device (default 2000)
-  --anomaly <spec>      device:metric:value:startAt:duration, repeatable
-                        e.g. dc-env-01:temperature_c:29.5:20:60
+  --anomaly <spec>      device:metric:value:startAt:duration[:shape], repeatable; the shape is
+                        step (default), ramp or spike
+                        e.g. dc-env-01:temperature_c:29.5:20:60 or ...:29.5:20:60:ramp
   --scenario <name>     play a scenario from the start: ${BUILT_IN_SCENARIOS.map((s) => s.name).join(' | ')},
                         or a custom one from the scenarios folder (read with the control server)
   --duration <s>        stop after this many seconds (default: run until Ctrl+C)
@@ -116,10 +118,16 @@ function resolveClockMode(): boolean {
 const simulated = resolveClockMode();
 
 // The scenarios the simulator can play. The folder of custom ones is read only for the control server, which is
-// what lists and runs them; a document that does not fit this registry is reported, not played.
+// what lists and runs them, and the same folder is where it saves them (PUT and DELETE /api/scenarios/:name); a
+// document that does not fit this registry is reported, not played.
 const library = new ScenarioLibrary({
   builtIn: BUILT_IN_SCENARIOS,
-  ...(control ? { folder: loadScenarioFolder(control.scenariosDir, { devices }) } : {}),
+  ...(control
+    ? {
+        folder: loadScenarioFolder(control.scenariosDir, { devices }),
+        store: new FolderScenarioStore(control.scenariosDir),
+      }
+    : {}),
   devices,
 });
 
@@ -181,7 +189,7 @@ for (const a of anomalies) {
 const counts = library.counts();
 console.log(
   control
-    ? `Scenarios: ${counts.builtIn} built-in, ${counts.custom} custom from ${control.scenariosDir}`
+    ? `Scenarios: ${counts.builtIn} built-in, ${counts.custom} custom from ${control.scenariosDir} (saved there too)`
     : `Scenarios: ${counts.builtIn} built-in (custom ones are read only with the control server)`,
 );
 for (const rejected of library.rejected) {
