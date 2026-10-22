@@ -16,7 +16,13 @@ import { type ObservationStore, PAGE_MAX } from './observation-store.ts';
 import type { RulesView } from './rules-source.ts';
 import { lengthS, parseAnomalies, type ScenarioDocument } from './scenario-document.ts';
 import { type Expected, expectedAlerts, MAX_WALK_TICKS } from './scenario-expectations.ts';
-import type { LibraryEntry, RejectedScenario, ScenarioLibrary } from './scenario-library.ts';
+import type {
+  LibraryEntry,
+  RejectedScenario,
+  RemoveResult,
+  SaveResult,
+  ScenarioLibrary,
+} from './scenario-library.ts';
 import {
   ScenarioConflictError,
   type ReplacedRun,
@@ -323,6 +329,26 @@ function toErrorResponse(error: unknown): RouteResponse {
  * its own status: `404` for something that does not exist, `400` for a value that cannot be used,
  * `409` for a command the engine cannot run in its current mode.
  */
+/**
+ * How the control API says the library's refusals. A document that is wrong in itself (including one that would not fit a
+ * file) is `400`; a request that is right but meets the state of the library is `409`; a folder that cannot be written is
+ * the environment's fault, not the caller's, so `500` with the reason.
+ */
+const SAVE_STATUS: Record<Extract<SaveResult, { ok: false }>['kind'], number> = {
+  invalid: 400,
+  'too-large': 400,
+  'built-in': 409,
+  full: 409,
+  'file-exists': 409,
+  unwritable: 500,
+};
+
+const REMOVE_STATUS: Record<Extract<RemoveResult, { ok: false }>['kind'], number> = {
+  'not-found': 404,
+  'built-in': 409,
+  unwritable: 500,
+};
+
 export function createRoutes(context: RoutesContext) {
   const { engine } = context;
   const view = () => buildStateView(context);
@@ -559,6 +585,39 @@ export function createRoutes(context: RoutesContext) {
       status: 201,
       body: { scenario: scenarioItem(result.entry, engine.snapshot()), ...view() },
     };
+  });
+
+  // Saving writes `<name>.json` in the scenarios folder (the first command that changes the disk; see ADR-0011). The name
+  // is the path's and the document's at once, so that a URL never says one thing and the file another. A scenario that is
+  // running is not changed: runs are found by name, and a stop of a scenario that is gone would be a 404.
+  function refuseWhileRunning(name: string): void {
+    if (context.runs.active().some((run) => run.scenario === name)) {
+      throw new HttpError(409, `"${name}" is running; stop it first`);
+    }
+  }
+
+  on('PUT', '/api/scenarios/:name', ({ name }, request) => {
+    const body = bodyObject(request);
+    if (body.name !== name) {
+      throw new HttpError(
+        400,
+        `"name" in the body must be "${name}", the name in the path (a rename is a save under the new name, then a delete)`,
+      );
+    }
+    refuseWhileRunning(name);
+    const result = context.library.save(body);
+    if (!result.ok) throw new HttpError(SAVE_STATUS[result.kind], result.reason);
+    return {
+      status: result.created ? 201 : 200,
+      body: { scenario: scenarioItem(result.entry, engine.snapshot()), ...view() },
+    };
+  });
+
+  on('DELETE', '/api/scenarios/:name', ({ name }) => {
+    refuseWhileRunning(name);
+    const result = context.library.remove(name);
+    if (!result.ok) throw new HttpError(REMOVE_STATUS[result.kind], result.reason);
+    return ok(view());
   });
 
   on('POST', '/api/scenarios/:name/run', ({ name }, request) => {

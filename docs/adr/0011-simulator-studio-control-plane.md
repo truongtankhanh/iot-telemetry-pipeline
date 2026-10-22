@@ -117,7 +117,7 @@ later tickets build on it and nobody has to infer it from the code:
   intervals. A device can have its own interval; the engine's applies otherwise.
 - **Held value.** Per device and metric, published exactly with no noise, and it wins over an anomaly on the same metric.
 - **Anomalies** can be added and removed while running; `startAt` is in seconds on the anomaly clock (since start or the last
-  Reset). Shapes: `step` (the existing one), `ramp` and `spike`. `--anomaly` still takes five fields and always means a step.
+  Reset). Shapes: `step` (the existing one), `ramp` and `spike`. `--anomaly` took five fields and always meant a step (SIM-11 added an optional sixth, the shape; see the amendment of 2026-10-22).
   Anomalies passed at construction (the CLI) are not validated; `addAnomaly` checks the device, the metric, the numbers and the
   shape.
 - **Failures.** The first tick's failure rejects `start()`, as the old loop's un-caught first tick did; a later failing tick is
@@ -569,3 +569,38 @@ adds no dependency and no route to the simulator: it uses `POST` and `DELETE /ap
   mechanism for the engine's run.
 - **Not checked by the tests** (jsdom computes no layout): the zones at 1920 px, the wall scale (`zoom`) with the viewport height, and the canvas
   filling its zone. They are a hand check, with the ticket's run against an ingest on `apps/simulator/fixtures/devices-100`.
+
+## Amendment, 2026-10-22: custom scenarios saved as files (SIM-11, simulator half)
+
+Brief, open question 3 asked where custom scenarios live; SIM-08 left them read-only (files read at start, imports in memory) and said SIM-11 could
+move the storage without changing the document. The timeline editor needs a save that survives a reload and a restart.
+
+- **Decision: files in `SCENARIOS_DIR`, written by the control API.** `PUT /api/scenarios/:name` creates or replaces `<name>.json` and
+  `DELETE /api/scenarios/:name` removes it, through the validator that guards import and the folder (`scenario-document.ts`), so the contract ranges
+  are checked before a scenario can be saved, not only before it runs. The document is unchanged; export is the file (or the card's data) and import
+  stays. Alternatives considered: **browser storage** (no simulator change, but invisible to git, to the CLI and to another browser, and the library
+  is empty after every simulator restart, so the page would re-import on load and race with taken names); **both** (write when the folder is
+  writable, else keep in memory: two states to explain, and a save that lasts "until restart" is the surprise the folder exists to avoid). The
+  mockups and the brief assume files. The constraint that forced the shape of the routes: a scenario is found and run by name, so a name is also a
+  file name, and the existing name pattern (lower-case letters, digits, hyphens; no dot or slash) makes that safe.
+- **Rules.** Only custom scenarios can be saved over or removed; a built-in answers `409` ("save a copy under another name"). A scenario that is
+  running answers `409` on save and on delete, because runs are keyed by name and a stop of a scenario that is gone would be a `404`. A rename is
+  not a route: save under the new name, then delete the old one. The 200-scenario cap counts new names. A save of an imported scenario writes it
+  to a file. A library entry now remembers its file (`LibraryEntry.file`), so a scenario read from `foo.json` that holds the name `bar` is saved
+  back to `foo.json`; otherwise the next start would find two files with one name and reject one.
+- **The write path** (`scenario-store.ts`) is the only code that writes a scenario file. It checks the serialized size against the 16 KiB limit
+  before touching the disk (a larger file is rejected at start, so a save that succeeded would make the scenario vanish at the next restart),
+  writes a temporary file and renames it, refuses a new file whose name exists on disk but was not loaded (a rejected file is somebody's data;
+  `409`), and refuses any name that is not a bare `*.json`. The library changes only after the write succeeded. A folder that cannot be written
+  answers `500` with the reason (`EROFS`, `EACCES`…): the request is valid, the environment is not.
+- **Security posture.** This is the first command of the control API that changes the disk (imports and runs only touch memory and the engine). The
+  API still has no authentication; it listens on loopback, sends no CORS header, wants `Content-Type: application/json` and checks `Host`
+  ([operations](../operations.md#security-posture)). What a caller can do is bounded: create, replace and delete `<valid-name>.json` files of at most
+  16 KiB, at most 200, in one folder. Nothing was hardened here, as the V1 scope says; the row of the table says what the API can now write.
+- **`--anomaly` gains an optional sixth field, the shape** (`device:metric:value:startAt:duration[:shape]`). Five fields mean what they always meant (a
+  step). With it every scenario document, including a `ramp` or a `spike`, has a command-line form, which closes the gap that the ticket allowed to be
+  "written down" instead. A sixth field that is not a shape, or a seventh field, is refused (a sixth used to be ignored).
+- **Not decided here, left as they were:** the folder is read once at start (a hand edit is seen after a restart); no observation is recorded for a
+  save or a delete (they are not events of the system under test); no route validates without saving (`POST /api/expectations` already refuses a bad
+  list of anomalies with the field named, and the save validates the whole document); the Compose and Kubernetes volume for the folder is not wired
+  (the README says to mount one).

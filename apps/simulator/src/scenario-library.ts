@@ -1,12 +1,17 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseScenarioDocument, type ScenarioDocument } from './scenario-document.ts';
+import {
+  MAX_SCENARIO_FILE_BYTES,
+  type ScenarioStore,
+  ScenarioStoreError,
+} from './scenario-store.ts';
 import type { DeviceSpec } from './signals.ts';
+
+export { MAX_SCENARIO_FILE_BYTES };
 
 /** Custom scenarios, from files and from imports together. */
 export const MAX_CUSTOM_SCENARIOS = 200;
-/** The largest scenario file read: the same bound as a request body of the control server (16 KB). */
-export const MAX_SCENARIO_FILE_BYTES = 16 * 1024;
 
 export type ScenarioSource = 'built-in' | 'custom';
 
@@ -15,6 +20,12 @@ export interface LibraryEntry {
   source: ScenarioSource;
   /** True for a custom scenario imported during this session: it is not in the folder and ends with the process. */
   imported: boolean;
+  /**
+   * The file in the scenarios folder that holds it: set for a scenario read from the folder (whatever the file is
+   * called: `foo.json` may hold the scenario `bar`) and for one saved to it. A save replaces and a removal deletes
+   * this file, so one name never ends up in two files.
+   */
+  file?: string;
 }
 
 /** A scenario that was not kept, and why. `file` is a file name, `built-in:<name>`, or the folder itself. */
@@ -96,6 +107,17 @@ export type ImportResult =
   | { ok: true; entry: LibraryEntry }
   | { ok: false; kind: 'invalid' | 'taken' | 'full'; reason: string };
 
+export type SaveResult =
+  | { ok: true; entry: LibraryEntry; created: boolean }
+  | {
+      ok: false;
+      kind: 'invalid' | 'built-in' | 'full' | 'too-large' | 'file-exists' | 'unwritable';
+      reason: string;
+    };
+
+export type RemoveResult =
+  { ok: true } | { ok: false; kind: 'not-found' | 'built-in' | 'unwritable'; reason: string };
+
 /**
  * Every scenario the simulator can run: the built-ins, the custom ones read from the folder at start, and the
  * ones imported during the session. Keyed by name in a `Map`, never in a plain object, because a name comes
@@ -109,12 +131,16 @@ export class ScenarioLibrary {
   readonly rejected: RejectedScenario[] = [];
   private readonly entries = new Map<string, LibraryEntry>();
   private readonly devices: readonly DeviceSpec[];
+  private readonly store: ScenarioStore | undefined;
 
   constructor(options: {
     builtIn: readonly ScenarioDocument[];
     folder?: FolderLoad;
     devices: readonly DeviceSpec[];
+    /** Where `save` and `remove` write; without it the library is read-only apart from imports. */
+    store?: ScenarioStore;
   }) {
+    this.store = options.store;
     this.devices = options.devices;
     for (const document of options.builtIn) {
       const result = parseScenarioDocument(document, { devices: options.devices });
@@ -138,7 +164,7 @@ export class ScenarioLibrary {
       if (this.entries.has(scenario.name)) {
         this.rejected.push({ file, reason: `the name "${scenario.name}" is already used` });
       } else {
-        this.entries.set(scenario.name, { scenario, source: 'custom', imported: false });
+        this.entries.set(scenario.name, { scenario, source: 'custom', imported: false, file });
       }
     }
   }
@@ -188,5 +214,93 @@ export class ScenarioLibrary {
     const entry: LibraryEntry = { scenario: result.scenario, source: 'custom', imported: true };
     this.entries.set(name, entry);
     return { ok: true, entry };
+  }
+
+  /**
+   * Validates a document with the same checks as a file and writes it to the scenarios folder, as a new scenario or
+   * in place of a custom one of the same name (an imported one becomes a file). The list changes only after the
+   * write succeeded, so a refusal leaves everything as it was. Refused when the document is invalid, when the name
+   * is a built-in's, when it would be the 201st custom scenario, when the file would be over the size limit, when
+   * the file name belongs to something the library did not load, or when the folder cannot be written.
+   */
+  save(input: unknown): SaveResult {
+    const result = parseScenarioDocument(input, { devices: this.devices });
+    if (!result.ok) return { ok: false, kind: 'invalid', reason: result.reason };
+    const { name } = result.scenario;
+
+    const existing = this.entries.get(name);
+    if (existing?.source === 'built-in') {
+      return {
+        ok: false,
+        kind: 'built-in',
+        reason: `"${name}" is a built-in scenario and is read-only; save a copy under another name`,
+      };
+    }
+    if (existing === undefined) {
+      const { custom, imported } = this.counts();
+      if (custom + imported >= MAX_CUSTOM_SCENARIOS) {
+        return {
+          ok: false,
+          kind: 'full',
+          reason: `there are already ${MAX_CUSTOM_SCENARIOS} custom scenarios`,
+        };
+      }
+    }
+    if (this.store === undefined) {
+      return { ok: false, kind: 'unwritable', reason: 'no scenarios folder is in use' };
+    }
+
+    // The file the name already has, so that one name is never in two files; else a new `<name>.json`. A name that
+    // passed the validator has no dot, slash or capital, so the file name cannot leave the folder.
+    const file = existing?.file ?? `${name}.json`;
+    try {
+      this.store.save(file, result.scenario, { replace: existing?.file !== undefined });
+    } catch (error) {
+      if (error instanceof ScenarioStoreError) {
+        return { ok: false, kind: error.kind, reason: error.message };
+      }
+      throw error;
+    }
+    const entry: LibraryEntry = {
+      scenario: result.scenario,
+      source: 'custom',
+      imported: false,
+      file,
+    };
+    this.entries.set(name, entry);
+    return { ok: true, entry, created: existing === undefined };
+  }
+
+  /**
+   * Removes a custom scenario: its file (when it has one) and then its entry. An imported scenario has no file and
+   * just ends. A built-in cannot be removed. If the file cannot be removed the entry stays.
+   */
+  remove(name: string): RemoveResult {
+    const entry = this.entries.get(name);
+    if (entry === undefined) {
+      return { ok: false, kind: 'not-found', reason: `Unknown scenario "${name}"` };
+    }
+    if (entry.source === 'built-in') {
+      return {
+        ok: false,
+        kind: 'built-in',
+        reason: `"${name}" is a built-in scenario and is read-only`,
+      };
+    }
+    if (entry.file !== undefined) {
+      if (this.store === undefined) {
+        return { ok: false, kind: 'unwritable', reason: 'no scenarios folder is in use' };
+      }
+      try {
+        this.store.remove(entry.file);
+      } catch (error) {
+        if (error instanceof ScenarioStoreError) {
+          return { ok: false, kind: 'unwritable', reason: error.message };
+        }
+        throw error;
+      }
+    }
+    this.entries.delete(name);
+    return { ok: true };
   }
 }

@@ -343,7 +343,9 @@ This follows the repository's V1 scope: it does not "fix" the anonymous broker o
 3. **Where custom scenarios live.** A JSON file under `apps/simulator/` (visible in git, easy to share) versus the
    browser. The mockups assume files; SIM-11 settles it. _For SIM-08 (2026-10-21):_ a read-only folder of `*.json` files
    (`SCENARIOS_DIR`, default `apps/simulator/scenarios`) read once at start, plus scenarios imported during the session, which
-   are kept in memory and written nowhere. SIM-11 may move the storage; the document does not change.
+   are kept in memory and written nowhere. SIM-11 may move the storage; the document does not change. _Settled in SIM-11 (2026-10-22):_ files in
+   `SCENARIOS_DIR`, written by `PUT` and `DELETE /api/scenarios/:name` (custom scenarios only, not while running); an import stays in memory
+   until it is saved. See [ADR-0011](../../adr/0011-simulator-studio-control-plane.md).
 4. **Benchmark in the same process.** It saturates the broker and the CPU. A child process keeps the UI responsive;
    SIM-15 decides.
 5. **Studio's port.** _Decided 2026-10-19: `3200`_ (`3100` ingest, `3000` Grafana, `9090` Prometheus, `5433`

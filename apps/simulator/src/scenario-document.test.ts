@@ -374,10 +374,10 @@ describe('toAnomalyFlag', () => {
     };
     const flag = toAnomalyFlag(original);
     assert.equal(flag, 'dc-env-01:temperature_c:29.2:20:60');
-    assert.deepEqual(parseAnomaly(flag!), original);
+    assert.deepEqual(parseAnomaly(flag), original);
   });
 
-  it('writes a flag for an explicit step and none for a shape the flag cannot say', () => {
+  it('writes five fields for a step and a sixth for a ramp or a spike, and parseAnomaly reads each back', () => {
     const base = {
       deviceId: 'dc-env-01',
       metric: 'temperature_c' as const,
@@ -386,7 +386,14 @@ describe('toAnomalyFlag', () => {
       duration: 10,
     };
     assert.equal(toAnomalyFlag({ ...base, shape: 'step' }), 'dc-env-01:temperature_c:30:0:10');
-    assert.equal(toAnomalyFlag({ ...base, shape: 'ramp' }), undefined);
-    assert.equal(toAnomalyFlag({ ...base, shape: 'spike' }), undefined);
+    assert.equal(toAnomalyFlag({ ...base, shape: 'ramp' }), 'dc-env-01:temperature_c:30:0:10:ramp');
+    assert.equal(
+      toAnomalyFlag({ ...base, shape: 'spike' }),
+      'dc-env-01:temperature_c:30:0:10:spike',
+    );
+    for (const shape of ['ramp', 'spike'] as const) {
+      const anomaly = { ...base, shape };
+      assert.deepEqual(parseAnomaly(toAnomalyFlag(anomaly)), anomaly);
+    }
   });
 });
