@@ -76,6 +76,7 @@ describe('the types and the fixture', () => {
       'config',
       'devices',
       'engine',
+      'faultEffect',
       'ingest',
       'metrics',
       'observationCursor',
@@ -88,12 +89,29 @@ describe('the types and the fixture', () => {
       'anomalies',
       'devices',
       'elapsedS',
+      'faults',
       'intervalMs',
       'nowMs',
       'published',
       'running',
       'simulated',
     ]);
+    expect(keys(view.engine.faults)).toEqual(
+      [
+        'activeCount',
+        'bursting',
+        'delay',
+        'deviceCount',
+        'drop',
+        'dropped',
+        'duplicate',
+        'held',
+        'linkLoss',
+        'malformed',
+        'reorder',
+        'scope',
+      ].sort(),
+    );
     expect(keys(view.engine.devices[0]!)).toEqual(['holds', 'id', 'intervalMs', 'seq', 'state']);
     expect(keys(view.devices[0]!)).toEqual(['id', 'kind', 'metrics', 'name', 'zoneCode']);
     expect(keys(view.config)).toEqual(['consoleUrl', 'ingestUrl', 'intervalMs', 'simulated']);

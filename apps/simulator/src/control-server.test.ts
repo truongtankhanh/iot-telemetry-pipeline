@@ -891,3 +891,95 @@ describe('ControlServer GET /api/alerts', () => {
     assert.equal(reply.headers.allow, 'GET');
   });
 });
+
+describe('ControlServer and the faults', () => {
+  it('streams a fault change as a state event and records it as an observation', async () => {
+    const { port } = await startServer();
+    const client = await openStream(port);
+    await client.waitFor((e) => e.event === 'snapshot');
+
+    const response = await send(port, 'PUT', '/api/faults/drop', { percent: 5 });
+    assert.equal(response.status, 200);
+
+    const state = await client.waitFor((e) => e.event === 'state' && e.data.type === 'fault-set');
+    assert.deepEqual(state.data, { type: 'fault-set', kind: 'drop', config: { percent: 5 } });
+    const observation = await client.waitFor(
+      (e) =>
+        e.event === 'observation' &&
+        e.data.kind === 'engine-state' &&
+        (e.data.data as Json).type === 'fault-set',
+    );
+    assert.equal(typeof observation.data.id, 'number');
+
+    const page = await get(port, '/api/observations');
+    const kinds = (page.json() as unknown as { data: { type?: string } }[]).map((o) => o.data.type);
+    assert.ok(kinds.includes('fault-set'));
+  });
+
+  it('tells a stream client about a dropped message, and keeps it out of the publish log', async () => {
+    const { port, engine } = await startServer();
+    await send(port, 'PUT', '/api/faults/scope', { mode: 'selected', deviceIds: ['dc-env-01'] });
+    await send(port, 'PUT', '/api/faults/drop', { percent: 100 });
+    const client = await openStream(port);
+    const snapshot = await client.waitFor((e) => e.event === 'snapshot');
+    const logBefore = (snapshot.data.publishLog as unknown[]).length;
+
+    await engine.step();
+
+    const dropped = await client.waitFor((e) => e.event === 'dropped');
+    assert.deepEqual(dropped.data, {
+      deviceId: 'dc-env-01',
+      seq: 2,
+      ts: new Date(T0 + 2000).toISOString(),
+      reason: 'fault',
+    });
+    // The other two devices published; the dropped one did not.
+    await client.waitFor(
+      (e) => e.event === 'published' && e.data.deviceId === 'dc-env-02' && e.data.seq === 2,
+    );
+    assert.equal(
+      client.events.some(
+        (e) => e.event === 'published' && e.data.deviceId === 'dc-env-01' && e.data.seq === 2,
+      ),
+      false,
+    );
+
+    const late = await openStream(port);
+    const lateSnapshot = await late.waitFor((e) => e.event === 'snapshot');
+    const log = lateSnapshot.data.publishLog as { deviceId: string; seq: number }[];
+    assert.equal(log.length, logBefore + 2);
+    assert.equal(
+      log.some((m) => m.deviceId === 'dc-env-01' && m.seq === 2),
+      false,
+    );
+  });
+
+  it('puts the faults and the effect session in the snapshot a page opens with', async () => {
+    const { port } = await startServer();
+    await send(port, 'PUT', '/api/faults/delay', { delayMs: 500 });
+    const client = await openStream(port);
+    const snapshot = await client.waitFor((e) => e.event === 'snapshot');
+    const faults = (snapshot.data.engine as Json).faults as Json;
+    assert.deepEqual(faults.delay, { delayMs: 500, jitterMs: 0 });
+    assert.equal(faults.activeCount, 1);
+    const effect = snapshot.data.faultEffect as Json;
+    assert.equal(effect.since, new Date(T0).toISOString());
+  });
+
+  it('streams the messages of a burst, tagged, and the publish log keeps the newest 200', async () => {
+    const { port } = await startServer();
+    const client = await openStream(port);
+    await client.waitFor((e) => e.event === 'snapshot');
+
+    const response = await send(port, 'POST', '/api/faults/burst', { count: 300 });
+    assert.equal(response.status, 200);
+    assert.equal(response.json().sent, 300);
+    await client.waitFor((e) => e.event === 'published' && e.data.fault === 'burst');
+
+    const late = await openStream(port);
+    const snapshot = await late.waitFor((e) => e.event === 'snapshot');
+    const log = snapshot.data.publishLog as { fault?: string }[];
+    assert.equal(log.length, 200);
+    assert.ok(log.every((m) => m.fault === 'burst'));
+  });
+});

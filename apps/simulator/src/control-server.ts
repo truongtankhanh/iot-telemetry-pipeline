@@ -11,7 +11,8 @@ import {
   type RouteResponse,
   type RoutesContext,
 } from './control-routes.ts';
-import type { Engine, PublishedMessage, StateChange } from './engine.ts';
+import type { DroppedMessage, Engine, PublishedMessage, StateChange } from './engine.ts';
+import { FaultEffect } from './fault-effect.ts';
 import { EventStream, type EventStreamOptions } from './event-stream.ts';
 import type { IngestPoller } from './ingest-poller.ts';
 import { type ObservationDraft, ObservationStore, RingBuffer } from './observation-store.ts';
@@ -121,6 +122,7 @@ export class ControlServer {
       config: { ingestUrl: options.config.ingestUrl, consoleUrl: options.config.consoleUrl },
       broker: options.broker,
       rules: options.rules ?? rulesUnavailable('no rules file was given'),
+      effect: new FaultEffect({ now: this.now }),
     };
     this.handle = createRoutes(this.context);
     this.server = createServer((req, res) => void this.onRequest(req, res));
@@ -206,12 +208,17 @@ export class ControlServer {
       this.publishLog.push(message);
       this.stream.send('published', message);
     });
+    // A message that was built and never sent: the stream tells a page about it, the publish log (what was sent) does not.
+    const onDropped = this.safely('dropped', (message: DroppedMessage) => {
+      this.stream.send('dropped', message);
+    });
     const onTickError = this.safely('tick-error', (error: Error) => {
       this.stream.send('tick-error', { message: error.message });
       this.observe({ kind: 'tick-error', data: { message: error.message } });
     });
     engine.on('state', onState);
     engine.on('published', onPublished);
+    engine.on('dropped', onDropped);
     engine.on('tick-error', onTickError);
 
     const onIngest = this.safely('ingest', (state) => this.stream.send('ingest', state));
@@ -230,6 +237,7 @@ export class ControlServer {
     return () => {
       engine.off('state', onState);
       engine.off('published', onPublished);
+      engine.off('dropped', onDropped);
       engine.off('tick-error', onTickError);
       poller.off('ingest', onIngest);
       poller.off('alerts', onAlerts);

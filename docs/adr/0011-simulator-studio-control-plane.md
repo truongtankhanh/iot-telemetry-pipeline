@@ -644,3 +644,45 @@ amendment of 2026-10-22 and the one before it), and the shared `GET /api/scenari
 - **What jsdom cannot check** (a hand check): the look at 1920 px and the wall scale, the neon filter and the spark, the feel of the drag with the snap, reduced
   motion, the page-leaving prompt, and the whole flow against a real simulator (build, save, reload, run, open the file in `apps/simulator/scenarios/`, run the same
   anomalies with `--anomaly`).
+
+## Amendment, 2026-10-22: fault injection (SIM-12, simulator half)
+
+The Faults page (frame 07) asks the engine to make the transport misbehave and to show the pipeline counting it. This was always listed as an
+engine feature, not a UI one (decision 1, and the consequences above), and `apps/simulator/src/faults.ts`, `engine.ts`, `mqtt-link.ts` and
+`fault-effect.ts` build it.
+
+- **Decision: the fault layer is in the engine, at the publish step.** The `seq` is used before anything can happen to the message, so a drop
+  leaves a gap by construction; `published` is emitted only for a message the publisher accepted, and a new `dropped` event says what was built
+  and not sent; delays run on the injected `Clock`, so a stepped engine releases them on the step. The alternative, a `Publisher` decorator in
+  `main.ts`, would have left the engine untouched, but a drop would then resolve as a success and the engine would emit `published` for a
+  message that never left, which the publish log and the Message inspector (SIM-13) would show as fact; the simulated clock and `snapshot()`
+  would need separate plumbing as well. With no fault on, a run is byte-for-byte what it was: the random source is read only for the faults that
+  are on, in a fixed order (link, drop, malformed, duplicate, reorder, delay).
+- **Malformed replaces the good message** rather than adding a bad one: a device that breaks the contract has lost that reading, and "a share of
+  the messages" stays true. Ingest records a `seq` only after `parsePayload` succeeded, so the replaced message is also a **gap**: with malformed
+  on, `telemetry_sequence_gaps_total` rises from it as well as from drop, and the effect panel must not credit gaps to Drop alone. Ten generators,
+  one per rejection reason of `parsePayload` and `topic` (from `parseTopic`), built from `METRICS` and `MAX_PAYLOAD_BYTES` of the contract, each
+  tested against the contract's own parser. The ingest-only reasons are not generated.
+- **Burst** sends valid messages with `ts` spread over the next interval and refuses a count a device could not space, because the readings'
+  key is `(device_id, metric, ts)`: the same `ts` for all would make ingest store one and count the rest as `duplicate` (a load test that looks
+  like a data test), and one interval per message would cross ingest's 5-minute `future` window after 150 messages. At most 5,000, one at a time,
+  chunks of 250, outside the switches, inside the scope.
+- **Link loss** really ends the MQTT connection (`end(true)`, then `reconnect()`; checked against `mqtt@5.16.1`) so the broker and the Broker pill
+  see it, and the messages built while it is down are lost, with their `seq`, which is ADR-0002's "bounded and measured" loss. The alternative,
+  letting mqtt.js queue them and flush on reconnect, delivers them late without a gap, piles up pending publishes while it is down, and needs a
+  bound the client does not give. `forS` is optional automatic restore; a restore waits up to 10 s for the broker.
+- **Clearing.** Faults are in memory and end with the process. Clear all faults restores the link first (or what is flushed next would be
+  dropped), switches everything off and sends what delay and reorder were holding; a stop (`SIGINT`, `SIGTERM`, `--duration`) does the same before
+  it ends the client, so it loses no more than the operator asked for. `POST /api/reset` keeps its meaning (anomalies and held values) and does
+  not clear faults: the amber pill is the reminder.
+- **The effect session** (`fault-effect.ts`) keeps the time the first fault, burst or link loss was switched on and the four ingest counters
+  then (read before the command; none if ingest had not been read), so a reload or a second tab shows the same "change since". It goes on after
+  Clear all faults because ingest confirms a gap after `SEQUENCE_GRACE_MS` (30 s); "Reset counters" starts it again. Fault changes are
+  `StateChange`s, hence timeline observations; `engine.faults` and `faultEffect` are part of the state view.
+- **Security posture.** Nothing is written to disk and nothing authenticates, as before. What changed is what an unauthenticated caller on loopback
+  can do: make the simulator publish invalid or bursty traffic (up to 5,000 messages per burst) to a broker that allows anonymous clients, and close
+  its own connection to it. Same trust level as anomalies and held values, but the first command that generates load on demand; the table of
+  [operations](../operations.md#security-posture) says so. Nothing was hardened here.
+- **Scope kept narrow:** frame 07's switch model only. The Lab's nine tiles model a fault as timed and targeted (`startAt`, `duration`,
+  `stagger`); the engine's settings do not preclude an automatic clear later (`forS` exists for link loss), but the Lab tiles are enabled, and
+  link loss gets its row on the Faults page, in `SIM-12-ui`. "Silent" is `stop`/`pause`. No CLI flag was added (`--help` is unchanged).

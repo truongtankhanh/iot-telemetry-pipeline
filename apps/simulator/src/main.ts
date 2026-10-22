@@ -12,6 +12,7 @@ import { ControlServer } from './control-server.ts';
 import { JsonFileDeviceSource } from './device-source.ts';
 import { Engine } from './engine.ts';
 import { IngestPoller } from './ingest-poller.ts';
+import { MqttLink } from './mqtt-link.ts';
 import { loadRules } from './rules-source.ts';
 import { toAnomalies } from './scenario-document.ts';
 import { loadScenarioFolder, ScenarioLibrary } from './scenario-library.ts';
@@ -166,6 +167,16 @@ client.on('end', () => brokerLink.setConnected(false));
 const engine = new Engine({
   devices,
   publisher: { publish: (topic, payload, options) => client.publishAsync(topic, payload, options) },
+  // The link-loss fault ends this client's connection and connects it again; nothing else here uses it.
+  link: new MqttLink({
+    isConnected: () => client.connected,
+    end: () => client.endAsync(true),
+    reconnect: () => void client.reconnect(),
+    onceConnect: (listener) => {
+      client.once('connect', listener);
+      return () => void client.removeListener('connect', listener);
+    },
+  }),
   intervalMs: Number(values.interval),
   anomalies,
   // The simulated clock starts at the wall time of now, so the first `ts` is inside ingest's window.
@@ -238,6 +249,15 @@ if (control) {
 const report = setInterval(() => console.log(`published ${engine.published} messages`), 10_000);
 
 async function stop(): Promise<void> {
+  // Faults are in memory and end with the process, but messages held back are sent and a cut link is restored first,
+  // so a stop does not lose more than the operator asked for.
+  try {
+    await engine.clearFaults();
+  } catch (error) {
+    console.error(
+      `could not clear the faults: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   engine.stop();
   await controlServer?.close();
   clearInterval(report);
