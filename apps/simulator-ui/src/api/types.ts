@@ -46,6 +46,42 @@ export interface EngineSnapshot {
     holds: Partial<Record<MetricName, number>>;
   }[];
   anomalies: { id: string; anomaly: Anomaly }[];
+  faults: FaultsSnapshot;
+}
+
+/** The reasons a malformed payload can be rejected for, one generator each: the parser's nine, and `topic`. */
+export type MalformedKind =
+  'size' | 'json' | 'shape' | 'seq' | 'ts' | 'empty' | 'metric' | 'value' | 'range' | 'topic';
+
+/** Which devices the faults and a burst act on. */
+export type FaultScope = { mode: 'running' } | { mode: 'selected'; deviceIds: string[] };
+
+/** The faults the engine has on, as `snapshot()` says; an absent fault is `null`. */
+export interface FaultsSnapshot {
+  scope: FaultScope;
+  drop: { percent: number } | null;
+  duplicate: { percent: number } | null;
+  delay: { delayMs: number; jitterMs: number } | null;
+  reorder: { window: number } | null;
+  malformed: { percent: number; kinds: MalformedKind[] } | null;
+  /** While the link to the broker is down: since when (the engine's clock) and the automatic restore, if any. */
+  linkLoss: { since: string; forS: number | null } | null;
+  /** Switches that are on, plus link loss while it is down; a burst is a one-shot and is not counted. */
+  activeCount: number;
+  /** Running devices in scope now (the chosen ones, for a selection). */
+  deviceCount: number;
+  /** Messages held back now by a delay or a reorder window. */
+  held: number;
+  /** Messages dropped by a fault or by link loss since the simulator started. */
+  dropped: number;
+  bursting: boolean;
+}
+
+/** When the faults began and what ingest's counters said then; `null` until a fault has been switched on. */
+export interface FaultEffectView {
+  since: string;
+  /** The four counters of the effect panel at that moment; `null` when ingest had not been read. */
+  baseline: MetricSample[] | null;
 }
 
 export type IngestStatus = 'unknown' | 'ready' | 'not-ready' | 'unreachable';
@@ -202,6 +238,7 @@ export interface StateView {
   profiles: Record<string, Partial<Record<MetricName, MetricProfile>>>;
   config: { ingestUrl: string; consoleUrl: string | null; intervalMs: number; simulated: boolean };
   observationCursor: number;
+  faultEffect: FaultEffectView | null;
 }
 
 export interface PublishedMessage {
@@ -210,6 +247,8 @@ export interface PublishedMessage {
   payload: string;
   seq: number;
   ts: string;
+  /** Present when the message is not a plain one: a second copy, a burst message or a malformed payload. */
+  fault?: 'duplicate' | 'burst' | `malformed:${MalformedKind}`;
 }
 
 /** The first message of the event stream: the state view plus the last published messages. */
@@ -351,6 +390,33 @@ export interface ImportAnswer extends StateView {
  * the state and the scenario as a card shows it, now a file in the scenarios folder.
  */
 export type SaveAnswer = ImportAnswer;
+
+// ---- Faults (SIM-12) ----
+// The routes under `/api/faults` of the simulator (`apps/simulator/src/faults.ts` has the settings and their limits). The state
+// side (`FaultsSnapshot`, `FaultScope`, `MalformedKind`, `FaultEffectView`) is above, next to the engine snapshot.
+
+/** The faults that act on each message of a device; link loss acts on the connection and a burst is a one-shot. */
+export type SwitchKind = 'drop' | 'duplicate' | 'delay' | 'reorder' | 'malformed';
+
+/** What `PUT /api/faults/:kind` takes. */
+export type FaultKind = SwitchKind | 'link-loss';
+
+/** The body of `PUT /api/faults/:kind`, by kind. */
+export interface FaultBodies {
+  drop: { percent: number };
+  duplicate: { percent: number };
+  delay: { delayMs: number; jitterMs: number };
+  reorder: { window: number };
+  malformed: { percent: number; kinds: MalformedKind[] };
+  /** Without `forS` the link stays down until it is restored. */
+  'link-loss': { forS?: number };
+}
+
+/** The answer of `POST /api/faults/burst`: the state, and how many messages the broker took or refused. */
+export interface BurstAnswer extends StateView {
+  sent: number;
+  failed: number;
+}
 
 // ---- The observation log (SIM-09) ----
 // A manual mirror of `ObservationEvent` in `apps/simulator/src/observation-store.ts`. `fixtures/observations.json` is a

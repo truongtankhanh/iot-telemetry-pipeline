@@ -168,6 +168,7 @@ export const uiIcons = {
   calendar: Calendar,
   filter: Filter,
   target: Crosshair,
+  info: Info,
 } satisfies Record<string, Glyph>;
 
 /** The glyph of each stage of the pipeline in the topology. */

@@ -3,6 +3,10 @@ import type {
   Anomaly,
   AnomalyAnswer,
   AnomalyRequest,
+  BurstAnswer,
+  FaultBodies,
+  FaultKind,
+  FaultScope,
   ExpectationPreview,
   ImportAnswer,
   ObservationEvent,
@@ -384,6 +388,67 @@ export function conflictsOf(error: unknown): RunConflict[] | null {
   }
   return conflicts;
 }
+
+// ---- Faults (SIM-12) ----
+
+const faultPath = (kind: FaultKind) => `/api/faults/${encodeURIComponent(kind)}`;
+
+/**
+ * Switches a fault on, or changes its settings (`link-loss` cuts the simulator's connection to the broker). The simulator
+ * checks the body again and refuses with the field named: `400`, or `409` for a link that is already down or that this process
+ * cannot cut, or `500` when the cut fails; the `ApiError` carries the status and the sentence.
+ */
+export function setFault<K extends FaultKind>(
+  kind: K,
+  body: FaultBodies[K],
+  options: RequestOptions = {},
+): Promise<StateView> {
+  return sendCommand('PUT', faultPath(kind), body, options);
+}
+
+/** Switches one fault off (`link-loss` restores the link). Harmless when it is not on. */
+export const clearFault = (kind: FaultKind, options: RequestOptions = {}) =>
+  sendCommand('DELETE', faultPath(kind), undefined, options);
+
+/**
+ * Which devices the switches and a burst act on. An empty selection is refused here, as the simulator refuses it: choosing
+ * "Selected" with no device chosen yet must not turn into a request.
+ */
+export function setFaultScope(scope: FaultScope, options: RequestOptions = {}): Promise<StateView> {
+  if (scope.mode === 'selected' && scope.deviceIds.length === 0) {
+    return Promise.reject(new ApiError(400, 'A selection needs at least one device'));
+  }
+  return sendCommand('PUT', '/api/faults/scope', scope, options);
+}
+
+/**
+ * Sends that many valid messages at once. The request lasts as long as the burst does. `409` while one is being sent, when the
+ * engine is not started, when no device in scope is running or when the link is down; `400` for a count the devices in scope
+ * cannot space within their interval.
+ */
+export function sendBurst(count: number, options: RequestOptions = {}): Promise<BurstAnswer> {
+  if (!Number.isInteger(count) || count < 1) {
+    return Promise.reject(new ApiError(400, 'A burst is a whole number of messages, 1 or more'));
+  }
+  return sendCommandFor<BurstAnswer>(
+    'POST',
+    '/api/faults/burst',
+    { count },
+    options,
+    (body) => typeof body.sent === 'number' && typeof body.failed === 'number',
+  );
+}
+
+/**
+ * Clear all faults: restores the link, switches every fault off and sends what delay and reorder were holding. The scope
+ * stays. `500` (with the rest cleared) when the link cannot be restored.
+ */
+export const clearFaults = (options: RequestOptions = {}) =>
+  sendCommand('DELETE', '/api/faults', undefined, options);
+
+/** Begins the effect session again from the counters now ("Reset counters"). */
+export const resetFaultEffect = (options: RequestOptions = {}) =>
+  sendCommand('POST', '/api/faults/effect/reset', undefined, options);
 
 // ---- The engine's clock commands, and the observation log (SIM-09) ----
 

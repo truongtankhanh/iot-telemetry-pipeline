@@ -12,6 +12,17 @@ import {
   type MetricsFeed,
 } from './ingest-poller.ts';
 import type { DeviceState, Engine, EngineSnapshot } from './engine.ts';
+import type { FaultEffect, FaultEffectView } from './fault-effect.ts';
+import {
+  type FaultConfigs,
+  FaultConflictError,
+  FAULT_KINDS,
+  type FaultKind,
+  parseBurst,
+  parseFaultConfig,
+  parseScope,
+  type SwitchKind,
+} from './faults.ts';
 import { type ObservationStore, PAGE_MAX } from './observation-store.ts';
 import type { RulesView } from './rules-source.ts';
 import { lengthS, parseAnomalies, type ScenarioDocument } from './scenario-document.ts';
@@ -94,6 +105,8 @@ export interface RoutesContext {
   broker: { state(): BrokerState };
   /** The threshold rules read at boot (or why there are none); they do not change while the process runs. */
   rules: RulesView;
+  /** When the faults began and what ingest's counters said then, for the effect panel. */
+  effect: FaultEffect;
 }
 
 /** Everything a client needs to draw the current state; the answer to every command. */
@@ -116,6 +129,8 @@ export interface StateView {
   config: { ingestUrl: string; consoleUrl: string | null; intervalMs: number; simulated: boolean };
   /** Id of the newest observation, where a timeline starts paging back from. */
   observationCursor: number;
+  /** The session of the effect panel (`fault-effect.ts`); `null` until a fault has been switched on. */
+  faultEffect: FaultEffectView | null;
 }
 
 /**
@@ -214,15 +229,18 @@ export function buildStateView(context: RoutesContext): StateView {
       simulated: engine.simulated,
     },
     observationCursor: context.store.latestId(),
+    faultEffect: context.effect.view(),
   };
 }
 
 /** The `:id`, `:metric` and `:name` of a path; a handler reads only the ones its path has. */
-type Params = Record<'id' | 'metric' | 'name', string>;
+type Params = Record<'id' | 'metric' | 'name' | 'kind', string>;
 
 interface Route {
   method: string;
   segments: string[];
+  /** A path that fits the segments but not this (a `:kind` that is no fault) is not this route's, and gets the `404` of no route. */
+  accepts?(params: Params): boolean;
   run(params: Params, request: RouteRequest): RouteResponse | Promise<RouteResponse>;
 }
 
@@ -315,6 +333,9 @@ function toErrorResponse(error: unknown): RouteResponse {
   }
   // The engine rejects what it cannot play with an Error or a RangeError and a message: that is the
   // caller's input. Anything else (a TypeError, something thrown that is not an Error) is our bug.
+  if (error instanceof FaultConflictError) {
+    return { status: 409, body: errorBody(409, error.message) };
+  }
   if (error instanceof Error && !(error instanceof TypeError)) {
     return { status: 400, body: errorBody(400, error.message) };
   }
@@ -370,8 +391,13 @@ export function createRoutes(context: RoutesContext) {
   }
 
   const routes: Route[] = [];
-  const on = (method: string, template: string, run: Route['run']) =>
-    routes.push({ method, segments: template.slice(1).split('/'), run });
+  const on = (method: string, template: string, run: Route['run'], accepts?: Route['accepts']) =>
+    routes.push({
+      method,
+      segments: template.slice(1).split('/'),
+      run,
+      ...(accepts ? { accepts } : {}),
+    });
 
   on('GET', '/api/state', () => ok(view()));
 
@@ -653,6 +679,88 @@ export function createRoutes(context: RoutesContext) {
     return ok(view());
   });
 
+  // Faults. Nothing here writes to disk: they change what this process sends, in memory, and end with it. The body is
+  // checked with the same parsers the engine checks again, so that a refusal names the field; the effect session starts
+  // after the command worked, from the counters read before it, so a refused command leaves no session behind.
+  const isFaultKind = ({ kind }: Params) => (FAULT_KINDS as readonly string[]).includes(kind);
+
+  /** The environment's fault, not the caller's: the connection could not be cut or restored. */
+  async function linkAction<T>(what: string, action: () => Promise<T>): Promise<T> {
+    try {
+      return await action();
+    } catch (error) {
+      if (error instanceof FaultConflictError) throw error;
+      throw new HttpError(
+        500,
+        `${what}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  on('PUT', '/api/faults/scope', (_params, request) => {
+    const parsed = parseScope(
+      request.body,
+      context.devices.map((d) => d.id),
+    );
+    if (!parsed.ok) throw new HttpError(parsed.unknownDevice ? 404 : 400, parsed.reason);
+    engine.setFaultScope(parsed.value);
+    return ok(view());
+  });
+
+  on('POST', '/api/faults/burst', async (_params, request) => {
+    const parsed = parseBurst(request.body);
+    if (!parsed.ok) throw new HttpError(400, parsed.reason);
+    const feed = context.ingest.metrics();
+    const result = await engine.burst(parsed.value.count);
+    context.effect.ensureStarted(feed);
+    return ok({ ...result, ...view() });
+  });
+
+  on('POST', '/api/faults/effect/reset', () => {
+    context.effect.restart(context.ingest.metrics());
+    return ok(view());
+  });
+
+  on(
+    'PUT',
+    '/api/faults/:kind',
+    async ({ kind }, request) => {
+      const parsed = parseFaultConfig(kind as FaultKind, request.body);
+      if (!parsed.ok) throw new HttpError(400, parsed.reason);
+      const feed = context.ingest.metrics();
+      if (kind === 'link-loss') {
+        const { forS } = parsed.value as FaultConfigs['link-loss'];
+        await linkAction('The link could not be cut', () => engine.cutLink({ forS }));
+      } else {
+        engine.setFault(kind as SwitchKind, parsed.value as FaultConfigs[SwitchKind]);
+      }
+      context.effect.ensureStarted(feed);
+      return ok(view());
+    },
+    isFaultKind,
+  );
+
+  on(
+    'DELETE',
+    '/api/faults/:kind',
+    async ({ kind }) => {
+      if (kind === 'link-loss') {
+        await linkAction('The link could not be restored', () => engine.restoreLink());
+      } else {
+        engine.clearFault(kind as SwitchKind);
+      }
+      return ok(view());
+    },
+    isFaultKind,
+  );
+
+  on('DELETE', '/api/faults', async () => {
+    await linkAction('Faults were cleared, but the link could not be restored', () =>
+      engine.clearFaults(),
+    );
+    return ok(view());
+  });
+
   on('POST', '/api/reset', () => {
     engine.reset();
     return ok(view());
@@ -679,7 +787,7 @@ export function createRoutes(context: RoutesContext) {
       const allowed = new Set<string>();
       for (const route of routes) {
         const params = matchSegments(route.segments, segments);
-        if (!params) continue;
+        if (!params || (route.accepts && !route.accepts(params))) continue;
         if (route.method === request.method) return await route.run(params, request);
         allowed.add(route.method);
       }

@@ -86,6 +86,99 @@ describe('a row for each kind of observation', () => {
     );
   });
 
+  it('says what the Faults page set, as the Engine: each fault with its settings, and off', () => {
+    const row = (data: Record<string, unknown>) => eventRow(event('engine-state', data));
+    expect(row({ type: 'fault-set', kind: 'drop', config: { percent: 5 } })).toMatchObject({
+      source: 'Engine',
+      glyph: 'engine',
+      message: 'Drop messages set to 5 %',
+    });
+    expect(row({ type: 'fault-set', kind: 'duplicate', config: { percent: 0.5 } }).message).toBe(
+      'Duplicate messages set to 0.5 %',
+    );
+    expect(
+      row({
+        type: 'fault-set',
+        kind: 'malformed',
+        config: { percent: 3, kinds: ['range', 'json'] },
+      }).message,
+    ).toBe('Malformed payloads set to 3 % (range, json)');
+    expect(
+      row({ type: 'fault-set', kind: 'delay', config: { delayMs: 500, jitterMs: 100 } }).message,
+    ).toBe('Delay and jitter set to 500 ms, give or take 100 ms');
+    expect(
+      row({ type: 'fault-set', kind: 'delay', config: { delayMs: 500, jitterMs: 0 } }).message,
+    ).toBe('Delay and jitter set to 500 ms');
+    expect(row({ type: 'fault-set', kind: 'reorder', config: { window: 4 } }).message).toBe(
+      'Out-of-order delivery set to windows of 4',
+    );
+    expect(row({ type: 'fault-cleared', kind: 'drop' }).message).toBe('Drop messages off');
+    expect(field(row({ type: 'fault-set', kind: 'drop', config: { percent: 5 } }), 'Fault')).toBe(
+      'drop',
+    );
+  });
+
+  it('says what the scope is, and that every fault is cleared', () => {
+    const selected = eventRow(
+      event('engine-state', {
+        type: 'fault-scope',
+        scope: { mode: 'selected', deviceIds: ['dc-env-01', 'lib-air-01'] },
+      }),
+    );
+    expect(selected.message).toBe('Faults now apply to 2 selected devices');
+    expect(selected.devices).toEqual(['dc-env-01', 'lib-air-01']);
+    expect(
+      eventRow(event('engine-state', { type: 'fault-scope', scope: { mode: 'running' } })).message,
+    ).toBe('Faults now apply to every running device');
+    expect(eventRow(event('engine-state', { type: 'faults-cleared' })).message).toBe(
+      'All faults cleared: held messages sent, the link restored',
+    );
+  });
+
+  it('says a burst, with how many went and how many did not, and names its devices', () => {
+    const ok = eventRow(
+      event('engine-state', {
+        type: 'burst',
+        count: 1000,
+        sent: 1000,
+        failed: 0,
+        deviceIds: ['dc-env-01', 'dc-env-02'],
+      }),
+    );
+    expect(ok.message).toBe('Burst of 1,000 messages to 2 devices');
+    expect(ok.devices).toEqual(['dc-env-01', 'dc-env-02']);
+    const failed = eventRow(
+      event('engine-state', { type: 'burst', count: 1000, sent: 997, failed: 3, deviceIds: ['a'] }),
+    );
+    expect(failed.message).toBe('Burst of 997 messages to 1 device, 3 failed');
+    expect(field(failed, 'Failed')).toBe('3');
+  });
+
+  it('says the link was cut, and how it came back', () => {
+    const row = (data: Record<string, unknown>) => eventRow(event('engine-state', data));
+    expect(row({ type: 'link-lost', forS: null }).message).toBe(
+      'Link loss: the simulator cut its connection to the broker',
+    );
+    expect(row({ type: 'link-lost', forS: 30 }).message).toBe(
+      'Link loss: the simulator cut its connection to the broker, to restore itself after 30 s',
+    );
+    expect(row({ type: 'link-restored', reason: 'timer' }).message).toBe(
+      'Link loss over: the connection to the broker was restored by its timer',
+    );
+    expect(row({ type: 'link-restored', reason: 'command' }).message).toMatch(/by hand$/);
+    expect(row({ type: 'link-restored', reason: 'clear' }).message).toMatch(/by Clear all faults$/);
+  });
+
+  it('copes with a fault event that lacks its keys', () => {
+    expect(eventRow(event('engine-state', { type: 'fault-set' })).message).toBe('A fault on');
+    expect(eventRow(event('engine-state', { type: 'fault-scope' })).message).toBe(
+      'Faults now apply to every running device',
+    );
+    expect(eventRow(event('engine-state', { type: 'burst' })).message).toMatch(
+      /^Burst of 0 messages/,
+    );
+  });
+
   it('says a scenario started, with the devices it started and the runs it replaced', () => {
     const row = byKind('scenario-run');
     expect(row).toMatchObject({

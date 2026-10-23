@@ -86,6 +86,12 @@ the state, as `GET /api/state` returns it.
 | `PUT /api/scenarios/:name`                       | Save a custom scenario as `<name>.json` in `SCENARIOS_DIR`: the body is the document and its `name` must be the path's (`201` new, `200` replaced, including an import that becomes a file; `400` with the reason; `409` for a built-in, a running scenario, the 201st, or a file in the folder that was not loaded; `500` when the folder cannot be written) |
 | `DELETE /api/scenarios/:name`                    | Remove a custom scenario and its file (`200`; `404` unknown; `409` for a built-in or a running scenario; `500` when the file cannot be removed)                                                                                                                                                                                                               |
 | `POST /api/expectations`                         | Read-only: `{ anomalies }` (the fields of a scenario's anomaly, `startAt` in seconds from now, 1 to 100 of them) answers `{ expected, needsStart, intervalMs }` as a library item would; `400` with the reason                                                                                                                                                |
+| `PUT /api/faults/:kind`                          | Switch a fault on or change it (below): `drop`, `duplicate` `{ "percent" }`; `delay` `{ "delayMs", "jitterMs"? }`; `reorder` `{ "window" }`; `malformed` `{ "percent", "kinds"? }`; `link-loss` `{ "forS"? }`; `400` names the field; `409` for a link already down or that cannot be cut; `500` when the cut fails                                           |
+| `DELETE /api/faults/:kind`                       | Switch one fault off (`link-loss` restores the link; `500` when it cannot); harmless when it is not on                                                                                                                                                                                                                                                        |
+| `PUT /api/faults/scope`                          | `{ "mode": "running" }` or `{ "mode": "selected", "deviceIds": [...] }`; `404` for a device the registry does not have                                                                                                                                                                                                                                        |
+| `POST /api/faults/burst`                         | `{ "count" }`, 1 to 5,000: send that many valid messages at once; answers `{ sent, failed, …state }`; `400` for a count the devices cannot space; `409` while one is sending, when not started, with no running device in scope, or with the link down                                                                                                        |
+| `DELETE /api/faults`                             | **Clear all faults**: restore the link, switch every fault off, send what delay and reorder held; the scope stays; `500` (rest cleared) if the link will not come back                                                                                                                                                                                        |
+| `POST /api/faults/effect/reset`                  | Start the effect session again from the counters now ("Reset counters")                                                                                                                                                                                                                                                                                       |
 | `POST /api/reset`                                | Clear anomalies and held values, restart the anomaly clock                                                                                                                                                                                                                                                                                                    |
 | `POST /api/step`                                 | One publish interval on the simulated clock; `409` on the wall clock, the default (start with `--simulated-clock` to step)                                                                                                                                                                                                                                    |
 
@@ -111,7 +117,8 @@ curl -s -X POST localhost:3200/api/reset                 # clear anomalies and h
 **The stream.** Every message is `event: <name>` and `data: <json>`. The first one is `snapshot`
 (the state, plus `publishLog`: the last 200 published messages), so a page opened mid-demo is not
 empty; after a disconnect a client reconnects and gets a new snapshot. Then: `state` (an engine
-change), `published` (a message the broker accepted), `tick-error`, `ingest` (the state of ingest
+change), `published` (a message the broker accepted; `fault` says when it is a second copy, a burst message or a malformed payload),
+`dropped` (a message that was built and never sent: a drop fault or a link that was down; it is not in the publish log), `tick-error`, `ingest` (the state of ingest
 changed), `alerts` (the alerts as Studio saw them), `metrics` (a read of `/metrics`) and
 `observation` (an entry of the observation store).
 
@@ -228,6 +235,49 @@ device that is not running is in `needsStart` and the times assume it starts wit
 does **not** start a device, so on a stopped one nothing would ever be published. When the walk would need more than 20,000 readings in all
 (signals × seconds ÷ interval), `expected` is `{ available: false, reason }` rather than an answer that holds up the publishing tick.
 
+**Faults.** The engine can make its own transport misbehave, to see the pipeline count it ([ADR-0002](../../docs/adr/0002-ack-on-receipt-with-bounded-loss.md):
+loss is bounded and measured). They are in memory, end with the process and write nothing; `GET /api/state` has them in `engine.faults`, and each
+change is a `state` event and an `engine-state` observation. A message is built first, so its `seq` is used whatever happens to it; then, for a
+device in scope and only when a fault is on, **in this order**: the link being down or **drop** ends it; **malformed** replaces the payload;
+**duplicate** makes a second copy; **reorder** holds the copies in the device's window; **delay** holds each back. With no fault on a run is
+exactly what it was, and the random source is not read for them.
+
+- `drop` `{percent}`: the message is not sent, but its `seq` was used, so ingest sees a gap (`telemetry_sequence_gaps_total`). It confirms a gap
+  only after `SEQUENCE_GRACE_MS` (30 s by default), so the counter stays at 0 for about that long.
+- `duplicate` `{percent}`: the same payload is sent twice. Ingest counts both in `telemetry_messages_total` and stores the reading once
+  (`telemetry_readings_total{result="duplicate"}` for the other). Readings are counted per metric, not per message.
+- `delay` `{delayMs, jitterMs}` (`delayMs` 1 to 10,000, `jitterMs` 0 to `delayMs`): each message waits, on the engine's clock (so a stepped engine
+  releases it on the step), and keeps the `ts` it was measured at, so ingest lag grows. Under the 30 s grace period on purpose.
+- `reorder` `{window}` (2 to 10): a device's messages are held until it has `window` of them and released in a different order (never the same
+  one). A message waits at most `window - 1` ticks. No gap follows while they all arrive inside the grace period.
+- `malformed` `{percent, kinds}`: the good message is **replaced** by one that breaks the contract in one way; one of `kinds` is chosen for each
+  (default `range`). The kinds are the nine reasons of `parsePayload` (`size json shape seq ts empty metric value range`, in the order it checks
+  them) and `topic` (`parseTopic`'s). Each is rejected by ingest with exactly its reason (`telemetry_rejections_total{reason}`), and, because
+  ingest records a `seq` only after the payload parsed, the replaced message is also a **gap**: with malformed on, the gap counter rises
+  as well. The ingest-only reasons (`unknown_device`, `future`, …) have no generator.
+- `link-loss` `{forS?}`: closes the simulator's connection to the broker (the Broker pill turns by itself) and, while it is down, drops every
+  message it builds (`dropped` with `reason: "link"`; `seq` advances, so a gap follows). `forS` (1 to 3,600) restores it by itself;
+  `DELETE /api/faults/link-loss` restores it, waiting up to 10 s for the broker. A publish that is in flight when the link is cut fails
+  and is reported as a `tick-error`.
+- **burst**, `POST /api/faults/burst` `{count}`: a one-shot, not a switch. It sends `count` (1 to 5,000) valid messages as fast as the broker
+  takes them, round-robin over the running devices in scope, ignoring the switches. Each gets its device's next `seq` and a `ts` spread over the
+  next publish interval (`at + 1 + floor(k × (interval − 1) / m)` ms for the k-th of `m`), so none shares a `ts` with another or with the
+  tick that has just gone out (`PRIMARY KEY (device_id, metric, ts)` would store only one); a count that one device could not space (more than
+  `interval − 1` per device) is refused with `400`. They are handed over in chunks of 250, one burst at a time, and each is a `published`
+  event (the publish log keeps the newest 200).
+
+**The scope** (`PUT /api/faults/scope`) is one for all switches and for a burst: all running devices (read at every tick, so a device started
+later is in scope), or a selection (a stopped one is in the list, it just publishes nothing). Link loss is the simulator's own connection and
+has no scope. **Clear all faults** (`DELETE /api/faults`) restores the link first, switches everything off, sends what delay and reorder were
+holding and keeps the scope. It is also what a stop does: on `SIGINT`, `SIGTERM` or `--duration` the faults are cleared before the process
+ends. `POST /api/reset` does **not** clear them (it keeps its meaning: anomalies and held values).
+
+**The effect of faults.** `GET /api/state` has `faultEffect`: `null` until a fault, a burst or link loss is switched on, then `{ since,
+baseline }`, the wall time and the four counters of ingest (`telemetry_messages_total`, `telemetry_rejections_total`,
+`telemetry_readings_total`, `telemetry_sequence_gaps_total`, as read just before the first command; `null` when ingest had not been read). A page
+subtracts the baseline from the counters it already has. The session goes on after Clear all faults (a gap is confirmed late); `POST
+/api/faults/effect/reset` starts it again.
+
 ## A registry of 100 devices
 
 [fixtures/devices-100/](fixtures/devices-100/) holds a `devices.json` of 100 devices in 20 zones and a copy of ingest's `rules.json`, for
@@ -301,7 +351,10 @@ src/
   main.ts            command line: arguments, broker connection, shutdown; runs the engine
   bench.ts           throughput benchmark
   gap-report.ts      accounts for every message of a benchmark run
-  engine.ts          the publish loop: devices, anomalies, held values, Step and Reset, events
+  engine.ts          the publish loop: devices, anomalies, held values, faults, Step and Reset, events
+  faults.ts          the faults: their settings and checks, the ten malformed-message generators (pure)
+  fault-effect.ts    the session of the effect panel: when the faults began and the ingest counters then
+  mqtt-link.ts       cuts and restores the simulator's own MQTT connection for the link-loss fault
   clock.ts           the engine's time: the system clock, and a manual clock for tests and Step
   device-source.ts   where devices come from (today the ingest registry, devices.json)
   scenarios.ts       the built-in scenarios, as documents

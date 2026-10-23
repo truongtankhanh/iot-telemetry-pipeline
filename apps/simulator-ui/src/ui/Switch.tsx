@@ -6,6 +6,8 @@ export interface SwitchProps {
   /** What it switches, in words ("Snap to 5 s"): the visible text and the name a screen reader hears. */
   label: string;
   disabled?: boolean;
+  /** The label is the name a screen reader hears but is not drawn (the row beside it has the words, as a heading). */
+  labelHidden?: boolean;
 }
 
 /**
@@ -13,7 +15,7 @@ export interface SwitchProps {
  * the focus ring and the announcement ("on", "off") come from the browser; the track and the thumb are drawn by the style sheet.
  * The position of the thumb says the state as well as the colour.
  */
-export function Switch({ checked, onChange, label, disabled }: SwitchProps) {
+export function Switch({ checked, onChange, label, disabled, labelHidden }: SwitchProps) {
   return (
     <label className={styles.switch} data-disabled={disabled ? 'true' : undefined}>
       <input
@@ -27,7 +29,7 @@ export function Switch({ checked, onChange, label, disabled }: SwitchProps) {
       <span className={styles.switchTrack} aria-hidden="true">
         <span className={styles.switchThumb} />
       </span>
-      <span className={styles.switchText}>{label}</span>
+      <span className={labelHidden ? 'visually-hidden' : styles.switchText}>{label}</span>
     </label>
   );
 }

@@ -7,6 +7,8 @@ import { stateViewFixture as fixture } from './fixtures/stateView';
 import {
   addAnomaly,
   ApiError,
+  clearFault,
+  clearFaults,
   conflictsOf,
   deleteScenario,
   getAlerts,
@@ -20,9 +22,13 @@ import {
   releaseValue,
   removeAnomaly,
   resetEngine,
+  resetFaultEffect,
   runScenario,
   saveScenario,
+  sendBurst,
   setDeviceInterval,
+  setFault,
+  setFaultScope,
   startDevice,
   stepEngine,
   stopDevice,
@@ -30,6 +36,7 @@ import {
 } from './client';
 import {
   type ExpectationPreview,
+  type FaultScope,
   OBSERVATION_KINDS,
   type ScenarioLibraryView,
   type ScenarioRunView,
@@ -76,6 +83,7 @@ describe('the types and the fixture', () => {
       'config',
       'devices',
       'engine',
+      'faultEffect',
       'ingest',
       'metrics',
       'observationCursor',
@@ -88,12 +96,29 @@ describe('the types and the fixture', () => {
       'anomalies',
       'devices',
       'elapsedS',
+      'faults',
       'intervalMs',
       'nowMs',
       'published',
       'running',
       'simulated',
     ]);
+    expect(keys(view.engine.faults)).toEqual(
+      [
+        'activeCount',
+        'bursting',
+        'delay',
+        'deviceCount',
+        'drop',
+        'dropped',
+        'duplicate',
+        'held',
+        'linkLoss',
+        'malformed',
+        'reorder',
+        'scope',
+      ].sort(),
+    );
     expect(keys(view.engine.devices[0]!)).toEqual(['holds', 'id', 'intervalMs', 'seq', 'state']);
     expect(keys(view.devices[0]!)).toEqual(['id', 'kind', 'metrics', 'name', 'zoneCode']);
     expect(keys(view.config)).toEqual(['consoleUrl', 'ingestUrl', 'intervalMs', 'simulated']);
@@ -1100,6 +1125,214 @@ describe('getExpected', () => {
     });
     await expect(getExpected(anomalies, { fetch: asFetch(aborted) })).rejects.toMatchObject({
       name: 'AbortError',
+    });
+  });
+});
+
+describe('the fault commands', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+  const sent = (fn: ReturnType<typeof reply>) => {
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    return { url, method: init.method, headers: init.headers, body: init.body };
+  };
+  const JSON_HEADERS = { Accept: 'application/json', 'Content-Type': 'application/json' };
+  const refusal = (status: number, message: string) =>
+    reply({ statusCode: status, error: 'Refused', message }, { status });
+
+  describe('setFault', () => {
+    it('puts the settings on the path of the kind, as JSON, and answers the state', async () => {
+      const cases = [
+        ['drop', { percent: 5 }],
+        ['duplicate', { percent: 2 }],
+        ['delay', { delayMs: 500, jitterMs: 100 }],
+        ['reorder', { window: 4 }],
+        ['malformed', { percent: 3, kinds: ['range', 'json'] }],
+        ['link-loss', { forS: 30 }],
+      ] as const;
+      for (const [kind, body] of cases) {
+        const fetchFn = reply(view);
+        const state = await setFault(kind, body as never, { fetch: asFetch(fetchFn) });
+        expect(state.engine.devices.length).toBe(view.engine.devices.length);
+        expect(sent(fetchFn)).toEqual({
+          url: `/api/faults/${kind}`,
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(body),
+        });
+      }
+    });
+
+    it('sends link loss without a body field when it has no automatic restore', async () => {
+      const fetchFn = reply(view);
+      await setFault('link-loss', {}, { fetch: asFetch(fetchFn) });
+      expect(sent(fetchFn).body).toBe('{}');
+    });
+
+    it('carries the status and the sentence of each refusal', async () => {
+      for (const [status, reason] of [
+        [400, '"percent" must be a number above 0 and at most 100'],
+        [409, 'The link is already down; restore it first'],
+        [409, 'This simulator has no broker link it can cut'],
+        [500, 'The link could not be cut: end failed'],
+      ] as const) {
+        const failure = await setFault(
+          'link-loss',
+          {},
+          { fetch: asFetch(refusal(status, reason)) },
+        ).catch((e: unknown) => e);
+        expect(failure).toBeInstanceOf(ApiError);
+        expect((failure as ApiError).status).toBe(status);
+        expect((failure as ApiError).message).toBe(reason);
+      }
+    });
+
+    it('reports a simulator that does not answer with status 0, and passes an abort on', async () => {
+      const down = vi.fn(async () => {
+        throw new TypeError('fetch failed');
+      });
+      const failure = await setFault('drop', { percent: 5 }, { fetch: asFetch(down) }).catch(
+        (e: unknown) => e,
+      );
+      expect((failure as ApiError).status).toBe(0);
+
+      const aborted = vi.fn(async () => {
+        throw new DOMException('aborted', 'AbortError');
+      });
+      await expect(
+        setFault('drop', { percent: 5 }, { fetch: asFetch(aborted) }),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+    });
+
+    it('fails loudly on an answer that is not a state', async () => {
+      const failure = await setFault(
+        'drop',
+        { percent: 5 },
+        { fetch: asFetch(reply({ ok: true })) },
+      ).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(ApiError);
+      expect((failure as ApiError).message).toMatch(/does not understand/);
+    });
+  });
+
+  describe('clearFault', () => {
+    it('deletes the fault of that kind, with no body', async () => {
+      const fetchFn = reply(view);
+      await clearFault('malformed', { fetch: asFetch(fetchFn) });
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/faults/malformed',
+        method: 'DELETE',
+        headers: JSON_HEADERS,
+        body: undefined,
+      });
+    });
+
+    it('carries the reason of a link that cannot be restored', async () => {
+      const failure = await clearFault('link-loss', {
+        fetch: asFetch(refusal(500, 'The link could not be restored: no answer from the broker')),
+      }).catch((e: unknown) => e);
+      expect((failure as ApiError).status).toBe(500);
+      expect((failure as ApiError).message).toMatch(/no answer from the broker/);
+    });
+  });
+
+  describe('setFaultScope', () => {
+    it('puts all running devices, or a selection', async () => {
+      const running = reply(view);
+      await setFaultScope({ mode: 'running' }, { fetch: asFetch(running) });
+      expect(sent(running)).toMatchObject({
+        url: '/api/faults/scope',
+        method: 'PUT',
+        body: JSON.stringify({ mode: 'running' }),
+      });
+
+      const selected = reply(view);
+      const scope: FaultScope = { mode: 'selected', deviceIds: ['dc-env-01', 'lib-air-01'] };
+      await setFaultScope(scope, { fetch: asFetch(selected) });
+      expect(sent(selected).body).toBe(JSON.stringify(scope));
+    });
+
+    it('does not send an empty selection', async () => {
+      const fetchFn = reply(view);
+      const failure = await setFaultScope(
+        { mode: 'selected', deviceIds: [] },
+        { fetch: asFetch(fetchFn) },
+      ).catch((e: unknown) => e);
+      expect((failure as ApiError).status).toBe(400);
+      expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it('carries the 404 of a device the registry does not have', async () => {
+      const failure = await setFaultScope(
+        { mode: 'selected', deviceIds: ['ghost'] },
+        { fetch: asFetch(refusal(404, 'Unknown device "ghost"')) },
+      ).catch((e: unknown) => e);
+      expect((failure as ApiError).status).toBe(404);
+      expect((failure as ApiError).message).toBe('Unknown device "ghost"');
+    });
+  });
+
+  describe('sendBurst', () => {
+    it('posts the count and answers the state with how many went', async () => {
+      const fetchFn = reply({ ...view, sent: 1000, failed: 0 });
+      const answer = await sendBurst(1000, { fetch: asFetch(fetchFn) });
+      expect(answer.sent).toBe(1000);
+      expect(answer.failed).toBe(0);
+      expect(answer.engine.devices.length).toBe(view.engine.devices.length);
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/faults/burst',
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ count: 1000 }),
+      });
+    });
+
+    it('does not send a count that is not a whole number of messages', async () => {
+      for (const count of [0, -1, 1.5, Number.NaN]) {
+        const fetchFn = reply({ ...view, sent: 0, failed: 0 });
+        const failure = await sendBurst(count, { fetch: asFetch(fetchFn) }).catch(
+          (e: unknown) => e,
+        );
+        expect((failure as ApiError).status).toBe(400);
+        expect(fetchFn).not.toHaveBeenCalled();
+      }
+    });
+
+    it('fails loudly on an answer without how many went', async () => {
+      const failure = await sendBurst(10, { fetch: asFetch(reply(view)) }).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(ApiError);
+    });
+
+    it('carries the 400 of a count the devices cannot space, and the 409s', async () => {
+      for (const [status, reason] of [
+        [400, '2000 messages over 1 device(s) is 2000 for one, more than the 1999 ms interval'],
+        [409, 'A burst is already being sent'],
+        [409, 'The link to the broker is down; restore it first'],
+      ] as const) {
+        const failure = await sendBurst(2000, { fetch: asFetch(refusal(status, reason)) }).catch(
+          (e: unknown) => e,
+        );
+        expect((failure as ApiError).status).toBe(status);
+        expect((failure as ApiError).message).toBe(reason);
+      }
+    });
+  });
+
+  describe('clearFaults and resetFaultEffect', () => {
+    it('delete all faults, and begin the effect session again', async () => {
+      const clear = reply(view);
+      await clearFaults({ fetch: asFetch(clear) });
+      expect(sent(clear)).toMatchObject({ url: '/api/faults', method: 'DELETE' });
+
+      const reset = reply(view);
+      await resetFaultEffect({ fetch: asFetch(reset) });
+      expect(sent(reset)).toMatchObject({ url: '/api/faults/effect/reset', method: 'POST' });
+    });
+
+    it('carry the reason of a refusal', async () => {
+      const failure = await clearFaults({
+        fetch: asFetch(refusal(500, 'The link could not be restored')),
+      }).catch((e: unknown) => e);
+      expect((failure as ApiError).status).toBe(500);
     });
   });
 });

@@ -1,0 +1,213 @@
+/* The Faults page (frame 07): the scope, the faults on the left, the effect on the pipeline on the right. Tokens only. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page[data-stale='true'] {
+  opacity: 0.7;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+}
+
+.faint {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-body);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-min);
+}
+
+/* ---- the scope ---- */
+.scope {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scopeHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lbl {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scopeNote {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+/* ---- the faults ---- */
+.list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.fault {
+  display: flex;
+  gap: 14px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.fault:first-child {
+  border-top: 0;
+}
+
+/* A fault that is on is lit in red, and says so in words as well (the switch, and the line of what it does). */
+.fault[data-on='true'] {
+  background: linear-gradient(90deg, rgba(255, 98, 128, 0.07), transparent 65%);
+}
+
+.tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  color: var(--text-secondary);
+}
+
+.tile[data-on='true'] {
+  color: var(--danger);
+  border-color: rgba(255, 98, 128, 0.45);
+}
+
+.faultBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faultHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.faultText {
+  min-width: 0;
+}
+
+.faultTitle {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-card-title);
+  font-weight: 600;
+}
+
+.faultDesc {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.faultState {
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  gap: 12px;
+  align-items: start;
+}
+
+/* ---- the effect ---- */
+.effect {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.counters {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.counter {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.counter:first-child {
+  border-top: 0;
+}
+
+.counterName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.delta {
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

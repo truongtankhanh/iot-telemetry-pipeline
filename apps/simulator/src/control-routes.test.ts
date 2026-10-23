@@ -24,7 +24,14 @@ import {
   type RoutesContext,
   type StateView,
 } from './control-routes.ts';
-import { type AlertsPage, type AlertsPageQuery, IngestReadError } from './ingest-poller.ts';
+import { FaultEffect } from './fault-effect.ts';
+import type { LinkControl } from './faults.ts';
+import {
+  type AlertsPage,
+  type AlertsPageQuery,
+  IngestReadError,
+  type MetricsFeed,
+} from './ingest-poller.ts';
 import {
   type ObservationDraft,
   type ObservationKind,
@@ -112,6 +119,8 @@ async function setup(
     broken?: boolean;
     /** Where the library saves scenarios; without it the library cannot save. */
     scenarioStore?: ScenarioStore;
+    /** The simulator's connection to the broker, for the link-loss fault; without it that fault is refused. */
+    link?: LinkControl;
   } = {},
 ) {
   const {
@@ -120,8 +129,12 @@ async function setup(
     rules = RULES,
     broken = false,
     scenarioStore,
+    link,
   } = options;
-  const { engine, publisher } = setupEngine(wallClock ? { clock: systemClock } : {});
+  const { engine, publisher } = setupEngine({
+    ...(wallClock ? { clock: systemClock } : {}),
+    ...(link ? { link } : {}),
+  });
   if (started && !wallClock) await engine.start();
   const store = new ObservationStore();
   const broker = new BrokerLink('mqtt://u:p@localhost:1883', true);
@@ -136,23 +149,27 @@ async function setup(
     record: (draft) => recorded.push(draft),
     now: () => T0 + 123,
   });
+  // What the fake ingest says about its counters now; a test changes it between two commands.
+  const feed: { current: MetricsFeed } = { current: INGEST.metrics() };
+  const effect = new FaultEffect({ now: () => T0 + 5000 });
   const context: RoutesContext = {
     engine,
     devices: DEVICES,
     library,
     runs,
     store,
-    ingest: INGEST,
+    ingest: { ...INGEST, metrics: () => feed.current },
     config: { ingestUrl: 'http://localhost:3100', consoleUrl: null },
     broker,
     rules,
+    effect,
   };
   const handle = createRoutes(context);
   const call = (method: string, path: string, body?: unknown): Promise<RouteResponse> => {
     const url = new URL(path, 'http://localhost');
     return handle({ method, path: url.pathname, query: url.searchParams, body });
   };
-  return { engine, publisher, store, broker, recorded, context, call };
+  return { engine, publisher, store, broker, recorded, context, call, feed, effect };
 }
 
 const view = (response: RouteResponse) => response.body as StateView;
@@ -1865,5 +1882,416 @@ describe('GET /api/observations and the fixture of the UI', () => {
     const response = await call('GET', '/api/observations');
     assert.deepEqual(response.body, fixture);
     assert.equal(response.headers, undefined);
+  });
+});
+
+/** Records what it is asked to do; either direction can be made to fail. */
+class FakeLink implements LinkControl {
+  readonly calls: string[] = [];
+  failCut = false;
+  failRestore = false;
+
+  async cut(): Promise<void> {
+    if (this.failCut) throw new Error('end failed');
+    this.calls.push('cut');
+  }
+
+  async restore(): Promise<void> {
+    if (this.failRestore) throw new Error('no answer from the broker');
+    this.calls.push('restore');
+  }
+}
+
+const faults = (response: RouteResponse) => view(response).engine.faults;
+const counter = (name: string, value: number, labels: Record<string, string> = {}) => ({
+  name,
+  labels,
+  value,
+});
+
+describe('PUT and DELETE /api/faults/:kind', () => {
+  it('switches a fault on with its settings and answers the state view', async () => {
+    const { call, engine } = await setup();
+    const response = await call('PUT', '/api/faults/drop', { percent: 5 });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(faults(response).drop, { percent: 5 });
+    assert.equal(faults(response).activeCount, 1);
+    assert.deepEqual(engine.snapshot().faults.drop, { percent: 5 });
+  });
+
+  it('takes the settings of each kind, and a second PUT changes them', async () => {
+    const { call } = await setup();
+    assert.deepEqual(faults(await call('PUT', '/api/faults/duplicate', { percent: 2 })).duplicate, {
+      percent: 2,
+    });
+    assert.deepEqual(
+      faults(await call('PUT', '/api/faults/delay', { delayMs: 800, jitterMs: 200 })).delay,
+      { delayMs: 800, jitterMs: 200 },
+    );
+    assert.deepEqual(faults(await call('PUT', '/api/faults/delay', { delayMs: 100 })).delay, {
+      delayMs: 100,
+      jitterMs: 0,
+    });
+    assert.deepEqual(faults(await call('PUT', '/api/faults/reorder', { window: 4 })).reorder, {
+      window: 4,
+    });
+    assert.deepEqual(
+      faults(await call('PUT', '/api/faults/malformed', { percent: 3, kinds: ['range', 'json'] }))
+        .malformed,
+      { percent: 3, kinds: ['range', 'json'] },
+    );
+    assert.deepEqual(faults(await call('PUT', '/api/faults/malformed', { percent: 3 })).malformed, {
+      percent: 3,
+      kinds: ['range'],
+    });
+  });
+
+  it('names the field it refuses, and changes nothing', async () => {
+    const { call, engine } = await setup();
+    assertEnvelope(await call('PUT', '/api/faults/drop', { percent: 0 }), 400, /"percent"/);
+    assertEnvelope(await call('PUT', '/api/faults/drop', {}), 400, /"percent"/);
+    assertEnvelope(await call('PUT', '/api/faults/drop'), 400, /"percent"/);
+    assertEnvelope(await call('PUT', '/api/faults/drop', { percent: 5, x: 1 }), 400, /"x"/);
+    assertEnvelope(await call('PUT', '/api/faults/drop', [5]), 400, /JSON object/);
+    assertEnvelope(
+      await call('PUT', '/api/faults/delay', { delayMs: 10, jitterMs: 50 }),
+      400,
+      /"jitterMs"/,
+    );
+    assertEnvelope(await call('PUT', '/api/faults/reorder', { window: 1 }), 400, /"window"/);
+    assertEnvelope(
+      await call('PUT', '/api/faults/malformed', { percent: 3, kinds: ['future'] }),
+      400,
+      /"kinds"/,
+    );
+    assert.equal(engine.snapshot().faults.activeCount, 0);
+  });
+
+  it('answers 404 for a fault that does not exist', async () => {
+    const { call } = await setup();
+    assertEnvelope(
+      await call('PUT', '/api/faults/telepathy', { percent: 5 }),
+      404,
+      /No such route/,
+    );
+    assertEnvelope(await call('DELETE', '/api/faults/telepathy'), 404, /No such route/);
+  });
+
+  it('switches a fault off, and it is harmless to do so twice', async () => {
+    const { call } = await setup();
+    await call('PUT', '/api/faults/drop', { percent: 5 });
+    const off = await call('DELETE', '/api/faults/drop');
+    assert.equal(off.status, 200);
+    assert.equal(faults(off).drop, null);
+    assert.equal(faults(off).activeCount, 0);
+    assert.equal((await call('DELETE', '/api/faults/drop')).status, 200);
+  });
+
+  it('refuses the wrong method with the methods that fit', async () => {
+    const { call } = await setup();
+    for (const [method, path, allow] of [
+      ['GET', '/api/faults/drop', 'PUT, DELETE'],
+      ['POST', '/api/faults/link-loss', 'PUT, DELETE'],
+      ['GET', '/api/faults', 'DELETE'],
+      ['PUT', '/api/faults', 'DELETE'],
+      ['GET', '/api/faults/scope', 'PUT'],
+      ['DELETE', '/api/faults/scope', 'PUT'],
+      ['PUT', '/api/faults/burst', 'POST'],
+      ['GET', '/api/faults/effect/reset', 'POST'],
+    ] as const) {
+      const response = await call(method, path);
+      assertEnvelope(response, 405);
+      assert.equal(response.headers?.Allow, allow, `${method} ${path}`);
+    }
+  });
+
+  it('leaves the faults on when the anomalies and held values are reset', async () => {
+    const { call } = await setup();
+    await call('PUT', '/api/faults/drop', { percent: 5 });
+    const response = await call('POST', '/api/reset');
+    assert.deepEqual(faults(response).drop, { percent: 5 });
+  });
+});
+
+describe('PUT /api/faults/scope', () => {
+  it('selects devices, and goes back to all running', async () => {
+    const { call } = await setup();
+    const selected = await call('PUT', '/api/faults/scope', {
+      mode: 'selected',
+      deviceIds: ['dc-env-01', 'lib-air-01'],
+    });
+    assert.equal(selected.status, 200);
+    assert.deepEqual(faults(selected).scope, {
+      mode: 'selected',
+      deviceIds: ['dc-env-01', 'lib-air-01'],
+    });
+    assert.equal(faults(selected).deviceCount, 2);
+
+    const running = await call('PUT', '/api/faults/scope', { mode: 'running' });
+    assert.deepEqual(faults(running).scope, { mode: 'running' });
+  });
+
+  it('answers 404 for a device the registry does not have, and 400 for a body that is no scope', async () => {
+    const { call, engine } = await setup();
+    assertEnvelope(
+      await call('PUT', '/api/faults/scope', { mode: 'selected', deviceIds: ['ghost'] }),
+      404,
+      /Unknown device "ghost"/,
+    );
+    assertEnvelope(
+      await call('PUT', '/api/faults/scope', { mode: 'selected' }),
+      400,
+      /"deviceIds"/,
+    );
+    assertEnvelope(await call('PUT', '/api/faults/scope', { mode: 'some' }), 400, /"mode"/);
+    assertEnvelope(await call('PUT', '/api/faults/scope'), 400, /"mode"/);
+    assert.deepEqual(engine.snapshot().faults.scope, { mode: 'running' });
+  });
+
+  it('is what the switches act on', async () => {
+    const { call, publisher } = await setup();
+    await call('PUT', '/api/faults/scope', { mode: 'selected', deviceIds: ['dc-env-01'] });
+    await call('PUT', '/api/faults/drop', { percent: 100 });
+    await call('POST', '/api/step');
+    const sentBy = (id: string) => publisher.sent.filter((m) => m.topic.includes(id)).length;
+    assert.equal(sentBy('dc-env-01'), 1);
+    assert.equal(sentBy('dc-env-02'), 2);
+  });
+});
+
+describe('DELETE /api/faults', () => {
+  it('clears every fault, keeps the scope, and answers the state view', async () => {
+    const { call } = await setup();
+    await call('PUT', '/api/faults/scope', { mode: 'selected', deviceIds: ['dc-env-01'] });
+    await call('PUT', '/api/faults/drop', { percent: 5 });
+    await call('PUT', '/api/faults/delay', { delayMs: 500 });
+    await call('PUT', '/api/faults/reorder', { window: 3 });
+
+    const response = await call('DELETE', '/api/faults');
+
+    assert.equal(response.status, 200);
+    const cleared = faults(response);
+    assert.equal(cleared.activeCount, 0);
+    assert.equal(cleared.held, 0);
+    assert.deepEqual([cleared.drop, cleared.delay, cleared.reorder], [null, null, null]);
+    assert.deepEqual(cleared.scope, { mode: 'selected', deviceIds: ['dc-env-01'] });
+  });
+
+  it('sends what delay was holding, once', async () => {
+    const { call, publisher } = await setup();
+    await call('PUT', '/api/faults/delay', { delayMs: 5000 });
+    await call('POST', '/api/step');
+    const before = publisher.sent.length; // the first tick; the second is held
+    assert.equal(faults(await call('GET', '/api/state')).held, 3);
+
+    const response = await call('DELETE', '/api/faults');
+
+    assert.equal(publisher.sent.length, before + 3);
+    assert.equal(faults(response).held, 0);
+  });
+
+  it('answers 500 with the reason when the link cannot be restored, after clearing the rest', async () => {
+    const link = new FakeLink();
+    const { call, engine } = await setup({ link });
+    await call('PUT', '/api/faults/drop', { percent: 5 });
+    await call('PUT', '/api/faults/link-loss');
+    link.failRestore = true;
+
+    const response = await call('DELETE', '/api/faults');
+
+    assertEnvelope(response, 500, /link could not be restored: no answer from the broker/);
+    assert.equal(engine.snapshot().faults.drop, null);
+  });
+});
+
+describe('POST /api/faults/burst', () => {
+  it('sends the messages and answers how many went, with the state view', async () => {
+    const { call, publisher } = await setup();
+    const before = publisher.sent.length;
+    const response = await call('POST', '/api/faults/burst', { count: 12 });
+
+    assert.equal(response.status, 200);
+    const body = response.body as { sent: number; failed: number } & StateView;
+    assert.equal(body.sent, 12);
+    assert.equal(body.failed, 0);
+    assert.equal(publisher.sent.length - before, 12);
+    assert.ok(body.engine.devices.every((d) => d.seq > 1));
+  });
+
+  it('names the field it refuses', async () => {
+    const { call } = await setup();
+    for (const body of [{}, { count: 0 }, { count: 5001 }, { count: 1.5 }, { count: '5' }]) {
+      assertEnvelope(await call('POST', '/api/faults/burst', body), 400, /"count"/);
+    }
+    assertEnvelope(await call('POST', '/api/faults/burst', { count: 5, x: 1 }), 400, /"x"/);
+    assertEnvelope(await call('POST', '/api/faults/burst'), 400, /"count"/);
+  });
+
+  it('answers 400 when the devices in scope cannot space that many, and 409 when it cannot be sent now', async () => {
+    const { call } = await setup();
+    await call('PUT', '/api/faults/scope', { mode: 'selected', deviceIds: ['dc-env-01'] });
+    assertEnvelope(await call('POST', '/api/faults/burst', { count: 2000 }), 400, /smaller count/);
+
+    const idle = await setup({ started: false });
+    assertEnvelope(await idle.call('POST', '/api/faults/burst', { count: 5 }), 409, /not started/);
+
+    const down = await setup({ link: new FakeLink() });
+    await down.call('PUT', '/api/faults/link-loss');
+    assertEnvelope(await down.call('POST', '/api/faults/burst', { count: 5 }), 409, /link/);
+  });
+
+  it('ignores the switches that are on', async () => {
+    const { call, publisher } = await setup();
+    await call('PUT', '/api/faults/drop', { percent: 100 });
+    const before = publisher.sent.length;
+    await call('POST', '/api/faults/burst', { count: 6 });
+    assert.equal(publisher.sent.length - before, 6);
+  });
+});
+
+describe('link loss over the API', () => {
+  it('cuts the link, says so in the state, and restores it', async () => {
+    const link = new FakeLink();
+    const { call } = await setup({ link });
+
+    const cut = await call('PUT', '/api/faults/link-loss', { forS: 30 });
+    assert.equal(cut.status, 200);
+    assert.deepEqual(faults(cut).linkLoss, { since: new Date(T0).toISOString(), forS: 30 });
+    assert.equal(faults(cut).activeCount, 1);
+
+    const restored = await call('DELETE', '/api/faults/link-loss');
+    assert.equal(restored.status, 200);
+    assert.equal(faults(restored).linkLoss, null);
+    assert.deepEqual(link.calls, ['cut', 'restore']);
+  });
+
+  it('takes no body, and refuses a bad forS', async () => {
+    const { call } = await setup({ link: new FakeLink() });
+    assertEnvelope(await call('PUT', '/api/faults/link-loss', { forS: 0 }), 400, /"forS"/);
+    assertEnvelope(await call('PUT', '/api/faults/link-loss', { x: 1 }), 400, /"x"/);
+    assert.equal((await call('PUT', '/api/faults/link-loss')).status, 200);
+  });
+
+  it('answers 409 when there is no link to cut, and when it is already down', async () => {
+    const bare = await setup();
+    assertEnvelope(await bare.call('PUT', '/api/faults/link-loss'), 409, /no broker link/);
+
+    const { call } = await setup({ link: new FakeLink() });
+    await call('PUT', '/api/faults/link-loss');
+    assertEnvelope(await call('PUT', '/api/faults/link-loss'), 409, /already down/);
+  });
+
+  it('answers 500 with the reason when the link cannot be cut or restored, and leaves the state true', async () => {
+    const link = new FakeLink();
+    const { call, engine } = await setup({ link });
+    link.failCut = true;
+    assertEnvelope(
+      await call('PUT', '/api/faults/link-loss'),
+      500,
+      /link could not be cut: end failed/,
+    );
+    assert.equal(engine.snapshot().faults.linkLoss, null);
+
+    link.failCut = false;
+    await call('PUT', '/api/faults/link-loss');
+    link.failRestore = true;
+    assertEnvelope(
+      await call('DELETE', '/api/faults/link-loss'),
+      500,
+      /link could not be restored/,
+    );
+    assert.notEqual(engine.snapshot().faults.linkLoss, null);
+  });
+
+  it('drops the messages built while it is down', async () => {
+    const { call, publisher } = await setup({ link: new FakeLink() });
+    await call('PUT', '/api/faults/link-loss');
+    const before = publisher.sent.length;
+    await call('POST', '/api/step');
+    assert.equal(publisher.sent.length, before);
+  });
+});
+
+describe('the effect session over the API', () => {
+  const baseline = [
+    counter('telemetry_sequence_gaps_total', 4),
+    counter('telemetry_rejections_total', 2, { reason: 'range' }),
+    counter('telemetry_ingest_lag_seconds_sum', 9),
+  ];
+
+  it('is null until a fault is switched on, and the state says so', async () => {
+    const { call } = await setup();
+    const state = await call('GET', '/api/state');
+    assert.equal(view(state).faultEffect, null);
+  });
+
+  it('starts with the first fault, from the counters read before it, and keeps them for the second', async () => {
+    const { call, feed } = await setup();
+    feed.current = { samples: baseline, lastOkAt: '2026-10-01T05:00:01.000Z', stale: false };
+    const first = await call('PUT', '/api/faults/drop', { percent: 5 });
+    assert.deepEqual(view(first).faultEffect, {
+      since: new Date(T0 + 5000).toISOString(),
+      baseline: [baseline[0], baseline[1]],
+    });
+
+    feed.current = {
+      samples: [counter('telemetry_sequence_gaps_total', 99)],
+      lastOkAt: 'x',
+      stale: false,
+    };
+    const second = await call('PUT', '/api/faults/duplicate', { percent: 2 });
+    assert.deepEqual(view(second).faultEffect?.baseline, [baseline[0], baseline[1]]);
+  });
+
+  it('starts with a burst as well, and with link loss', async () => {
+    const burst = await setup();
+    await burst.call('POST', '/api/faults/burst', { count: 4 });
+    assert.notEqual(burst.effect.view(), null);
+
+    const link = await setup({ link: new FakeLink() });
+    await link.call('PUT', '/api/faults/link-loss');
+    assert.notEqual(link.effect.view(), null);
+  });
+
+  it('is not started by a command that was refused', async () => {
+    const { call, effect } = await setup();
+    await call('PUT', '/api/faults/drop', { percent: 0 });
+    await call('PUT', '/api/faults/telepathy', { percent: 5 });
+    await call('POST', '/api/faults/burst', { count: 0 });
+    await call('PUT', '/api/faults/link-loss');
+    assert.equal(effect.view(), null);
+
+    await call('PUT', '/api/faults/scope', { mode: 'selected', deviceIds: ['dc-env-01'] });
+    assert.equal(effect.view(), null);
+  });
+
+  it('has no baseline when ingest has not been read, but still knows when it began', async () => {
+    const { call, feed } = await setup();
+    feed.current = { samples: baseline, lastOkAt: null, stale: true };
+    const response = await call('PUT', '/api/faults/drop', { percent: 5 });
+    assert.deepEqual(view(response).faultEffect, {
+      since: new Date(T0 + 5000).toISOString(),
+      baseline: null,
+    });
+  });
+
+  it('goes on after Clear all faults, and starts again with the reset', async () => {
+    const { call, feed } = await setup();
+    feed.current = { samples: baseline, lastOkAt: 'x', stale: false };
+    await call('PUT', '/api/faults/drop', { percent: 5 });
+    const cleared = await call('DELETE', '/api/faults');
+    assert.deepEqual(view(cleared).faultEffect?.baseline, [baseline[0], baseline[1]]);
+
+    feed.current = {
+      samples: [counter('telemetry_sequence_gaps_total', 30)],
+      lastOkAt: 'x',
+      stale: false,
+    };
+    const reset = await call('POST', '/api/faults/effect/reset');
+    assert.equal(reset.status, 200);
+    assert.deepEqual(view(reset).faultEffect?.baseline, [
+      counter('telemetry_sequence_gaps_total', 30),
+    ]);
   });
 });

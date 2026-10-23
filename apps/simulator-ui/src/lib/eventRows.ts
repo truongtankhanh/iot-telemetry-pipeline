@@ -1,4 +1,5 @@
 import type { ObservationEvent } from '../api/types';
+import { FAULT_ROWS, percentText } from './faultSettings';
 
 /**
  * The event timeline's rows (frame 11), as pure functions of the observations the simulator recorded. A row is what
@@ -92,10 +93,154 @@ interface Described {
   scenarios?: (string | null)[];
 }
 
+const num = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+/** The name a fault has on the Faults page: "Drop messages". */
+const faultTitle = (kind: string | null): string =>
+  FAULT_ROWS.find((row) => row.kind === kind)?.title ?? kind ?? 'A fault';
+
+/** What a fault was set to, in words: "5 %", "500 ms, give or take 100 ms", "windows of 4". `null` when the event does not say. */
+function settingsOf(kind: string | null, config: Data): string | null {
+  const percent = num(config.percent);
+  switch (kind) {
+    case 'drop':
+    case 'duplicate':
+      return percent === null ? null : `${percentText(percent)} %`;
+    case 'malformed': {
+      const kinds = strings(config.kinds);
+      const share = percent === null ? null : `${percentText(percent)} %`;
+      return (
+        [share, kinds.length > 0 ? `(${list(kinds)})` : null].filter(Boolean).join(' ') || null
+      );
+    }
+    case 'delay': {
+      const delay = num(config.delayMs);
+      const jitter = num(config.jitterMs);
+      if (delay === null) return null;
+      return jitter === null || jitter === 0
+        ? `${delay} ms`
+        : `${delay} ms, give or take ${jitter} ms`;
+    }
+    case 'reorder': {
+      const window = num(config.window);
+      return window === null ? null : `windows of ${window}`;
+    }
+    default:
+      return null;
+  }
+}
+
+/** The rows of the faults the Faults page sets (SIM-12). They are the Engine's: Studio saw the engine change. */
+function describeFault(type: string | null, data: Data): Described | null {
+  switch (type) {
+    case 'fault-set': {
+      const kind = text(data.kind);
+      const config =
+        typeof data.config === 'object' && data.config !== null ? (data.config as Data) : {};
+      const settings = settingsOf(kind, config);
+      return {
+        source: 'Engine',
+        parts: plain(strong(faultTitle(kind)), settings === null ? ' on' : ` set to ${settings}`),
+        fields: [
+          ['Fault', kind, true],
+          ['Settings', settings],
+        ],
+      };
+    }
+    case 'fault-cleared': {
+      const kind = text(data.kind);
+      return {
+        source: 'Engine',
+        parts: plain(strong(faultTitle(kind)), ' off'),
+        fields: [['Fault', kind, true]],
+      };
+    }
+    case 'fault-scope': {
+      const scope =
+        typeof data.scope === 'object' && data.scope !== null ? (data.scope as Data) : {};
+      const ids = strings(scope.deviceIds);
+      const selected = scope.mode === 'selected';
+      return {
+        source: 'Engine',
+        parts: plain(
+          selected
+            ? `Faults now apply to ${ids.length} selected ${ids.length === 1 ? 'device' : 'devices'}`
+            : 'Faults now apply to every running device',
+        ),
+        fields: [
+          ['Scope', selected ? 'selected devices' : 'all running'],
+          ['Devices', selected ? list(ids) : null, true],
+        ],
+        devices: ids,
+      };
+    }
+    case 'faults-cleared':
+      return {
+        source: 'Engine',
+        parts: plain('All faults cleared: held messages sent, the link restored'),
+        fields: [],
+      };
+    case 'burst': {
+      const count = num(data.count);
+      const sent = num(data.sent);
+      const failed = num(data.failed);
+      const ids = strings(data.deviceIds);
+      return {
+        source: 'Engine',
+        parts: plain(
+          strong('Burst'),
+          ` of ${(sent ?? count ?? 0).toLocaleString('en-US')} messages to ${ids.length} ${ids.length === 1 ? 'device' : 'devices'}`,
+          failed !== null && failed > 0 ? `, ${failed.toLocaleString('en-US')} failed` : '',
+        ),
+        fields: [
+          ['Asked', count === null ? null : String(count)],
+          ['Sent', sent === null ? null : String(sent)],
+          ['Failed', failed === null ? null : String(failed)],
+          ['Devices', ids.length > 0 ? list(ids) : null, true],
+        ],
+        devices: ids,
+      };
+    }
+    case 'link-lost': {
+      const forS = num(data.forS);
+      return {
+        source: 'Engine',
+        parts: plain(
+          strong('Link loss'),
+          ': the simulator cut its connection to the broker',
+          forS === null ? '' : `, to restore itself after ${forS} s`,
+        ),
+        fields: [['Restores after', forS === null ? 'when it is restored' : `${forS} s`]],
+      };
+    }
+    case 'link-restored': {
+      const reason = text(data.reason);
+      const how =
+        reason === 'timer'
+          ? ' by its timer'
+          : reason === 'clear'
+            ? ' by Clear all faults'
+            : reason === 'command'
+              ? ' by hand'
+              : '';
+      return {
+        source: 'Engine',
+        parts: plain(strong('Link loss'), ` over: the connection to the broker was restored${how}`),
+        fields: [['How', reason, true]],
+      };
+    }
+    default:
+      return null;
+  }
+}
+
 function describeEngineState(data: Data): Described {
   const type = text(data.type);
   const deviceId = text(data.deviceId);
   const metric = text(data.metric);
+  const fault = describeFault(type, data);
+  if (fault !== null) return fault;
   switch (type) {
     case 'device-state': {
       const state = text(data.state);

@@ -63,7 +63,23 @@
           "duration": 60
         }
       }
-    ]
+    ],
+    "faults": {
+      "scope": {
+        "mode": "running"
+      },
+      "drop": null,
+      "duplicate": null,
+      "delay": null,
+      "reorder": null,
+      "malformed": null,
+      "linkLoss": null,
+      "activeCount": 0,
+      "deviceCount": 5,
+      "held": 0,
+      "dropped": 0,
+      "bursting": false
+    }
   },
   "devices": [
     {
@@ -351,5 +367,6 @@
     "intervalMs": 2000,
     "simulated": true
   },
-  "observationCursor": 0
+  "observationCursor": 0,
+  "faultEffect": null
 }

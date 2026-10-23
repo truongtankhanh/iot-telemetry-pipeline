@@ -15,7 +15,7 @@ function pills(change: (view: StateView) => void = () => {}, input: Partial<Pill
     lastAlertSink: 'ops-command-center',
     ...input,
   });
-  // The four ids are fixed, so a lookup by id is never undefined (the index signature would say it may be).
+  // The ids are fixed (the fifth only while a fault is on), so a lookup by id is never undefined for the four.
   return Object.fromEntries(list.map((pill) => [pill.id, pill])) as Record<Pill['id'], Pill>;
 }
 
@@ -185,5 +185,68 @@ describe('before data and after the link is lost', () => {
     });
     expect(list.every((p) => p.stale)).toBe(true);
     expect(list[0]).toMatchObject({ id: 'broker', tone: 'ok', detail: ':1883' }); // the last known value, not a guess
+  });
+});
+
+describe('the faults pill', () => {
+  const faultsOn = (view: StateView) => {
+    view.engine.faults.drop = { percent: 5 };
+    view.engine.faults.linkLoss = { since: '2026-10-23T08:00:00.000Z', forS: null };
+    view.engine.faults.activeCount = 2;
+  };
+
+  it('is not there while no fault is on, so the four pills and their order are as they were', () => {
+    const list = derivePills({
+      view: structuredClone(base),
+      link: 'live',
+      publishRate: 7.5,
+      lastAlertSink: 'ops-command-center',
+    });
+    expect(list.map((pill) => pill.id)).toEqual(['broker', 'ingest', 'commandCenter', 'running']);
+  });
+
+  it('is amber and says how many are on, after the four', () => {
+    const view = structuredClone(base);
+    faultsOn(view);
+    const list = derivePills({ view, link: 'live', publishRate: 7.5, lastAlertSink: null });
+    expect(list.map((pill) => pill.id)).toEqual([
+      'broker',
+      'ingest',
+      'commandCenter',
+      'running',
+      'faults',
+    ]);
+    expect(list[4]).toEqual({
+      id: 'faults',
+      label: 'Faults on',
+      detail: '2 active',
+      tone: 'warn',
+      stale: false,
+    });
+  });
+
+  it('counts only what the engine counts: a burst, or nothing on, adds no pill', () => {
+    const view = structuredClone(base);
+    view.engine.faults.activeCount = 0;
+    view.engine.faults.bursting = true;
+    const list = derivePills({ view, link: 'live', publishRate: 0, lastAlertSink: null });
+    expect(list.some((pill) => pill.id === 'faults')).toBe(false);
+  });
+
+  it('is dimmed with the others when the link to the simulator is lost', () => {
+    const view = structuredClone(base);
+    faultsOn(view);
+    const list = derivePills({ view, link: 'lost', publishRate: 0, lastAlertSink: null });
+    expect(list.find((pill) => pill.id === 'faults')).toMatchObject({ tone: 'warn', stale: true });
+  });
+
+  it('is not there before the first message, when nobody knows what is on', () => {
+    const list = derivePills({
+      view: null,
+      link: 'connecting',
+      publishRate: 0,
+      lastAlertSink: null,
+    });
+    expect(list.some((pill) => pill.id === 'faults')).toBe(false);
   });
 });
