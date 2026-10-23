@@ -21,6 +21,7 @@ import {
   pauseDevice,
   releaseValue,
   removeAnomaly,
+  republishMessage,
   resetEngine,
   resetFaultEffect,
   runScenario,
@@ -1311,6 +1312,67 @@ describe('the fault commands', () => {
         const failure = await sendBurst(2000, { fetch: asFetch(refusal(status, reason)) }).catch(
           (e: unknown) => e,
         );
+        expect((failure as ApiError).status).toBe(status);
+        expect((failure as ApiError).message).toBe(reason);
+      }
+    });
+  });
+
+  describe('republishMessage', () => {
+    const again = {
+      id: 9,
+      at: '2026-10-23T08:00:00.000Z',
+      ackMs: 3.1,
+      deviceId: 'dc-env-01',
+      topic: 'campus/BLD-DC/dc-env-01/telemetry',
+      payload: '{"seq":1}',
+      seq: 1,
+      ts: '2026-10-23T07:59:58.000Z',
+      fault: 'republish',
+    };
+
+    it('posts to the path of the message and answers the state with the message that went out', async () => {
+      const fetchFn = reply({ ...view, message: again });
+      const answer = await republishMessage(4, { fetch: asFetch(fetchFn) });
+      expect(answer.message).toEqual(again);
+      expect(answer.engine.devices.length).toBe(view.engine.devices.length);
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/messages/4/republish',
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: undefined,
+      });
+    });
+
+    it('does not send an id that is not a whole number of 1 or more', async () => {
+      for (const id of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 2]) {
+        const fetchFn = reply({ ...view, message: again });
+        const failure = await republishMessage(id, { fetch: asFetch(fetchFn) }).catch(
+          (e: unknown) => e,
+        );
+        expect((failure as ApiError).status, String(id)).toBe(400);
+        expect(fetchFn).not.toHaveBeenCalled();
+      }
+    });
+
+    it('fails loudly on an answer without the message, or with one that is not a message', async () => {
+      for (const body of [view, { ...view, message: 'sent' }, { ...view, message: { id: 'x' } }]) {
+        const failure = await republishMessage(1, { fetch: asFetch(reply(body)) }).catch(
+          (e: unknown) => e,
+        );
+        expect(failure).toBeInstanceOf(ApiError);
+      }
+    });
+
+    it('carries the simulator’s reason for 404, 409 and 502', async () => {
+      for (const [status, reason] of [
+        [404, 'Message 4 is not in the publish log; only the last 200 are kept'],
+        [409, 'The link to the broker is down; restore it first'],
+        [502, 'The broker did not accept the message: not authorised'],
+      ] as const) {
+        const failure = await republishMessage(4, {
+          fetch: asFetch(refusal(status, reason)),
+        }).catch((e: unknown) => e);
         expect((failure as ApiError).status).toBe(status);
         expect((failure as ApiError).message).toBe(reason);
       }

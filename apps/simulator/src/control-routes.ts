@@ -11,7 +11,7 @@ import {
   type IngestState,
   type MetricsFeed,
 } from './ingest-poller.ts';
-import type { DeviceState, Engine, EngineSnapshot } from './engine.ts';
+import type { DeviceState, Engine, EngineSnapshot, PublishedMessage } from './engine.ts';
 import type { FaultEffect, FaultEffectView } from './fault-effect.ts';
 import {
   type FaultConfigs,
@@ -107,6 +107,8 @@ export interface RoutesContext {
   rules: RulesView;
   /** When the faults began and what ingest's counters said then, for the effect panel. */
   effect: FaultEffect;
+  /** The publish log: the last `capacity` messages the broker acknowledged and the stream forwarded, newest last. */
+  messages: { find(id: number): PublishedMessage | undefined; capacity: number };
 }
 
 /** Everything a client needs to draw the current state; the answer to every command. */
@@ -759,6 +761,34 @@ export function createRoutes(context: RoutesContext) {
       engine.clearFaults(),
     );
     return ok(view());
+  });
+
+  on('POST', '/api/messages/:id/republish', async ({ id }) => {
+    const messageId = /^\d+$/.test(id) ? Number(id) : NaN;
+    if (!Number.isSafeInteger(messageId) || messageId < 1) {
+      throw new HttpError(400, '"id" must be a whole number of 1 or more');
+    }
+    const original = context.messages.find(messageId);
+    if (!original) {
+      throw new HttpError(
+        404,
+        `Message ${messageId} is not in the publish log; only the last ${context.messages.capacity} are kept`,
+      );
+    }
+    const feed = context.ingest.metrics();
+    let sent: PublishedMessage;
+    try {
+      sent = await engine.republish(original);
+    } catch (error) {
+      if (error instanceof FaultConflictError) throw error;
+      // The broker did not take it: that is not the caller's input, which is why it is not the 400 of an Error.
+      throw new HttpError(
+        502,
+        `The broker did not accept the message: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    context.effect.ensureStarted(feed);
+    return ok({ message: sent, ...view() });
   });
 
   on('POST', '/api/reset', () => {

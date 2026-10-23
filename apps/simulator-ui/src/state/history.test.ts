@@ -245,3 +245,43 @@ describe('HistoryStore snapshots', () => {
     expect(history.snapshot('a', 'temperature_c')).toHaveLength(1);
   });
 });
+
+describe('HistoryStore and a republished message', () => {
+  const republished = (deviceId: string, atS: number, value: number): PublishedMessage => ({
+    ...message(deviceId, atS, { temperature_c: value }),
+    fault: 'republish',
+  });
+
+  it('adds no sample, does not replace the last message and does not move the last seen, when recorded', () => {
+    const history = new HistoryStore();
+    const original = message('a', 0, { temperature_c: 22.5 });
+    history.record(original);
+    history.record(republished('a', 5, 99));
+    vi.advanceTimersByTime(1000);
+
+    expect(history.series('a', 'temperature_c')).toEqual([{ t: T0, v: 22.5 }]);
+    expect(history.lastPayload('a')).toBe(original);
+    expect(history.lastSeen('a')).toBe(T0);
+  });
+
+  it('leaves it out of a seed too', () => {
+    const history = new HistoryStore();
+    history.seed([message('a', 0), republished('a', 0, 22.5)]);
+    expect(history.series('a', 'temperature_c')).toHaveLength(1);
+  });
+
+  it('does not make a device known that has only a republished message', () => {
+    const history = new HistoryStore();
+    history.record(republished('a', 0, 22.5));
+    vi.advanceTimersByTime(1000);
+    expect(history.lastSeen('a')).toBeNull();
+    expect(history.deviceSnapshot('a')).toEqual({ lastSeen: null, last: null });
+  });
+
+  it('still records a copy made by the duplicate fault, as it always did', () => {
+    const history = new HistoryStore();
+    history.record(message('a', 0, { temperature_c: 22.5 }));
+    history.record({ ...message('a', 0, { temperature_c: 22.5 }), fault: 'duplicate' });
+    expect(history.series('a', 'temperature_c')).toHaveLength(2);
+  });
+});

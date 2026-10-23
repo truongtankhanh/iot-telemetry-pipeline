@@ -40,9 +40,30 @@ export type StateChange =
   | { type: 'faults-cleared' }
   | { type: 'burst'; count: number; sent: number; failed: number; deviceIds: string[] }
   | { type: 'link-lost'; forS: number | null }
-  | { type: 'link-restored'; reason: 'command' | 'timer' | 'clear' };
+  | { type: 'link-restored'; reason: 'command' | 'timer' | 'clear' }
+  | { type: 'republish'; deviceId: string; seq: number };
+
+/**
+ * The real clocks, apart from the engine's `Clock`, which may be simulated and so cannot say what time it is or how long
+ * a PUBACK took. `wall` is milliseconds since the epoch; `mono` is a monotonic millisecond counter with a fraction.
+ */
+export interface RealTime {
+  wall(): number;
+  mono(): number;
+}
+
+const SYSTEM_REAL_TIME: RealTime = { wall: () => Date.now(), mono: () => performance.now() };
 
 export interface PublishedMessage {
+  /** From 1, strictly increasing for the life of the process, given when `published` is emitted: the order of the log. */
+  id: number;
+  /** Wall time (ISO 8601) of the broker's acknowledgement. `ts` is the payload's, and follows the engine's clock. */
+  at: string;
+  /**
+   * Milliseconds, to a tenth, from handing the message to the publisher to its PUBACK. It includes the client's own
+   * queueing, so for a burst chunk of 250 it is more than the broker's time alone.
+   */
+  ackMs: number;
   deviceId: string;
   topic: string;
   payload: string;
@@ -92,6 +113,8 @@ export interface EngineOptions {
   anomalies?: Anomaly[];
   /** The simulator's own connection to the broker, for the link-loss fault. Without it that fault is refused. */
   link?: LinkControl;
+  /** Defaults to `Date.now` and `performance.now`; a test passes a fake to fix `at` and `ackMs`. */
+  realTime?: RealTime;
 }
 
 export interface EngineSnapshot {
@@ -202,8 +225,10 @@ export class Engine extends EventEmitter<EngineEvents> {
   private epochMs = 0;
   private started = false;
   private publishedCount = 0;
+  private nextMessageId = 1;
   private cancelTimer: (() => void) | undefined;
   private readonly link: LinkControl | undefined;
+  private readonly realTime: RealTime;
   private switches: Switches = { ...NO_SWITCHES };
   private scope: FaultScope = DEFAULT_SCOPE;
   private linkDown: { since: string; forS: number | null } | undefined;
@@ -220,6 +245,7 @@ export class Engine extends EventEmitter<EngineEvents> {
     assertInterval(options.intervalMs, 'The publish interval');
     this.publisher = options.publisher;
     this.link = options.link;
+    this.realTime = options.realTime ?? SYSTEM_REAL_TIME;
     this.clock = options.clock ?? systemClock;
     this.random = options.random ?? Math.random;
     this.intervalMs = options.intervalMs;
@@ -661,19 +687,61 @@ export class Engine extends EventEmitter<EngineEvents> {
     return this.dispatch(device, topic, payload);
   }
 
-  /** The message as the publisher gets it. Counted when handed over, not when built, so a dropped one is not counted. */
-  private send(message: Outgoing): Promise<void> {
+  /**
+   * The message as the publisher gets it. Counted when handed over, not when built, so a dropped one is not counted.
+   * `published` is emitted when the publisher settles (the PUBACK at QoS 1), with the time that took. `onSent` gets the
+   * emitted message, for the one caller that has to answer with it; it adds no await.
+   */
+  private send(message: Outgoing, onSent?: (sent: PublishedMessage) => void): Promise<void> {
     this.publishedCount++;
+    const started = this.realTime.mono();
     return this.publisher.publish(message.topic, message.body, { qos: 1 }).then(() => {
-      this.emit('published', {
+      const sent: PublishedMessage = {
+        id: this.nextMessageId++,
+        at: new Date(this.realTime.wall()).toISOString(),
+        ackMs: Math.round((this.realTime.mono() - started) * 10) / 10,
         deviceId: message.deviceId,
         topic: message.topic,
         payload: message.body,
         seq: message.seq,
         ts: message.ts,
         ...(message.fault ? { fault: message.fault } : {}),
-      });
+      };
+      this.emit('published', sent);
+      onSent?.(sent);
     });
+  }
+
+  /**
+   * Sends a message that was published before again, byte for byte: same topic, payload, `seq` and `ts`, so ingest reads
+   * a redelivery. It is the operator's explicit resend, so it goes straight to the publisher, outside every fault switch
+   * and the scope, and is refused while the link is down (a message built then would be dropped without a word). Counted
+   * in `published`, tagged `republish`. A publish the broker refuses rejects the call; there is no `tick-error` for it,
+   * the caller is a command and answers it.
+   */
+  async republish(
+    original: Pick<PublishedMessage, 'deviceId' | 'topic' | 'payload' | 'seq' | 'ts'>,
+  ): Promise<PublishedMessage> {
+    if (this.linkDown) {
+      throw new FaultConflictError('The link to the broker is down; restore it first');
+    }
+    const result: { sent?: PublishedMessage } = {};
+    await this.send(
+      {
+        deviceId: original.deviceId,
+        topic: original.topic,
+        body: original.payload,
+        seq: original.seq,
+        ts: original.ts,
+        fault: 'republish',
+      },
+      (sent) => {
+        result.sent = sent;
+      },
+    );
+    if (!result.sent) throw new Error('The message was published but not reported');
+    this.emit('state', { type: 'republish', deviceId: original.deviceId, seq: original.seq });
+    return result.sent;
   }
 
   private inScope(device: DeviceRuntime): boolean {

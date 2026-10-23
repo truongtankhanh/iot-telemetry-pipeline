@@ -42,4 +42,27 @@ describe('RateCounter', () => {
     rate.record(10_200);
     expect(rate.perSecond(11_000)).toBe(2);
   });
+
+  it('counts a weight as that many messages at that time', () => {
+    const rate = new RateCounter(5000, 0);
+    rate.record(100);
+    rate.record(500, 9); // nine messages the simulator skipped, reported at 500 ms
+    expect(rate.perSecond(1000)).toBe(10);
+  });
+
+  it('lets a weighted time leave the window like any other', () => {
+    const rate = new RateCounter(5000, 0);
+    rate.record(100, 50);
+    expect(rate.perSecond(5000)).toBe(10); // 50 over the 5 s window
+    expect(rate.perSecond(5200)).toBe(0); // the one at 100 ms is out of the window
+  });
+
+  it('counts nothing for a weight that is zero, negative or not a number', () => {
+    const rate = new RateCounter(5000, 0);
+    rate.record(100, 0);
+    rate.record(200, -3);
+    rate.record(300, Number.NaN);
+    rate.record(400, Number.POSITIVE_INFINITY);
+    expect(rate.perSecond(1000)).toBe(0);
+  });
 });

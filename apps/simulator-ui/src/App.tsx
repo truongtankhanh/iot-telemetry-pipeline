@@ -20,6 +20,7 @@ import { LinkBanner } from './shell/LinkBanner';
 import { Navigation } from './shell/Navigation';
 import { Shell } from './shell/Shell';
 import { HistoryStore } from './state/history';
+import { MessageLog } from './state/messageLog';
 import { ObservationLog } from './state/observationLog';
 import { PulseBus } from './state/pulses';
 import { connectStream } from './state/stream';
@@ -69,6 +70,11 @@ const Timeline = lazy(() =>
 // The Faults page is its own chunk: it brings the fault rows, the scope picker and the effect panel, which no other page needs.
 const Faults = lazy(() =>
   import('./pages/faults/Faults').then((module) => ({ default: module.Faults })),
+);
+
+// The Event stream is its own chunk: it brings the table, the filters and the detail with the command, which no other page needs.
+const Events = lazy(() =>
+  import('./pages/events/Events').then((module) => ({ default: module.Events })),
 );
 
 const TITLE = 'Simulator Studio';
@@ -122,6 +128,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Topology />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/events"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Events />
           </Suspense>
         }
       />
@@ -278,20 +292,29 @@ export function App() {
   const [pulses] = useState(() => new PulseBus());
   // What the simulator saw happen (the last 5,000 observations), for the Overview's timeline.
   const [observations] = useState(() => new ObservationLog());
+  // The last 200 forwarded messages, the exact total and the sampling notice, for the Event stream.
+  const [messages] = useState(() => new MessageLog());
   // One animation budget for the window (12 animated nodes, 24 glowing lines). Without a provider nothing animates.
   const [budget] = useState(() => new AnimationBudget());
   useEffect(() => {
-    const connection = connectStream(store, { history, pulses, observations });
+    const connection = connectStream(store, { history, pulses, observations, messages });
     return () => {
       connection.close();
       history.dispose();
       pulses.dispose();
       observations.dispose();
+      messages.dispose();
     };
-  }, [store, history, pulses, observations]);
+  }, [store, history, pulses, observations, messages]);
 
   return (
-    <StudioProvider store={store} history={history} pulses={pulses} observations={observations}>
+    <StudioProvider
+      store={store}
+      history={history}
+      pulses={pulses}
+      observations={observations}
+      messages={messages}
+    >
       <AnimationBudgetProvider budget={budget}>
         <BrowserRouter>
           <StudioFrame />

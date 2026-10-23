@@ -8,11 +8,13 @@ import type {
   ObservationEvent,
   ObservationsPage,
   PublishedMessage,
+  SamplingReport,
   Snapshot,
   StateView,
 } from '../api/types';
 import { RateCounter } from '../lib/rate';
 import type { HistoryStore } from './history';
+import type { MessageLog } from './messageLog';
 import { OBSERVATION_CAPACITY, type ObservationLog } from './observationLog';
 import type { PulseBus } from './pulses';
 import type { StudioStore } from './store';
@@ -36,6 +38,8 @@ export interface StreamOptions {
   history?: HistoryStore;
   /** Told when each device publishes, for the dots on the topology's edges (nothing renders per message). */
   pulses?: PulseBus;
+  /** The messages of the Event stream: seeded by each snapshot, fed by each `published` message and each `sampling` report. */
+  messages?: MessageLog;
   /** How often the publish rate is written to the store. */
   rateEveryMs?: number;
   /**
@@ -70,6 +74,11 @@ export interface StreamConnection {
  *   its listeners at most once a second). A snapshot seeds the history from its publish log, replacing what was
  *   there, so a reconnect does not double the readings. With `pulses`, each `published` message also tells that bus
  *   which device published (the topology's dots); the publish log of a snapshot is the past and is not replayed.
+ * - With `messages`, the same snapshot seeds that log (the publish log, `publishTotal` and `sampling`) and each `published`
+ *   message is recorded in it. The simulator **samples** `published` events when they come faster than its budget and says
+ *   so with a `sampling` report once per window (`skipped`, and `total`, the exact count of every message up to then): the
+ *   report's `skipped` is added to the rate at the time it arrives, so the rate stays the rate of the messages and not of
+ *   the events received, and it sets the log's total and its sampling notice. Without a `sampling` event nothing changes.
  * - `observation` is recorded in `observations`, when one is given. A snapshot shows how far the simulator's log has
  *   got (`observationCursor`, the id of its newest event): when the log here is behind, it is read from the simulator
  *   newest first, page by page, to the end and added (the events that arrived live meanwhile stay; one read at a
@@ -156,7 +165,9 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
 
   on<Snapshot>('snapshot', (data, at) => {
     store.getState().applySnapshot(data, at);
-    options.history?.seed(Array.isArray(data.publishLog) ? data.publishLog : []);
+    const publishLog = Array.isArray(data.publishLog) ? data.publishLog : [];
+    options.history?.seed(publishLog);
+    options.messages?.seed(publishLog, { total: data.publishTotal, sampling: data.sampling });
     if (typeof data.observationCursor === 'number') void fillObservations(data.observationCursor);
   });
   on<StateView['ingest']>('ingest', (data, at) => store.getState().patchSlice('ingest', data, at));
@@ -183,10 +194,17 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
 
   on<PublishedMessage>('published', (message, at) => {
     options.history?.record(message);
+    options.messages?.record(message);
     // A message that names no device cannot draw a dot on a device's edge.
     if (typeof message.deviceId === 'string') options.pulses?.emit(message.deviceId, at);
   });
   source.addEventListener('published', () => rate.record(now()));
+  on<SamplingReport>('sampling', (report, at) => {
+    // Not a report (an older or different simulator): nothing to count and nothing to show.
+    if (typeof report.total !== 'number' || typeof report.active !== 'boolean') return;
+    if (typeof report.skipped === 'number') rate.record(at, report.skipped);
+    options.messages?.applySampling(report);
+  });
   on<ObservationEvent>('observation', (event) => {
     // An event without an id cannot be told from another, and could not be kept once.
     if (typeof event.id === 'number') observations?.record(event);

@@ -49,10 +49,15 @@ export interface StudioState {
 
 export type StudioStore = StoreApi<StudioState>;
 
-/** A snapshot without the publish log: it is the stream's to show, not the store's to hold. */
+/**
+ * A snapshot without the publish log and what goes with it (the count of every message and the sampling notice): they
+ * are the stream's to show, in the message log, not the store's to hold, and a message arrives hundreds of times a second.
+ */
 function withoutLog(snapshot: Snapshot): StateView {
   const view: Partial<Snapshot> = { ...snapshot };
   delete view.publishLog;
+  delete view.publishTotal;
+  delete view.sampling;
   return view as StateView;
 }
 

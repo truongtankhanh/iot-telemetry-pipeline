@@ -724,3 +724,80 @@ The Faults page ([frame 07](../design/simulator/mockups/07-fault-injection.dc.ht
   counts of the snapshot are not shown: they refresh only when something else changes, and the Message inspector (SIM-13) is where a dropped message belongs.
 - **Not done here, left as they were:** a count field for the burst (the button is a fixed 1,000), timed or staggered faults, a fault from a scenario file, and the Twin's
   fault visuals (SIM-19).
+
+## Amendment, 2026-10-23: the Event stream (SIM-13, simulator half)
+
+The Event stream page ([frame 06](../design/simulator/mockups/06-message-inspector.dc.html)) lists the last 200 published messages with their PUBACK time and
+resends one with the same `seq`. The 200-message publish log of SIM-03 already existed; this adds what a row needs, one command, and a bound on what the stream
+forwards. No dependency, no route in ingest, no change to the contract, the metrics, Compose or Kubernetes.
+
+- **PUBACK is measured by the simulator, on the real clock.** `published` is emitted when the publisher settles, which at QoS 1 is the broker's PUBACK, so the engine
+  takes the time before the call and builds the message in the same `.then` that already emitted it (`ackMs`, to a tenth, and `at`, the wall time). The engine's `Clock`
+  cannot be used: on `--simulated-clock` it stands still or jumps a whole interval. `EngineOptions.realTime` is the seam (default `Date.now` and `performance.now`), so
+  the cadence, the random source and the parity tests are untouched. `ackMs` includes the client's own queueing: for a burst chunk of 250 it is more than the broker's time alone.
+  `id` (from 1, given when the event is emitted) is the key of a row and of a republish. Ingest was not asked for a delivery time (brief, open question 7): PUBACK is the broker's.
+- **Republish takes the message from the log, not from the request.** `POST /api/messages/:id/republish` sends a logged message byte for byte. The alternative, a body
+  with `{ topic, payload }`, would be a new capability for an unauthenticated API ("publish anything to the broker"); a resend of what the simulator itself published adds none, and
+  is bounded by the log (200 ids). It goes straight to the publisher, **outside the fault switches and the scope** (it is an explicit act: a drop or a malformed rewrite of it
+  would make "send this again" untrue), is refused with `409` while the link is down instead of being built and dropped, is counted in `published`, comes back tagged `republish`
+  and is a `StateChange` (an observation), while the message itself is not (published messages never are). A broker that refuses it is `502`, not the caller's input. A skipped
+  message (below) is not in the log and cannot be republished.
+- **What ingest does with a repeat** (read in `sequence-ledger.ts` and `batch-writer.service.ts`): a message with an equal or lower `seq` that fills no hole and whose `ts` is not
+  newer is a redelivery and is ignored by the ledger (no gap, no restart); its readings hit `ON CONFLICT DO NOTHING`, so `telemetry_readings_total{result="stored"}` does not move
+  and `{result="duplicate"}` grows by the number of metrics; `telemetry_messages_total{result="accepted"}` grows by one; rollups and rules run on stored rows only. The acceptance
+  check therefore reads `{result="stored"}`: a `grep` of every `telemetry_readings_total` series shows the `duplicate` one growing, by design. A repeat of a malformed message is
+  rejected again. The effect session starts on a republish as it does on a burst, and the baseline already holds the `duplicate` and `accepted` series (the poller forwards every
+  label of `telemetry_readings_total` and `telemetry_messages_total`; `fault-effect.ts` selects by name), so nothing changed there.
+- **Sampling is in the control server, not in the engine and not only in the page.** The engine publishes every due device in the same tick, a burst is up to 5,000 messages and the
+  benchmark's rate is 10,000 a second; each `published` event was serialized once and written to up to 20 sockets, and a client more than 1 MiB behind is dropped. A page-side
+  throttle would leave that cost on the server, and sampling in the engine would starve every other listener. `PublishSampler` (pure, an injected clock) counts every message and
+  forwards the first **250** of each one-second window to the log and the stream; the rest are skipped. The budget is a burst chunk (`FAULT_LIMITS.burstChunk`), not a lower number,
+  because the 100-device registry offers 100 messages within milliseconds every 2 s: at 50 a normal demo fleet would be "sampling" on every tick. The stream says so (a `sampling`
+  event per window while it skips, one closing event with `active: false`, a timer that exists only while sampling is going on, and `publishTotal` and `sampling` in the first
+  message), and a page's message rate is `forwarded + skipped` over the window, because counting `published` events would now under-report. The log holds what was forwarded.
+  `StateView` does not change, so the Studio fixtures of the state do not move; `apps/simulator-ui/src/api/types.ts` gains the optional fields and the `sampling` event name (types only).
+- **The benchmark does not reach this stream today.** `bench.ts` publishes with its own client and `bench` never starts the control server, so the "benchmark's rate" the ticket
+  names is, for this stream, a burst or a short-interval 100-device fleet; the unit test is "10,000 events in, at most the budget out, the count exact". Whether SIM-15 runs the
+  benchmark in a child process or through the engine decides whether it ever does (brief, open question 4); SIM-13 is checked again then.
+- **Not done here, and why.** Dropped messages are not rows of the Event stream (the `dropped` event stays on the stream; the frame has no state for one). Clear is the page's own
+  cut-off: the log is shared (it seeds the Fleet's last payload and every new snapshot), so a server-side clear would empty it for every tab. `size`, `qos` and `retain` are not
+  fields: the page computes the size in bytes from the payload, and QoS 1 and retain off are constants of the contract (`docs/telemetry-contract.md`, section 3).
+- **Security posture.** Nothing is written to disk and nothing authenticates, as before. What an unauthenticated caller on loopback can now do beyond the burst is resend a message
+  the simulator already published, as often as it asks. Same trust level as anomalies, holds and the burst. Nothing was hardened.
+
+## Amendment, 2026-10-23: the Event stream as built (SIM-13, Studio half)
+
+The Event stream page ([frame 06](../design/simulator/mockups/06-message-inspector.dc.html)) at `/events` lists the last 200 published messages, filters them, pages
+them, shows one with its command and sends it again. It adds no dependency and no route to the simulator; it reads what the simulator half of the same ticket
+(amendment above) provides.
+
+- **The messages are a store of their own, outside React and outside Zustand.** `MessageLog` holds the rows, the exact total and the sampling notice, as `HistoryStore` and
+  `ObservationLog` hold theirs, because a message arrives hundreds of times a second at the benchmark's rate and nothing may render per message. A row is worked out once when the
+  message arrives (`toRow`: the payload parsed once, the size in bytes, the time of the acknowledgement), not on every render. Notifications are throttled to **250 ms**, not the other
+  stores' second: a table people watch moves in steps they notice at 1 s. `HistoryStore` keeps a series per metric and the last message per device, and cannot be asked for a
+  list, so it was not extended. Two small parsers (the metrics of a payload, an indented payload) are written again beside `history.ts` and `pages/fleet/Inspector.tsx` rather than
+  shared: a refactor of two pages that work was not this ticket's.
+- **Total and rate stay exact under sampling.** The first message of the stream gives the total (`publishTotal`) and the notice; each `sampling` report sets the total to its
+  `total` (exact, because every forwarded event of the window has arrived before the report) and adds its `skipped` to the rate at the time it arrives (`RateCounter.record(at, weight)`),
+  so the header pill and the Overview, which read the rate, are right as well. Without a `sampling` event nothing changes. The notice on the page says the list is a sample and that
+  the figures are exact; the skipped count sits in the summary line, not in the notice, because the notice is a live region and its words would be announced every window.
+- **Following, pause and clear.** Page 1 follows the stream; any other page, and Pause, hold a copy of the rows taken in the render that starts the hold, and the chip counts the
+  messages published since from the totals (so it is right when more arrive than the log holds). **Clear is the page's own cut-off**, held in the log: it hides every message up to the
+  newest id now, survives leaving the page and a reconnect (the next snapshot holds the same messages), is lost with a reload, and is dropped when a snapshot's newest id is lower than one
+  already seen (a restarted simulator begins its ids again). The simulator's own log is untouched: it is shared with the Fleet and with every reconnect.
+- **The address is the state.** `q`, `device`, `metric`, `page`, `size` and `message` (the open message; opening one adds a history entry, so Back closes it). The command palette has
+  written `/events?topic=<topic>` since SIM-04; `topic` is read as the text filter and the address is rewritten to `?q=` once, replacing the entry. A page past the end is rewritten to the
+  page shown.
+- **The command uses `localhost`.** `mosquitto_pub -h localhost -p <port> -q 1 -t <topic> -m '<payload>'`, as the frame and [the contract's section 8](../telemetry-contract.md) show; the
+  port is the one the state reports for the broker. The broker host in the state can be a service name that only the simulator's network resolves (the Compose demo), and the command is
+  for a shell on the machine that runs the broker. The payload is always single-quoted with `'` written `'\''`, the topic only when it has a character a shell would read, because the
+  simulator makes payloads with quotes and newlines on purpose (the malformed kinds). Payloads and topics are rendered as text, never as HTML.
+- **Republish.** A button on the open message; the simulator's reason (`404` no longer in the last 200, `409` link down, `502` broker refused) is shown as it came. Its answer is the new
+  state and goes into the store at once, so the effect session it starts is on the Faults page without waiting for the stream. The button is disabled for a message that has left the
+  log (`MessageLog.has`, which ignores Clear: the simulator can still send what the page has hidden). The page keeps the open message's row, so its detail stays after its row is gone.
+  A message sent again is **not recorded in the charts' history**: it has the original's time and values and would put a second sample at the same instant on every chart of the device.
+  The `duplicate` fault's copies are recorded as before (outside this ticket).
+- **The Faults page shows the repeat.** The effect panel gains a row for `telemetry_readings_total{result="duplicate"}` ("the same reading arriving again, ignored"), so a message
+  sent again reads `stored +0` and `duplicate +n` (n = its metrics), and the duplicate fault shows its effect there too. The simulator's baseline already held every label of that series.
+- **Not done here.** Dropped messages as rows or a counter (the frame has no state for one); a server-side clear; the optional `id`, `at` and `ackMs` of `PublishedMessage` are
+  still optional in the Studio's types (a row without an `id` is not kept), to be tightened when the guards look like noise; `CopyButton` still lives in `pages/fleet/`.

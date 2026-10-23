@@ -242,18 +242,48 @@ export interface StateView {
 }
 
 export interface PublishedMessage {
+  /**
+   * From 1, increasing for the life of the simulator process: the key of a row and the id of a republish. Optional here
+   * only so that the code written before the Event stream still compiles; the simulator always sends it.
+   */
+  id?: number;
+  /** Wall time (ISO 8601) of the broker's acknowledgement; `ts` is the payload's and follows the engine's clock. */
+  at?: string;
+  /** Milliseconds, to a tenth, from handing the message to the client to its PUBACK (includes the client's own queueing). */
+  ackMs?: number;
   deviceId: string;
   topic: string;
   payload: string;
   seq: number;
   ts: string;
-  /** Present when the message is not a plain one: a second copy, a burst message or a malformed payload. */
-  fault?: 'duplicate' | 'burst' | `malformed:${MalformedKind}`;
+  /**
+   * Present when the message is not a plain one: a second copy, a burst message, a malformed payload, or one the operator
+   * sent again from the log (`republish`).
+   */
+  fault?: 'duplicate' | 'burst' | 'republish' | `malformed:${MalformedKind}`;
+}
+
+/**
+ * What the simulator's sampling of `published` events says: the stream forwards a budget of messages per window and
+ * counts the rest. Sent as the `sampling` event once per window while it skips, and once more with `active: false`.
+ */
+export interface SamplingReport {
+  /** Every message so far, forwarded or not. */
+  total: number;
+  skipped: number;
+  forwarded: number;
+  windowMs: number;
+  budgetPerS: number;
+  active: boolean;
 }
 
 /** The first message of the event stream: the state view plus the last published messages. */
 export interface Snapshot extends StateView {
   publishLog: PublishedMessage[];
+  /** Every message published so far, forwarded or not (the log holds only what was forwarded). */
+  publishTotal?: number;
+  /** Whether the stream is skipping messages now, and by what budget. */
+  sampling?: { active: boolean; skipped: number; budgetPerS: number; windowMs: number };
 }
 
 /** The events of `GET /api/stream` that Studio listens to. */
@@ -261,6 +291,7 @@ export type StreamEventName =
   | 'snapshot'
   | 'state'
   | 'published'
+  | 'sampling'
   | 'ingest'
   | 'alerts'
   | 'metrics'
@@ -416,6 +447,14 @@ export interface FaultBodies {
 export interface BurstAnswer extends StateView {
   sent: number;
   failed: number;
+}
+
+/**
+ * The answer of `POST /api/messages/:id/republish`: the state, and the message as it went out again (a new `id`, the same
+ * `seq`, `ts` and payload, tagged `republish`).
+ */
+export interface RepublishAnswer extends StateView {
+  message: PublishedMessage;
 }
 
 // ---- The observation log (SIM-09) ----
