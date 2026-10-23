@@ -79,6 +79,50 @@ describe('faultEffect', () => {
     // Messages are the sum over accepted and rejected; readings only the ones stored.
     expect(row(model, 'messages')?.delta).toBe(474);
     expect(row(model, 'readings')?.delta).toBe(240);
+    expect(row(model, 'duplicates')?.delta).toBe(9);
+  });
+
+  it('shows a message sent again as stored +0 and duplicate +n, one per metric', () => {
+    // A message with two metrics was republished: one more message, no new reading, two repeats.
+    const model = faultEffect({
+      faults: off,
+      effect: effect(BASELINE),
+      metrics: feed(
+        BASELINE.map((s) => {
+          if (s.name === 'telemetry_messages_total' && s.labels.result === 'accepted') {
+            return { ...s, value: s.value + 1 };
+          }
+          if (s.name === 'telemetry_readings_total' && s.labels.result === 'duplicate') {
+            return { ...s, value: s.value + 2 };
+          }
+          return s;
+        }),
+      ),
+    });
+    expect(row(model, 'readings')?.delta).toBe(0);
+    expect(row(model, 'duplicates')?.delta).toBe(2);
+    expect(row(model, 'duplicates')?.detail).toBe('the same reading arriving again, ignored');
+    expect(row(model, 'messages')?.delta).toBe(1);
+  });
+
+  it('counts the duplicates as 0 when ingest has not exported that series yet, and says "—" when it started again', () => {
+    const fresh = faultEffect({
+      faults: off,
+      effect: effect([gaps(0), readings('stored', 10)]),
+      metrics: feed([gaps(0), readings('stored', 10)]),
+    });
+    expect(row(fresh, 'duplicates')?.delta).toBe(0);
+
+    const restarted = faultEffect({
+      faults: off,
+      effect: effect([readings('duplicate', 50)]),
+      metrics: feed([readings('duplicate', 2)]),
+    });
+    expect(row(restarted, 'duplicates')).toMatchObject({ delta: null, restarted: true });
+  });
+
+  it('has no duplicates row before a fault has been switched on', () => {
+    expect(faultEffect({ faults: off, effect: null, metrics: feed(NOW) }).rows).toEqual([]);
   });
 
   it('puts the rows in the frame’s order, with the series as ingest exports them', () => {
@@ -93,6 +137,7 @@ describe('faultEffect', () => {
       'telemetry_rejections_total{reason="json"}',
       'telemetry_messages_total',
       'telemetry_readings_total{result="stored"}',
+      'telemetry_readings_total{result="duplicate"}',
     ]);
   });
 

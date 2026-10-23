@@ -12,6 +12,7 @@ import type {
   ObservationEvent,
   ObservationsPage,
   PagedAlert,
+  RepublishAnswer,
   RunAnswer,
   RunConflict,
   SaveAnswer,
@@ -436,6 +437,39 @@ export function sendBurst(count: number, options: RequestOptions = {}): Promise<
     { count },
     options,
     (body) => typeof body.sent === 'number' && typeof body.failed === 'number',
+  );
+}
+
+/** Whether a value has what Studio reads of a message the simulator sent again. */
+function isSentMessage(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const message = value as Record<string, unknown>;
+  return (
+    typeof message.id === 'number' &&
+    typeof message.seq === 'number' &&
+    typeof message.payload === 'string'
+  );
+}
+
+/**
+ * Sends a message of the simulator's publish log again, byte for byte (the same topic, payload, `seq` and `ts`), outside
+ * the faults, and answers with the state and the message as it went out (a new `id`). `404` when the message is no longer
+ * in the last 200 (or was never forwarded to the stream), `409` while the link to the broker is down, `502` when the broker
+ * refuses it, `400` for an `id` that is not a whole number of 1 or more.
+ */
+export function republishMessage(
+  id: number,
+  options: RequestOptions = {},
+): Promise<RepublishAnswer> {
+  if (!Number.isSafeInteger(id) || id < 1) {
+    return Promise.reject(new ApiError(400, 'A message id is a whole number of 1 or more'));
+  }
+  return sendCommandFor<RepublishAnswer>(
+    'POST',
+    `/api/messages/${id}/republish`,
+    undefined,
+    options,
+    (body) => isSentMessage(body.message),
   );
 }
 

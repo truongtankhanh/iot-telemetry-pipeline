@@ -449,6 +449,14 @@ export interface BurstAnswer extends StateView {
   failed: number;
 }
 
+/**
+ * The answer of `POST /api/messages/:id/republish`: the state, and the message as it went out again (a new `id`, the same
+ * `seq`, `ts` and payload, tagged `republish`).
+ */
+export interface RepublishAnswer extends StateView {
+  message: PublishedMessage;
+}
+
 // ---- The observation log (SIM-09) ----
 // A manual mirror of `ObservationEvent` in `apps/simulator/src/observation-store.ts`. `fixtures/observations.json` is a
 // `GET /api/observations` body with one event of every kind: the key lists of `client.test.ts` and of

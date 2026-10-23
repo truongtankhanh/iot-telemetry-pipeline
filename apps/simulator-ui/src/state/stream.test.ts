@@ -4,10 +4,12 @@ import type {
   ObservationEvent,
   ObservationsPage,
   PublishedMessage,
+  SamplingReport,
   Snapshot,
   StateView,
 } from '../api/types';
 import { HistoryStore } from './history';
+import { MessageLog } from './messageLog';
 import { ObservationLog } from './observationLog';
 import { PulseBus } from './pulses';
 import { createStudioStore } from './store';
@@ -45,6 +47,7 @@ function setup(
     history?: HistoryStore;
     pulses?: PulseBus;
     observations?: ObservationLog;
+    messages?: MessageLog;
     getObservations?: (
       request: { before?: number; limit?: number },
       options: { signal?: AbortSignal },
@@ -60,6 +63,7 @@ function setup(
     ...(options.history ? { history: options.history } : {}),
     ...(options.pulses ? { pulses: options.pulses } : {}),
     ...(options.observations ? { observations: options.observations } : {}),
+    ...(options.messages ? { messages: options.messages } : {}),
     ...(options.getObservations ? { getObservations: options.getObservations } : {}),
   });
   return { store, source, getState, connection };
@@ -602,5 +606,170 @@ describe('a burst of published messages (SIM-12)', () => {
     for (let i = 0; i < 10; i++) source.emit('published', burstMessage(i));
     await vi.advanceTimersByTimeAsync(1000);
     expect(history.series('dc-env-01', 'temperature_c')).toHaveLength(10);
+  });
+});
+
+describe('the message log and the sampling of the simulator (SIM-13)', () => {
+  const published = (id: number, overrides: Partial<PublishedMessage> = {}): PublishedMessage => {
+    const ts = new Date(T0 + id).toISOString();
+    return {
+      id,
+      at: ts,
+      ackMs: 3,
+      deviceId: 'dc-env-01',
+      topic: 'campus/BLD-DC/dc-env-01/telemetry',
+      payload: JSON.stringify({ seq: id, ts, metrics: { temperature_c: id } }),
+      seq: id,
+      ts,
+      ...overrides,
+    };
+  };
+  const report = (overrides: Partial<SamplingReport> = {}): SamplingReport => ({
+    total: 100,
+    skipped: 95,
+    forwarded: 5,
+    windowMs: 1000,
+    budgetPerS: 250,
+    active: true,
+    ...overrides,
+  });
+  const ids = (messages: MessageLog) => messages.snapshot().rows.map((row) => row.id);
+
+  it('is seeded from a snapshot: the publish log, the simulator’s total and its sampling notice', () => {
+    const messages = new MessageLog();
+    const { source } = setup({ messages });
+    source.emit('snapshot', {
+      ...view,
+      publishLog: [published(1), published(2)],
+      publishTotal: 7612,
+      sampling: { active: true, skipped: 40, budgetPerS: 250, windowMs: 1000 },
+    } satisfies Snapshot);
+    expect(ids(messages)).toEqual([2, 1]);
+    expect(messages.snapshot().total).toBe(7612);
+    expect(messages.snapshot().sampling).toEqual({ skipped: 40, budgetPerS: 250, windowMs: 1000 });
+  });
+
+  it('is seeded again by the snapshot of a reconnect, not doubled', () => {
+    const messages = new MessageLog();
+    const { source } = setup({ messages });
+    source.emit('snapshot', { ...view, publishLog: [published(1)], publishTotal: 1 });
+    source.emit('published', published(2));
+    source.emit('snapshot', { ...view, publishLog: [published(1), published(2)], publishTotal: 2 });
+    expect(ids(messages)).toEqual([2, 1]);
+    expect(messages.snapshot().total).toBe(2);
+  });
+
+  it('records each published message and counts it', () => {
+    const messages = new MessageLog();
+    const { source } = setup({ messages });
+    source.emit('snapshot', { ...view, publishLog: [], publishTotal: 10 });
+    source.emit('published', published(11));
+    source.emit('published', published(12));
+    vi.advanceTimersByTime(250);
+    expect(ids(messages)).toEqual([12, 11]);
+    expect(messages.snapshot().total).toBe(12);
+  });
+
+  it('copes with a snapshot that has no publish log or total, and with a published event that is not a message', () => {
+    const messages = new MessageLog();
+    const { source } = setup({ messages });
+    source.emit('snapshot', view);
+    source.emit('published', 'not json');
+    source.emit('published', { seq: 3 }); // no id: it cannot be kept
+    vi.advanceTimersByTime(250);
+    expect(ids(messages)).toEqual([]);
+    expect(messages.snapshot().total).toBe(0);
+  });
+
+  it('keeps the publish log, the total and the sampling notice out of the view in the store', () => {
+    const { store, source } = setup({ messages: new MessageLog() });
+    source.emit('snapshot', {
+      ...view,
+      publishLog: [published(1)],
+      publishTotal: 5,
+      sampling: { active: false, skipped: 0, budgetPerS: 250, windowMs: 1000 },
+    });
+    const stored = store.getState().view as unknown as Record<string, unknown>;
+    expect(stored).not.toHaveProperty('publishLog');
+    expect(stored).not.toHaveProperty('publishTotal');
+    expect(stored).not.toHaveProperty('sampling');
+    expect(stored).toHaveProperty('engine');
+  });
+
+  it('adds the skipped messages of a report to the rate, and sets the total and the notice', async () => {
+    const messages = new MessageLog();
+    const { store, source } = setup({ messages });
+    source.emit('snapshot', { ...view, publishLog: [], publishTotal: 0 });
+    for (let id = 1; id <= 5; id++) source.emit('published', published(id));
+    source.emit('sampling', report());
+    await vi.advanceTimersByTimeAsync(1000);
+
+    // 5 events received and 95 skipped: the rate of the messages is 100 a second, not 5.
+    expect(store.getState().publishRate).toBe(100);
+    expect(messages.snapshot().total).toBe(100);
+    expect(messages.snapshot().sampling).toEqual({ skipped: 95, budgetPerS: 250, windowMs: 1000 });
+  });
+
+  it('ends the notice with the closing report and adds nothing to the rate for it', async () => {
+    const messages = new MessageLog();
+    const { store, source } = setup({ messages });
+    source.emit('snapshot', { ...view, publishLog: [] });
+    source.emit('sampling', report());
+    source.emit('sampling', report({ total: 120, skipped: 0, active: false }));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(messages.snapshot().sampling).toBeNull();
+    expect(messages.snapshot().total).toBe(120);
+    expect(store.getState().publishRate).toBe(95);
+  });
+
+  it('ignores a sampling event that is not a report', async () => {
+    const messages = new MessageLog();
+    const { store, source } = setup({ messages });
+    source.emit('snapshot', { ...view, publishLog: [] });
+    source.emit('sampling', 'not json {');
+    source.emit('sampling', { skipped: 10 });
+    source.emit('sampling', { total: 'many', active: true });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(messages.snapshot().sampling).toBeNull();
+    expect(messages.snapshot().total).toBe(0);
+    expect(store.getState().publishRate).toBe(0);
+  });
+
+  it('works without a message log: a sampling report still counts for the rate', async () => {
+    const { store, source } = setup();
+    source.emit('snapshot', { ...view, publishLog: [] });
+    source.emit('sampling', report({ skipped: 30 }));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(store.getState().publishRate).toBe(30);
+  });
+
+  it('keeps 200 rows, an exact total and a handful of notifications through 10,000 published events', async () => {
+    const messages = new MessageLog();
+    const { store, source } = setup({ messages });
+    source.emit('snapshot', { ...view, publishLog: [], publishTotal: 0 });
+    const before = store.getState().view;
+    const listener = vi.fn();
+    messages.subscribe(listener);
+
+    for (let id = 1; id <= 10_000; id++) source.emit('published', published(id));
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(messages.snapshot().rows).toHaveLength(200);
+    expect(messages.snapshot().total).toBe(10_000);
+    expect(listener.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(store.getState().publishRate).toBe(10_000);
+    expect(store.getState().view).toBe(before);
+  });
+
+  it('keeps a republished message out of the history but lists it in the log', () => {
+    const history = new HistoryStore();
+    const messages = new MessageLog();
+    const { source } = setup({ history, messages });
+    source.emit('snapshot', { ...view, publishLog: [], publishTotal: 0 });
+    source.emit('published', published(1));
+    source.emit('published', published(2, { fault: 'republish', payload: published(1).payload }));
+    vi.advanceTimersByTime(1000);
+    expect(history.series('dc-env-01', 'temperature_c')).toHaveLength(1);
+    expect(ids(messages)).toEqual([2, 1]);
   });
 });

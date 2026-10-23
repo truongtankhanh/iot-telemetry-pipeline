@@ -80,7 +80,11 @@ export class HistoryStore {
     this.notifyEveryMs = options.notifyEveryMs ?? DEFAULTS.notifyEveryMs;
   }
 
-  /** Records a message that arrived live. Listeners hear about it within `notifyEveryMs`. */
+  /**
+   * Records a message that arrived live. Listeners hear about it within `notifyEveryMs`. A message the operator sent again
+   * (`fault: 'republish'`) is not recorded: it has the original's time and values, so it is not a new reading, and it would
+   * put a second sample at the same instant on every chart of the device.
+   */
   record(message: PublishedMessage): void {
     this.add(message);
     this.scheduleNotify();
@@ -165,6 +169,7 @@ export class HistoryStore {
   }
 
   private add(message: PublishedMessage): void {
+    if (message.fault === 'republish') return;
     const t = Date.parse(message.ts);
     if (!Number.isFinite(t)) return;
     const { deviceId } = message;

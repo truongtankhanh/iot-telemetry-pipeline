@@ -140,6 +140,14 @@ export function faultEffect(input: FaultEffectInput): FaultEffectModel {
     detail: 'stored once each, counted per metric',
     ...change(input, READINGS, { result: 'stored' }),
   });
+  // A reading that arrives again (a duplicate copy, or a message sent again from the Event stream) is not stored twice:
+  // ingest counts it here instead, one per metric of the message.
+  rows.push({
+    id: 'duplicates',
+    metric: `${READINGS}{result="duplicate"}`,
+    detail: 'the same reading arriving again, ignored',
+    ...change(input, READINGS, { result: 'duplicate' }),
+  });
 
   const notes: string[] = [];
   if (noBaseline) {
