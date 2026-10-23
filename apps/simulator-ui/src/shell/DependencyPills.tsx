@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { formatClockTime } from '../lib/time';
 import { useStudio } from '../state/studioContext';
 import { Pill } from '../ui/Pill';
@@ -17,7 +18,7 @@ function useStaleTitle(): (stale: boolean) => string | undefined {
  * last said, dimmed and dashed when that is old, and says why in words ("unreachable", "not configured").
  */
 export function DependencyPills() {
-  const pills = usePills().filter((pill) => pill.id !== 'running');
+  const pills = usePills().filter((pill) => pill.id !== 'running' && pill.id !== 'faults');
   const titleFor = useStaleTitle();
   return (
     <div className={styles.env} role="group" aria-label="Dependencies">
@@ -48,5 +49,24 @@ export function EnginePill() {
       stale={pill.stale}
       title={titleFor(pill.stale)}
     />
+  );
+}
+
+/**
+ * "Faults on · n active", while the engine has a fault on: a link to the Faults page, on every page, so that nobody forgets
+ * that the readings in the database may differ from what the devices intended. Nothing is drawn when no fault is on.
+ */
+export function FaultsPill() {
+  const pill = usePills().find((p) => p.id === 'faults');
+  const titleFor = useStaleTitle();
+  if (!pill) return null;
+  return (
+    <Link
+      to="/lab/faults"
+      className={styles.pillLink}
+      title={titleFor(pill.stale) ?? 'Open the Faults page'}
+    >
+      <Pill label={pill.label} detail={pill.detail} tone={pill.tone} stale={pill.stale} />
+    </Link>
   );
 }

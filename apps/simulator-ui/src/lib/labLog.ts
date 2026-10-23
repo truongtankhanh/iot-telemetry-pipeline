@@ -47,6 +47,17 @@ export interface LogRow {
   alertId: string | null;
 }
 
+/** The `engine-state` changes the Faults page makes (SIM-12): a fault switched on, off or changed, the scope, a burst, the link. */
+const FAULT_STATE_TYPES: ReadonlySet<string> = new Set([
+  'fault-set',
+  'fault-cleared',
+  'fault-scope',
+  'faults-cleared',
+  'burst',
+  'link-lost',
+  'link-restored',
+]);
+
 /** Observation kinds the log shows, and the filter each belongs to. Anything else is left to the Overview's timeline. */
 function groupOf(event: ObservationEvent): LogRow['group'] | null {
   switch (event.kind) {
@@ -60,7 +71,11 @@ function groupOf(event: ObservationEvent): LogRow['group'] | null {
       return 'faults';
     case 'engine-state': {
       const type = event.data.type;
-      return type === 'anomaly-added' || type === 'anomaly-removed' ? 'faults' : null;
+      return type === 'anomaly-added' ||
+        type === 'anomaly-removed' ||
+        FAULT_STATE_TYPES.has(String(type))
+        ? 'faults'
+        : null;
     }
     default:
       return null;

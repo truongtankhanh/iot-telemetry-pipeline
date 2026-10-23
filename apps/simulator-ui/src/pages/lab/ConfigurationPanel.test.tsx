@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useMemo, useState } from 'react';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { Anomaly, ExpectedAlert, StateView } from '../../api/types';
 import { buildFleetRows } from '../../lib/fleetRows';
@@ -75,7 +76,9 @@ function renderPanel(props: HarnessProps) {
   store.getState().setView(structuredClone(props.view), 1);
   return render(
     <StudioProvider store={store}>
-      <Harness {...props} />
+      <MemoryRouter>
+        <Harness {...props} />
+      </MemoryRouter>
     </StudioProvider>,
   );
 }
@@ -122,7 +125,15 @@ describe('ConfigurationPanel: a device chosen', () => {
     expect(tiles.filter((tile) => !(tile as HTMLInputElement).disabled)).toHaveLength(1);
     expect(screen.getByRole('radio', { name: 'Breach' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Drop' })).toBeDisabled();
-    expect(screen.getByText(/The other faults come with SIM-12/)).toBeInTheDocument();
+    expect(screen.getByText(/Only a breach is a timed fault/)).toBeInTheDocument();
+    // The note says where the others are, and links there.
+    expect(screen.getByRole('link', { name: 'Faults page' })).toHaveAttribute(
+      'href',
+      '/lab/faults',
+    );
+    expect(screen.getByRole('radio', { name: 'Drop' })).toHaveAccessibleDescription(
+      /Only a breach is a timed fault/,
+    );
   });
 
   it('changes the value from the field and from the slider, and the shape', async () => {

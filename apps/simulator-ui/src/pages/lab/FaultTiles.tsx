@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { Link } from 'react-router';
 import { FAULT_TILES, type FaultTile } from '../../lib/labFault';
 import { Icon } from '../../ui/Icon';
 import { faultGlyphs } from '../../ui/icons';
@@ -10,8 +11,8 @@ export interface FaultTilesProps {
 }
 
 /**
- * The nine kinds of fault of frame 12. Only a breach exists in the engine, so the other eight are drawn but cannot be
- * chosen, and one line under them says why (the reason is not left to a tooltip). Native radios underneath: the arrow
+ * The nine kinds of fault of frame 12. Only a breach is a timed fault the Lab can inject, so the other eight are drawn but
+ * cannot be chosen, and one line under them says why and where they are (the reason is not left to a tooltip). Native radios underneath: the arrow
  * keys, the single tab stop and the announcement come from the browser, and a disabled tile is skipped by the keyboard.
  */
 export function FaultTiles({ value, onChange }: FaultTilesProps) {
@@ -43,7 +44,9 @@ export function FaultTiles({ value, onChange }: FaultTilesProps) {
         ))}
       </div>
       <p id={noteId} className={styles.note}>
-        Only a breach exists in the engine so far. The other faults come with SIM-12.
+        Only a breach is a timed fault. Drop, delay, burst, malformed, duplicate, reorder and link
+        loss are switches: set them on the <Link to="/lab/faults">Faults page</Link>. To silence a
+        device, pause or stop it in the Fleet.
       </p>
     </>
   );

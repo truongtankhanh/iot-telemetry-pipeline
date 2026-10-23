@@ -66,6 +66,11 @@ const Timeline = lazy(() =>
   import('./pages/timeline/Timeline').then((module) => ({ default: module.Timeline })),
 );
 
+// The Faults page is its own chunk: it brings the fault rows, the scope picker and the effect panel, which no other page needs.
+const Faults = lazy(() =>
+  import('./pages/faults/Faults').then((module) => ({ default: module.Faults })),
+);
+
 const TITLE = 'Simulator Studio';
 
 // One array for the life of the window: the shortcuts and the palette's items are derived from it.
@@ -149,6 +154,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Timeline />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/lab/faults"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Faults />
           </Suspense>
         }
       />

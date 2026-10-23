@@ -68,6 +68,32 @@ describe('logRows', () => {
     },
   ];
 
+  it('puts the changes the Faults page makes to the engine in the Faults filter', () => {
+    const state = (id: number, data: Record<string, unknown>): ObservationEvent => ({
+      id,
+      at: at(id),
+      kind: 'engine-state',
+      data,
+    });
+    const rows = logRows(
+      [
+        state(1, { type: 'fault-set', kind: 'drop', config: { percent: 5 } }),
+        state(2, { type: 'fault-cleared', kind: 'drop' }),
+        state(3, { type: 'fault-scope', scope: { mode: 'running' } }),
+        state(4, { type: 'faults-cleared' }),
+        state(5, { type: 'burst', count: 1000, sent: 1000, failed: 0, deviceIds: [] }),
+        state(6, { type: 'link-lost', forS: null }),
+        state(7, { type: 'link-restored', reason: 'command' }),
+        // Not a fault of the page: left to the Overview, as before.
+        state(8, { type: 'device-state', deviceId: 'a', state: 'paused' }),
+      ],
+      [],
+    );
+    expect(rows).toHaveLength(7);
+    expect(rows.every((row) => row.group === 'faults')).toBe(true);
+    expect(logCounts(rows)).toEqual({ all: 7, alerts: 0, faults: 7 });
+  });
+
   it('keeps what concerns faults and alerts, leaves the rest to the Overview, and merges the commands by time', () => {
     const rows = logRows(events, [command('c1', 15)]);
     expect(rows.map((r) => [r.kind, r.group])).toEqual([

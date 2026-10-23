@@ -558,3 +558,49 @@ describe('the observation log', () => {
     expect(getObservations).not.toHaveBeenCalled();
   });
 });
+
+describe('a burst of published messages (SIM-12)', () => {
+  const burstMessage = (i: number): PublishedMessage => {
+    const ts = new Date(T0 + i).toISOString();
+    return {
+      deviceId: 'dc-env-01',
+      topic: 'campus/BLD-DC/dc-env-01/telemetry',
+      payload: JSON.stringify({ seq: i + 2, ts, metrics: { temperature_c: i } }),
+      seq: i + 2,
+      ts,
+      fault: 'burst',
+    };
+  };
+
+  it('leaves the history within its bound, tells the pulses of every message, counts them in the rate and does not touch the store', async () => {
+    const history = new HistoryStore({ maxPoints: 50 });
+    const pulses = new PulseBus();
+    const heard: string[] = [];
+    pulses.subscribe(['dc-env-01'], (deviceId) => heard.push(deviceId));
+    const { store, source } = setup({ history, pulses });
+    source.emit('snapshot', { ...view, publishLog: [] } satisfies Snapshot);
+    const before = store.getState().view;
+
+    for (let i = 0; i < 1000; i++) source.emit('published', burstMessage(i));
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const series = history.series('dc-env-01', 'temperature_c');
+    // The history keeps its newest points, however many arrive at once.
+    expect(series.length).toBeLessThanOrEqual(50);
+    expect(series.at(-1)?.v).toBe(999);
+    expect(heard).toHaveLength(1000);
+    expect(store.getState().publishRate).toBe(1000);
+    // A message is not a change of the state: nothing is stored per message, and nothing is read again.
+    expect(store.getState().view).toBe(before);
+  });
+
+  it('ignores a message of the burst that is not one, and goes on', async () => {
+    const history = new HistoryStore({ maxPoints: 50 });
+    const { source } = setup({ history });
+    source.emit('snapshot', { ...view, publishLog: [] } satisfies Snapshot);
+    source.emit('published', 'not json');
+    for (let i = 0; i < 10; i++) source.emit('published', burstMessage(i));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(history.series('dc-env-01', 'temperature_c')).toHaveLength(10);
+  });
+});

@@ -44,19 +44,24 @@ export interface FaultTileInfo {
   reason: string | null;
 }
 
-const LATER = 'Comes with SIM-12';
+/**
+ * Why a tile cannot be chosen here. The Lab injects a fault that has a start and a length (a breach: a value held for a
+ * while); the engine's other faults are switches with a scope and no clock, so they live on the Faults page (SIM-12).
+ */
+const SWITCH = 'A switch, not a timed fault: set it on the Faults page';
+const PAUSE = 'Pause or stop the device in the Fleet';
 
-/** The nine tiles of the frame. Only a breach exists in the engine: the others are SIM-12's. */
+/** The nine tiles of the frame. Only a breach is a timed fault the Lab can inject; the others say where to find them. */
 export const FAULT_TILES: readonly FaultTileInfo[] = [
   { id: 'breach', label: 'Breach', available: true, reason: null },
-  { id: 'silent', label: 'Silent', available: false, reason: LATER },
-  { id: 'drop', label: 'Drop', available: false, reason: LATER },
-  { id: 'delay', label: 'Delay', available: false, reason: LATER },
-  { id: 'burst', label: 'Burst', available: false, reason: LATER },
-  { id: 'malformed', label: 'Malformed', available: false, reason: LATER },
-  { id: 'duplicate', label: 'Duplicate', available: false, reason: LATER },
-  { id: 'reorder', label: 'Reorder', available: false, reason: LATER },
-  { id: 'link-loss', label: 'Link loss', available: false, reason: LATER },
+  { id: 'silent', label: 'Silent', available: false, reason: PAUSE },
+  { id: 'drop', label: 'Drop', available: false, reason: SWITCH },
+  { id: 'delay', label: 'Delay', available: false, reason: SWITCH },
+  { id: 'burst', label: 'Burst', available: false, reason: SWITCH },
+  { id: 'malformed', label: 'Malformed', available: false, reason: SWITCH },
+  { id: 'duplicate', label: 'Duplicate', available: false, reason: SWITCH },
+  { id: 'reorder', label: 'Reorder', available: false, reason: SWITCH },
+  { id: 'link-loss', label: 'Link loss', available: false, reason: SWITCH },
 ];
 
 export type FaultShape = 'step' | 'ramp' | 'spike';

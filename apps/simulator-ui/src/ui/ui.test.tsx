@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AnimationBudget } from '../lib/animationBudget';
 import { axeViolations } from '../test-axe';
 import { AnimationBudgetProvider } from './AnimationBudget';
+import { Banner } from './Banner';
 import { Button } from './Button';
 import { Checkbox } from './Checkbox';
 import { Chip } from './Chip';
@@ -531,6 +532,16 @@ describe('Switch', () => {
     await user.tab();
     await user.keyboard(' ');
     expect(onChange).toHaveBeenCalledWith(false);
+  });
+
+  it('can keep its label for a screen reader only, and still toggles under that name', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Switch label="Drop messages" labelHidden checked={false} onChange={onChange} />);
+    const toggle = screen.getByRole('switch', { name: 'Drop messages' });
+    expect(screen.getByText('Drop messages')).toHaveClass('visually-hidden');
+    await user.click(toggle);
+    expect(onChange).toHaveBeenCalledWith(true);
   });
 
   it('does nothing while it is disabled', async () => {
@@ -1132,6 +1143,31 @@ describe('CursorPager', () => {
 
   it('has no accessibility violation', async () => {
     const { container } = render(<CursorPager {...props} note="Note." />);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('Banner', () => {
+  it('says its words in a polite live region, with an icon that is not the only signal', () => {
+    const { container } = render(<Banner tone="warn">3 faults are active on 4 devices</Banner>);
+    const banner = screen.getByRole('status');
+    expect(banner).toHaveTextContent('3 faults are active on 4 devices');
+    expect(banner).toHaveAttribute('data-tone', 'warn');
+    expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('has an informational tone as well', () => {
+    render(<Banner tone="info">Gaps are confirmed later.</Banner>);
+    expect(screen.getByRole('status')).toHaveAttribute('data-tone', 'info');
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <>
+        <Banner tone="warn">Faults are on.</Banner>
+        <Banner tone="info">Gaps are confirmed later.</Banner>
+      </>,
+    );
     expect(await axeViolations(container)).toEqual([]);
   });
 });

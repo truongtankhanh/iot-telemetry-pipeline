@@ -1,0 +1,35 @@
+/* A banner on a page: a warning in amber, an explanation in the neutral colours. Tokens only. */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+
+.banner svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.banner[data-tone='warn'] {
+  border: 1px dashed rgba(255, 194, 61, 0.55);
+  background: var(--tint-warn);
+}
+
+.banner[data-tone='warn'] svg {
+  color: var(--warning);
+}
+
+.banner[data-tone='info'] {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+}
+
+.banner[data-tone='info'] svg {
+  color: var(--flow);
+}

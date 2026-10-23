@@ -302,9 +302,14 @@ describe('the tiles and the stop conditions', () => {
   it('has nine tiles and only the breach can be chosen', () => {
     expect(FAULT_TILES).toHaveLength(9);
     expect(FAULT_TILES.filter((t) => t.available).map((t) => t.id)).toEqual(['breach']);
-    expect(
-      FAULT_TILES.filter((t) => !t.available).every((t) => t.reason === 'Comes with SIM-12'),
-    ).toBe(true);
+    // Each one that cannot be chosen says where to find it: a switch on the Faults page, or a device to pause in the Fleet.
+    expect(FAULT_TILES.find((t) => t.id === 'silent')?.reason).toBe(
+      'Pause or stop the device in the Fleet',
+    );
+    for (const tile of FAULT_TILES.filter((t) => !t.available && t.id !== 'silent')) {
+      expect(tile.reason, tile.id).toBe('A switch, not a timed fault: set it on the Faults page');
+    }
+    expect(FAULT_TILES.every((t) => t.available === (t.reason === null))).toBe(true);
   });
 
   it('has Timed and Manual, and says why Alert clears cannot be chosen', () => {
@@ -363,7 +368,12 @@ describe('defaultMetric and planFault', () => {
 
   it('says why it cannot be sent, one reason at a time', () => {
     expect(plan({ reached: [] }).blocker).toBe('Choose at least one target');
-    expect(plan({ draft: { ...DEFAULT_FAULT, tile: 'drop' } }).blocker).toBe('Comes with SIM-12');
+    expect(plan({ draft: { ...DEFAULT_FAULT, tile: 'drop' } }).blocker).toBe(
+      'A switch, not a timed fault: set it on the Faults page',
+    );
+    expect(plan({ draft: { ...DEFAULT_FAULT, tile: 'silent' } }).blocker).toBe(
+      'Pause or stop the device in the Fleet',
+    );
     expect(plan({ draft: { ...DEFAULT_FAULT, value: 99 } }).blocker).toMatch(
       /Enter a value from -40 to 85/,
     );

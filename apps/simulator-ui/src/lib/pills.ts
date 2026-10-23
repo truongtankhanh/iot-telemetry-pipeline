@@ -4,7 +4,7 @@ import type { LinkState } from '../state/store';
 export type PillTone = 'ok' | 'warn' | 'bad' | 'unknown';
 
 export interface Pill {
-  id: 'broker' | 'ingest' | 'commandCenter' | 'running';
+  id: 'broker' | 'ingest' | 'commandCenter' | 'running' | 'faults';
   label: string;
   /** A port, a reason, a count: the small text after the label. */
   detail: string | null;
@@ -128,9 +128,26 @@ function runningPill(view: StateView, publishRate: number, stale: boolean): Pill
 }
 
 /**
+ * Faults are on: amber, with how many. It exists only while the engine has a fault on (`activeCount` counts the switches and
+ * link loss while the link is down, not a burst): a pill that was always there, saying "none", would not be noticed on the day
+ * it matters. Dimmed with the others when the link to the simulator is lost, because then it is the last known state.
+ */
+function faultsPill(view: StateView, stale: boolean): Pill | null {
+  const { activeCount } = view.engine.faults;
+  if (activeCount <= 0) return null;
+  return {
+    id: 'faults',
+    label: 'Faults on',
+    detail: `${activeCount} active`,
+    tone: 'warn',
+    stale,
+  };
+}
+
+/**
  * The four pills of the header: Broker, Ingest, Command Center and the engine. Nothing is drawn healthy
  * that is not known to be: before the first message every pill is unknown, and with the link lost every
- * pill keeps its last data but is stale (dimmed, and dated by the header).
+ * pill keeps its last data but is stale (dimmed, and dated by the header). A fifth, "Faults on", is added while any fault is on.
  */
 export function derivePills({ view, link, publishRate, lastAlertSink }: PillInput): Pill[] {
   const stale = link === 'lost';
@@ -143,10 +160,12 @@ export function derivePills({ view, link, publishRate, lastAlertSink }: PillInpu
       { id: 'running', label: 'Engine', detail, tone: 'unknown', stale },
     ];
   }
+  const faults = faultsPill(view, stale);
   return [
     brokerPill(view, stale),
     ingestPill(view, stale),
     commandCenterPill(view, lastAlertSink, stale),
     runningPill(view, publishRate, stale),
+    ...(faults === null ? [] : [faults]),
   ];
 }

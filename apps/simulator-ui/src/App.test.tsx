@@ -164,6 +164,15 @@ describe('navigation', () => {
     expect(within(nav).getByRole('link', { name: /Scenarios/ })).toBeInTheDocument();
   });
 
+  it('opens the Faults page from the Lab, and a path under it goes to the page, not to a placeholder', async () => {
+    const first = renderStudio({ path: '/lab/faults' });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Faults' })).toBeInTheDocument();
+    expect(screen.queryByText(/Coming with SIM-12/)).not.toBeInTheDocument();
+    first.unmount();
+    renderStudio({ path: '/lab/faults/drop' });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Faults' })).toBeInTheDocument();
+  });
+
   it('treats a path under a page that is not built as that page, one under a built page as the page, and an unknown path as not found', async () => {
     const first = renderStudio({ path: '/twin/7' });
     expect(screen.getByText('Coming with SIM-18')).toBeInTheDocument();

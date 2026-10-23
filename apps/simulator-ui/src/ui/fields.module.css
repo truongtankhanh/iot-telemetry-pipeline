@@ -1,0 +1,138 @@
+/* The fields of the Faults page: a number with its unit, a percentage as a slider and a number, and a chip that is a switch. */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+}
+
+.input:focus-within {
+  border-color: var(--flow);
+  box-shadow: var(--neon-flow);
+}
+
+.input[data-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  outline: none;
+}
+
+.input input:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+.unit {
+  color: var(--text-tertiary);
+  font-size: var(--fs-min);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-min);
+}
+
+/* ---- a percentage: the slider takes the room, the number sits beside it ---- */
+.percent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.range {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.range:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.range:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.percentNumber {
+  flex: none;
+  width: 92px;
+}
+
+/* ---- a chip that is a switch ---- */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.toggle:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: rgba(71, 215, 255, 0.1);
+}
+
+.toggle[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+/* The mark says "on" without the colour. */
+.toggle[aria-pressed='true']::before {
+  content: '✓';
+  color: var(--accent);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
+.toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

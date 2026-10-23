@@ -686,3 +686,41 @@ engine feature, not a UI one (decision 1, and the consequences above), and `apps
 - **Scope kept narrow:** frame 07's switch model only. The Lab's nine tiles model a fault as timed and targeted (`startAt`, `duration`,
   `stagger`); the engine's settings do not preclude an automatic clear later (`forS` exists for link loss), but the Lab tiles are enabled, and
   link loss gets its row on the Faults page, in `SIM-12-ui`. "Silent" is `stop`/`pause`. No CLI flag was added (`--help` is unchanged).
+
+## Amendment, 2026-10-23: the Faults page as built (SIM-12, Studio half)
+
+The Faults page ([frame 07](../design/simulator/mockups/07-fault-injection.dc.html)) at `/lab/faults` switches the faults of the amendment of
+2026-10-22 on and off and shows the pipeline counting them. It adds no dependency and no route to the simulator.
+
+- **The engine is the only state.** The page holds no fault of its own: a switch is on when `engine.faults` says so, so the page is right after a reload and
+  in a second tab. What it keeps is the _drafts_ of the values being edited (`useFaultDrafts`): a draft goes back to the engine's settings when they change
+  under it (per fault, so an edit is not lost because another tab switched another fault) and when the simulator refuses a command. A value is sent when it is
+  done (a slider released, a number confirmed or blurred, a chip pressed), not on every step; a value the simulator would refuse is not sent and the words are under
+  the field. A field that has focus drops what was typed when the value in force changes to something else, or a blur would send the refused value again.
+- **Seven rows, not six, and a set, not a choice.** Frame 07 draws six rows and one malformed kind chosen among nine. The engine has link loss and takes a
+  set of ten kinds (`empty` is a reason of the parser the frame left out), so the page has a link-loss row (an optional "restore after" before it is cut; the
+  Broker pill turns by itself) and toggle chips with `aria-pressed`, at least one on. Delay and reorder, which the frame does not give controls, get two number
+  fields and a window. The rows are in the frame's order with link loss last, and the controls of a fault show only while it is on.
+- **The scope is the Lab's picker.** "Selected" opens the same `TargetPicker` (device, zone or class) and the engine gets device ids: a zone is expanded once,
+  when it is sent, while the picker keeps showing the zone. "Selected" with nothing chosen sends nothing, because the simulator refuses an empty selection.
+- **The effect panel does not guess.** It subtracts the simulator's baseline from the `metrics` slice (`lib/faultEffect.ts`). Before any fault there is a line, not
+  zeros; without a baseline (ingest could not be read when the faults went on) the rows are "—" and a chip says so; a counter that went down (ingest restarted) is
+  "—" and says so; a series ingest has not exported is 0. Readings are `result="stored"` and are said to be counted per metric; the subtitles name what can move a
+  counter _now_ (gaps "from Drop, Malformed and Link loss"), where the frame's "from Drop messages" would have been wrong because a malformed payload leaves a gap
+  as well; and a standing note says a gap is confirmed only after ingest's grace period (30 s by default), shown only while a fault that makes gaps is on. The session
+  goes on after Clear all faults.
+- **The header pill** ("Faults on · n active", amber, a link to the page) is the fifth pill, added by `derivePills` only while `activeCount > 0` and left out of the
+  dependency group; with nothing on, the four pills are as they were. A burst is not counted (it is a one-shot).
+- **The Lab's tiles** keep Breach as the only one it injects: the Lab's fault has a start and a length, the engine's other faults are switches with a scope and no
+  clock, so the seven disabled tiles say "A switch, not a timed fault: set it on the Faults page" (Silent: pause or stop the device in the Fleet) and the note links to
+  the page. Making them timed faults would be an engine feature (an automatic clear on the switches), not a Studio one.
+- **Timelines.** The seven new `engine-state` types have rows (source Engine, not a new source: the anomaly rows of the same kind are Engine's) and belong to the Lab
+  log's Faults filter.
+- **Limits are copied, and pinned.** The percentages, the delay, the window, the burst size, the restore time and the ten kinds are a copy of the simulator's
+  (`lib/faultSettings.ts`, with a test that pins every number); the simulator enforces them and refuses with the field named, so a stale copy would show a wrong hint, not
+  accept a wrong value. The four counters' names are copied once more in `lib/faultEffect.ts`, as `lib/ingestRates.ts` already copies its own.
+- **A burst is up to 5,000 `published` events at once.** `stream.ts` is unchanged: it parses each (cheap), the history keeps its bound and tells its listeners at most once
+  a second, and the rate shows the spike, which is true. A test sends 1,000 through `connectStream` and checks that. The `dropped` event and the `held` and `dropped`
+  counts of the snapshot are not shown: they refresh only when something else changes, and the Message inspector (SIM-13) is where a dropped message belongs.
+- **Not done here, left as they were:** a count field for the burst (the button is a fixed 1,000), timed or staggered faults, a fault from a scenario file, and the Twin's
+  fault visuals (SIM-19).

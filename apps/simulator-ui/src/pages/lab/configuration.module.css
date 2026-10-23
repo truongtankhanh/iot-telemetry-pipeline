@@ -38,6 +38,16 @@
   line-height: 1.35;
 }
 
+.note a {
+  color: var(--flow);
+  text-decoration: underline;
+}
+
+.note a:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
+
 /* ---- the tiles ---- */
 .tiles {
   display: grid;

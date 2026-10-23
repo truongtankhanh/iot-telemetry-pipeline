@@ -391,6 +391,33 @@ export interface ImportAnswer extends StateView {
  */
 export type SaveAnswer = ImportAnswer;
 
+// ---- Faults (SIM-12) ----
+// The routes under `/api/faults` of the simulator (`apps/simulator/src/faults.ts` has the settings and their limits). The state
+// side (`FaultsSnapshot`, `FaultScope`, `MalformedKind`, `FaultEffectView`) is above, next to the engine snapshot.
+
+/** The faults that act on each message of a device; link loss acts on the connection and a burst is a one-shot. */
+export type SwitchKind = 'drop' | 'duplicate' | 'delay' | 'reorder' | 'malformed';
+
+/** What `PUT /api/faults/:kind` takes. */
+export type FaultKind = SwitchKind | 'link-loss';
+
+/** The body of `PUT /api/faults/:kind`, by kind. */
+export interface FaultBodies {
+  drop: { percent: number };
+  duplicate: { percent: number };
+  delay: { delayMs: number; jitterMs: number };
+  reorder: { window: number };
+  malformed: { percent: number; kinds: MalformedKind[] };
+  /** Without `forS` the link stays down until it is restored. */
+  'link-loss': { forS?: number };
+}
+
+/** The answer of `POST /api/faults/burst`: the state, and how many messages the broker took or refused. */
+export interface BurstAnswer extends StateView {
+  sent: number;
+  failed: number;
+}
+
 // ---- The observation log (SIM-09) ----
 // A manual mirror of `ObservationEvent` in `apps/simulator/src/observation-store.ts`. `fixtures/observations.json` is a
 // `GET /api/observations` body with one event of every kind: the key lists of `client.test.ts` and of

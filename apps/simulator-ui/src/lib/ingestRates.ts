@@ -11,7 +11,7 @@ export interface IngestRates {
 const NONE: IngestRates = { storedPerSecond: null, lagSeconds: null };
 
 /** The total of one metric over the samples that match; `null` when ingest did not export it. */
-function total(
+export function total(
   samples: readonly MetricSample[],
   name: string,
   labels: Record<string, string> = {},
