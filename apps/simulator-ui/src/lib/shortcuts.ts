@@ -88,3 +88,63 @@ export function createAddAnomalyShortcut(
     return key === 'a' && !afterGo;
   };
 }
+
+/** What a key does in presenter mode (the guided demo). */
+export type PresenterAction = 'next' | 'back' | 'pause' | 'restart' | 'notes' | 'exit';
+
+/** A target whose own action is `Space`: a button, a link, a summary, a select, or anything that says it is a button. */
+function isInteractiveTarget(target: unknown): boolean {
+  if (typeof target !== 'object' || target === null) return false;
+  const element = target as { tagName?: unknown; getAttribute?: unknown };
+  const tag = typeof element.tagName === 'string' ? element.tagName.toLowerCase() : '';
+  if (tag === 'button' || tag === 'a' || tag === 'summary' || tag === 'select') return true;
+  if (typeof element.getAttribute !== 'function') return false;
+  const role = (element.getAttribute as (name: string) => unknown).call(target, 'role');
+  return role === 'button' || role === 'link' || role === 'checkbox' || role === 'switch';
+}
+
+/**
+ * The keyboard of presenter mode (frame 08): `Space` next, `←` back, `P` pause the devices, `R` restart the step, `N` the presenter
+ * notes, `Esc` exit. It belongs to the guided demo, which listens for it only while presenting, not to the shell. Like every single-key
+ * shortcut it is ignored in a field and with a modifier held. `Space` is also ignored on a button, a link or another control that has an
+ * action of its own for it (the Next button's own action is the same, and "Restart step" must not skip a step). `g` then a letter is the
+ * shell's go-to, so a `p`, `r` or `n` within a second of a `g` is not this one.
+ *
+ * Returns the action, or `null` when the key is not presenter mode's. The caller prevents the browser default (`Space` scrolls) only
+ * when there is an action. Whether the palette or a dialog is open is the caller's to say: they own `Esc` then.
+ */
+export function createPresenterShortcuts(
+  options: { now?: () => number; goWindowMs?: number } = {},
+): (event: KeyEventLike) => PresenterAction | null {
+  const now = options.now ?? Date.now;
+  const goWindowMs = options.goWindowMs ?? 1000;
+  let goPressedAt: number | null = null;
+
+  return (event) => {
+    const at = now();
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    if (event.metaKey || event.ctrlKey || event.altKey || isEditableTarget(event.target)) {
+      goPressedAt = null;
+      return null;
+    }
+    const afterGo = goPressedAt !== null && at - goPressedAt <= goWindowMs;
+    goPressedAt = key === 'g' ? at : null;
+
+    switch (key) {
+      case ' ':
+        return isInteractiveTarget(event.target) ? null : 'next';
+      case 'ArrowLeft':
+        return 'back';
+      case 'Escape':
+        return 'exit';
+      case 'p':
+        return afterGo ? null : 'pause';
+      case 'r':
+        return afterGo ? null : 'restart';
+      case 'n':
+        return afterGo ? null : 'notes';
+      default:
+        return null;
+    }
+  };
+}

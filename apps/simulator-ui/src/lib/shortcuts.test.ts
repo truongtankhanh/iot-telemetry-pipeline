@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { appRoutes } from './routes';
 import {
   createAddAnomalyShortcut,
+  createPresenterShortcuts,
   createShortcuts,
   isEditableTarget,
   type KeyEventLike,
@@ -160,5 +161,107 @@ describe('the editor’s A (add an anomaly)', () => {
     handle(press('g'));
     handle(press('g', { target: { tagName: 'INPUT' } }));
     expect(handle(press('a'))).toBe(true);
+  });
+});
+
+describe('createPresenterShortcuts', () => {
+  function presenter() {
+    let time = 0;
+    const handle = createPresenterShortcuts({ now: () => time });
+    return { handle, at: (ms: number) => void (time = ms) };
+  }
+
+  it('maps each key of the frame to its action', () => {
+    const { handle } = presenter();
+    expect(handle(press(' '))).toBe('next');
+    expect(handle(press('ArrowLeft'))).toBe('back');
+    expect(handle(press('p'))).toBe('pause');
+    expect(handle(press('r'))).toBe('restart');
+    expect(handle(press('n'))).toBe('notes');
+    expect(handle(press('Escape'))).toBe('exit');
+  });
+
+  it('reads a capital letter as the letter (Caps Lock, Shift)', () => {
+    const { handle } = presenter();
+    expect(handle(press('P'))).toBe('pause');
+    expect(handle(press('N'))).toBe('notes');
+  });
+
+  it('ignores every other key', () => {
+    const { handle } = presenter();
+    for (const key of ['a', 'Enter', 'ArrowRight', 'Tab', 'x', '/', 'g']) {
+      expect(handle(press(key)), key).toBeNull();
+    }
+  });
+
+  it('ignores a key in a field, and with a modifier held', () => {
+    const { handle } = presenter();
+    for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) {
+      expect(handle(press(' ', { target: { tagName } })), tagName).toBeNull();
+      expect(handle(press('p', { target: { tagName } })), tagName).toBeNull();
+      expect(handle(press('Escape', { target: { tagName } })), tagName).toBeNull();
+    }
+    expect(handle(press('p', { target: { tagName: 'DIV', isContentEditable: true } }))).toBeNull();
+    for (const extra of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }]) {
+      expect(handle(press(' ', extra))).toBeNull();
+      expect(handle(press('r', extra))).toBeNull();
+    }
+  });
+
+  it('leaves Space to a button, a link and a control that says it is one, but not the other keys', () => {
+    const { handle } = presenter();
+    const button = { tagName: 'BUTTON' };
+    expect(handle(press(' ', { target: button }))).toBeNull();
+    expect(handle(press(' ', { target: { tagName: 'A' } }))).toBeNull();
+    expect(handle(press(' ', { target: { tagName: 'SUMMARY' } }))).toBeNull();
+    const roled = {
+      tagName: 'DIV',
+      getAttribute: (name: string) => (name === 'role' ? 'button' : null),
+    };
+    expect(handle(press(' ', { target: roled }))).toBeNull();
+    const plain = { tagName: 'DIV', getAttribute: () => null };
+    expect(handle(press(' ', { target: plain }))).toBe('next');
+    // the other keys do not belong to a button
+    expect(handle(press('ArrowLeft', { target: button }))).toBe('back');
+    expect(handle(press('r', { target: button }))).toBe('restart');
+    expect(handle(press('Escape', { target: button }))).toBe('exit');
+  });
+
+  it('does not take a p, r or n that follows a g within a second (the shell’s go-to), and takes it after that', () => {
+    const { handle, at } = presenter();
+    at(0);
+    expect(handle(press('g'))).toBeNull();
+    at(400);
+    expect(handle(press('n'))).toBeNull();
+    at(500);
+    expect(handle(press('g'))).toBeNull();
+    at(500 + 1000);
+    expect(handle(press('p'))).toBeNull(); // exactly at the window's edge: still the go-to's
+    at(2000);
+    expect(handle(press('g'))).toBeNull();
+    at(2000 + 1001);
+    expect(handle(press('r'))).toBe('restart');
+  });
+
+  it('does not let a g leave Space, the arrow or Escape unread', () => {
+    const { handle, at } = presenter();
+    at(0);
+    handle(press('g'));
+    at(100);
+    expect(handle(press('Escape'))).toBe('exit');
+    at(200);
+    handle(press('g'));
+    at(300);
+    expect(handle(press(' '))).toBe('next');
+  });
+
+  it('forgets a g when another key comes between', () => {
+    const { handle, at } = presenter();
+    at(0);
+    handle(press('g'));
+    at(100);
+    handle(press('x'));
+    at(200);
+    expect(handle(press('p'))).toBe('pause');
   });
 });

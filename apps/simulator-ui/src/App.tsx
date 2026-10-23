@@ -16,6 +16,7 @@ import { createShortcuts } from './lib/shortcuts';
 import { NotBuilt } from './pages/NotBuilt';
 import { Overview } from './pages/Overview';
 import { Header } from './shell/Header';
+import { PresenterHeader } from './shell/PresenterHeader';
 import { LinkBanner } from './shell/LinkBanner';
 import { Navigation } from './shell/Navigation';
 import { Shell } from './shell/Shell';
@@ -25,6 +26,7 @@ import { ObservationLog } from './state/observationLog';
 import { PulseBus } from './state/pulses';
 import { connectStream } from './state/stream';
 import { createStudioStore } from './state/store';
+import { useDemoSession, useDemoSessionStore } from './state/demoSessionContext';
 import { StudioProvider } from './state/StudioProvider';
 import { useStudio, useStudioStore } from './state/studioContext';
 import { AnimationBudgetProvider } from './ui/AnimationBudget';
@@ -76,6 +78,9 @@ const Faults = lazy(() =>
 const Events = lazy(() =>
   import('./pages/events/Events').then((module) => ({ default: module.Events })),
 );
+
+// The Guided demo is its own chunk: it brings the script, the driver, the presenter view and the start screen, which no other page needs.
+const Demo = lazy(() => import('./pages/demo/Demo').then((module) => ({ default: module.Demo })));
 
 const TITLE = 'Simulator Studio';
 
@@ -136,6 +141,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Events />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/demo"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Demo />
           </Suspense>
         }
       />
@@ -215,6 +228,11 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
   const paletteOpen = useStudio((state) => state.paletteOpen);
   const modalOpen = useStudio((state) => state.modalCount > 0);
   const current = findRoute(routes, pathname);
+  // Presenter mode (the guided demo): the shell leaves the navigation out and the header is the presenter's. It is the demo page
+  // while a demo is being presented; `g` then a letter still goes elsewhere, and the session keeps its step (nothing is stopped).
+  const demoSession = useDemoSession();
+  const demoStore = useDemoSessionStore();
+  const presenting = demoSession.status === 'presenting' && current?.path === '/demo';
 
   const openPalette = () => store.getState().setPaletteOpen(true);
 
@@ -257,7 +275,13 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
   return (
     <>
       <Shell
-        header={<Header onOpenPalette={openPalette} />}
+        header={
+          presenting ? (
+            <PresenterHeader onExit={() => demoStore.dispatch({ type: 'exit' })} />
+          ) : (
+            <Header onOpenPalette={openPalette} />
+          )
+        }
         navigation={
           <Navigation
             routes={routes}
@@ -272,6 +296,7 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
           ) : null
         }
         pinned={railPinned}
+        presenter={presenting}
         inert={paletteOpen || modalOpen}
       >
         <Pages routes={routes} />

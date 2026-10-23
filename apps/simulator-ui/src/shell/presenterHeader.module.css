@@ -1,0 +1,4 @@
+/* The brand's name is a heading here (the page has no other h1 in presenter mode), and a heading brings a margin the header's div does not. */
+.title {
+  margin: 0;
+}

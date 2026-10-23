@@ -801,3 +801,47 @@ them, shows one with its command and sends it again. It adds no dependency and n
   sent again reads `stored +0` and `duplicate +n` (n = its metrics), and the duplicate fault shows its effect there too. The simulator's baseline already held every label of that series.
 - **Not done here.** Dropped messages as rows or a counter (the frame has no state for one); a server-side clear; the optional `id`, `at` and `ackMs` of `PublishedMessage` are
   still optional in the Studio's types (a row without an `id` is not kept), to be tightened when the guards look like noise; `CopyButton` still lives in `pages/fleet/`.
+
+## Amendment, 2026-10-23: the Guided demo as built (SIM-14)
+
+The Guided demo ([frame 08](../design/simulator/mockups/08-guided-demo.dc.html)) at `/demo` runs a script of steps with a presenter view: each step can start a scenario or hold a
+value, and waits for an event of the pipeline; when the event happens the demo moves on by itself. It is Studio only: it adds no dependency and no route to the simulator, and it reads
+what Studio already has (the state, the observation log, the readings, the scenario library).
+
+- **One page, two faces, and a flag on the shell.** The start screen (the script, its steps with live numbers, what would stop it from finishing, "Start presenter" or "Resume at step N")
+  and the presenter view. While a demo is presented on `/demo`, `Shell` takes a `presenter` prop (additive: without it every page is as it was) that leaves the navigation out entirely and
+  gives one column; `StudioFrame` swaps in `PresenterHeader` (the three dependency pills stay, and so does the lost-link banner: a demo that stops working must say so on the stage). `g`
+  then a letter and `⌘ K` still work in presenter mode; they only navigate, and the session keeps its step.
+- **A script is data with a validator.** `DemoScript { id, title, summary, subject, scenario, steps }`; a step is `{ id, title, summary, say, action?, await?, timeoutS?, notes? }`. `action` is
+  `run-scenario` or `hold-value`, `await` is `rule-raised`, `alert-opened`, `incident-delivered` or `alert-cleared` (for a rule and a device): both are unions, so a later ticket adds a camera
+  step (SIM-21) without changing the code that reads the others. `validateScript` reports every problem, naming the step. The first script, "overheat to incident", is a TypeScript constant
+  (`lib/demoScripts.ts`), not a file the simulator serves: that would be a backend change, a route and a contract kept honest in two places, none of which the ticket asks for. The numbers in
+  the text (`4 devices, 2.0 msg/s`, `Raise 27 °C, clear 25.5 °C, 3 in a row`, `dc-env-01 → 29.2 °C for 60 s`) are `{tokens}` read from the rules, the scenario and the state, never literals, so
+  they follow `rules.json` and the scenario when those change; a test pins that the shipped script names a scenario, a rule and a device that exist.
+- **What each awaited event is.** The observation log has no "rule raised": ingest does not export its counter, so `rule-raised` is **Studio's own count**, as the Topology's rule row already is
+  (`rule.for` readings in a row beyond the raise line, among the readings newer than the baseline, compared by the reading's `t` so a clock difference between the browser and the simulator
+  cannot matter). `alert-opened` and `alert-cleared` are the observations of that name for the rule and the device. `incident-delivered` is the `incident` observation; **it and `delivery` carry
+  an `alertId` and no rule or device**, so it is matched to the alerts the rule opened since the baseline. The log and the history notify at most once a second, so a step moves on up to about a
+  second after the event; nothing promises less.
+- **A step counts what happened since the step that started the chain.** A step that does something (starts the scenario) takes a fresh baseline; a step that only waits keeps the one before it, so
+  an incident that arrived while the presenter was still reading the alert's step still counts and is shown as already happened, instead of the step waiting for what will not come again. A
+  simulator that restarted (a log whose newest id is below the baseline) is a new log, and everything in it counts. An alert that was already open before the heat is said at once ("already
+  open before this step") and the way on is offered; it is never taken as the event.
+- **Moving on.** One step at a time, only for the current step, never before it has been on screen for 1.5 s (`MIN_DWELL_MS`), never past the last step (the presenter finishes it), `Space` and the
+  Next button always. A **time limit** (the step's `timeoutS`, else the scenario's expected time plus 30 s, else 60 s) only changes what the step says: "Late: still waiting for the alert of
+  `server-room-hot` on `dc-env-01` to open", how long, **one** cause when Studio can see it (link lost, ingest unreachable or not ready, no command center for an incident, rules not available,
+  engine stopped, device not running, the simulated clock, an alert already open) and the way on by name ("Move on without the alert"). It never moves the step on. A cause that is visible
+  before the limit offers the way on at once. The start screen says what would stop the whole script (no command center, ingest unreachable, the simulated clock) before step 3 and not a minute into it.
+- **The session outlives the page.** `DemoSessionStore` (the shape of `EditorDrafts`: an external store, one state object until an action changes it) holds a pure reducer's state; `Esc` leaves
+  presenter mode and **stops nothing**, and coming back finds the step. A reload loses it, and the start screen says so. A value the script held is let go when the demo finishes, or with
+  "Stop demo and release"; it is never let go silently by `Esc`.
+- **Starting a scenario is the same command as the other three places.** The step runs it through `useScenarioCommands` (the hook of the Scenarios page and the Overview), so a run that
+  something is in the way of asks the same question (`ReplaceDialog`, which is keyboard-operable); a refusal keeps the step on screen with the simulator's reason and a Retry. The step counts as
+  started when there is a run of the scenario whose id is new.
+- **Keys.** `Space` next, `←` back, `P`, `R`, `N`, `Esc`, listened to only while presenting; ignored in a field, with a modifier, and while the palette or a dialog is open (they own `Esc`); `Space`
+  is also left to a focused button, which has its own action for it. The brief and the frame disagreed on two meanings, fixed as follows. **`P` pauses the devices** (what Pause is everywhere else
+  in Studio; the frame said "pause scenario", which the brief records Pause does not do), up to `BULK_CONFIRM_ABOVE` (10) devices: above that it does nothing and says "use the Overview", because a
+  confirmation inside a keyboard-only view would need a second dialog the frame does not draw. **`R` restarts the step**: it stops the script's scenario (a `409` "not running" is fine) and runs it
+  again, or holds the value again, and begins the wait again from now; it never calls the engine's reset, which would also clear what the presenter set by hand. `N` shows the step's notes, when it has some.
+- **Not done here.** Camera steps and inject-from-scene (SIM-21); other scripts, an editor or an import for scripts; a server-side script store; a palette item that starts the demo; the session
+  surviving a reload.
