@@ -539,13 +539,18 @@ describe('Engine events', () => {
     await engine.start();
 
     assert.equal(events.length, 2);
-    assert.deepEqual(events[0], {
+    const { id, at, ackMs, ...given } = events[0] as PublishedMessage;
+    assert.deepEqual(given, {
       deviceId: 'dc-env-01',
       topic: 'campus/BLD-DC/dc-env-01/telemetry',
       payload: publisher.sent[0]?.payload,
       seq: 1,
       ts: iso(0),
     });
+    // What the engine adds is covered by the describe of ids, time and PUBACK below.
+    assert.equal(id, 1);
+    assert.ok(Number.isFinite(Date.parse(at)));
+    assert.ok(ackMs >= 0);
   });
 
   it('emits one state event per change, in order, and none for a change that changes nothing', () => {
@@ -1530,7 +1535,8 @@ describe('Engine published messages: id, time and PUBACK', () => {
   });
 
   it('measures the PUBACK time on the monotonic clock, to a tenth of a millisecond', async () => {
-    const { engine, publisher } = setupTimed();
+    // One device: two publishes in one tick would share the fake clock, as they share a client's queue.
+    const { engine, publisher } = setupTimed({ devices: [dc1] });
     const heard = listen(engine);
     publisher.ackMs = 3.14159;
     await engine.start();
