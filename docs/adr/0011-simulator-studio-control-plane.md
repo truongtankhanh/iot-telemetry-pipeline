@@ -724,3 +724,43 @@ The Faults page ([frame 07](../design/simulator/mockups/07-fault-injection.dc.ht
   counts of the snapshot are not shown: they refresh only when something else changes, and the Message inspector (SIM-13) is where a dropped message belongs.
 - **Not done here, left as they were:** a count field for the burst (the button is a fixed 1,000), timed or staggered faults, a fault from a scenario file, and the Twin's
   fault visuals (SIM-19).
+
+## Amendment, 2026-10-23: the Event stream (SIM-13, simulator half)
+
+The Event stream page ([frame 06](../design/simulator/mockups/06-message-inspector.dc.html)) lists the last 200 published messages with their PUBACK time and
+resends one with the same `seq`. The 200-message publish log of SIM-03 already existed; this adds what a row needs, one command, and a bound on what the stream
+forwards. No dependency, no route in ingest, no change to the contract, the metrics, Compose or Kubernetes.
+
+- **PUBACK is measured by the simulator, on the real clock.** `published` is emitted when the publisher settles, which at QoS 1 is the broker's PUBACK, so the engine
+  takes the time before the call and builds the message in the same `.then` that already emitted it (`ackMs`, to a tenth, and `at`, the wall time). The engine's `Clock`
+  cannot be used: on `--simulated-clock` it stands still or jumps a whole interval. `EngineOptions.realTime` is the seam (default `Date.now` and `performance.now`), so
+  the cadence, the random source and the parity tests are untouched. `ackMs` includes the client's own queueing: for a burst chunk of 250 it is more than the broker's time alone.
+  `id` (from 1, given when the event is emitted) is the key of a row and of a republish. Ingest was not asked for a delivery time (brief, open question 7): PUBACK is the broker's.
+- **Republish takes the message from the log, not from the request.** `POST /api/messages/:id/republish` sends a logged message byte for byte. The alternative, a body
+  with `{ topic, payload }`, would be a new capability for an unauthenticated API ("publish anything to the broker"); a resend of what the simulator itself published adds none, and
+  is bounded by the log (200 ids). It goes straight to the publisher, **outside the fault switches and the scope** (it is an explicit act: a drop or a malformed rewrite of it
+  would make "send this again" untrue), is refused with `409` while the link is down instead of being built and dropped, is counted in `published`, comes back tagged `republish`
+  and is a `StateChange` (an observation), while the message itself is not (published messages never are). A broker that refuses it is `502`, not the caller's input. A skipped
+  message (below) is not in the log and cannot be republished.
+- **What ingest does with a repeat** (read in `sequence-ledger.ts` and `batch-writer.service.ts`): a message with an equal or lower `seq` that fills no hole and whose `ts` is not
+  newer is a redelivery and is ignored by the ledger (no gap, no restart); its readings hit `ON CONFLICT DO NOTHING`, so `telemetry_readings_total{result="stored"}` does not move
+  and `{result="duplicate"}` grows by the number of metrics; `telemetry_messages_total{result="accepted"}` grows by one; rollups and rules run on stored rows only. The acceptance
+  check therefore reads `{result="stored"}`: a `grep` of every `telemetry_readings_total` series shows the `duplicate` one growing, by design. A repeat of a malformed message is
+  rejected again. The effect session starts on a republish as it does on a burst, and the baseline already holds the `duplicate` and `accepted` series (the poller forwards every
+  label of `telemetry_readings_total` and `telemetry_messages_total`; `fault-effect.ts` selects by name), so nothing changed there.
+- **Sampling is in the control server, not in the engine and not only in the page.** The engine publishes every due device in the same tick, a burst is up to 5,000 messages and the
+  benchmark's rate is 10,000 a second; each `published` event was serialized once and written to up to 20 sockets, and a client more than 1 MiB behind is dropped. A page-side
+  throttle would leave that cost on the server, and sampling in the engine would starve every other listener. `PublishSampler` (pure, an injected clock) counts every message and
+  forwards the first **250** of each one-second window to the log and the stream; the rest are skipped. The budget is a burst chunk (`FAULT_LIMITS.burstChunk`), not a lower number,
+  because the 100-device registry offers 100 messages within milliseconds every 2 s: at 50 a normal demo fleet would be "sampling" on every tick. The stream says so (a `sampling`
+  event per window while it skips, one closing event with `active: false`, a timer that exists only while sampling is going on, and `publishTotal` and `sampling` in the first
+  message), and a page's message rate is `forwarded + skipped` over the window, because counting `published` events would now under-report. The log holds what was forwarded.
+  `StateView` does not change, so the Studio fixtures of the state do not move; `apps/simulator-ui/src/api/types.ts` gains the optional fields and the `sampling` event name (types only).
+- **The benchmark does not reach this stream today.** `bench.ts` publishes with its own client and `bench` never starts the control server, so the "benchmark's rate" the ticket
+  names is, for this stream, a burst or a short-interval 100-device fleet; the unit test is "10,000 events in, at most the budget out, the count exact". Whether SIM-15 runs the
+  benchmark in a child process or through the engine decides whether it ever does (brief, open question 4); SIM-13 is checked again then.
+- **Not done here, and why.** Dropped messages are not rows of the Event stream (the `dropped` event stays on the stream; the frame has no state for one). Clear is the page's own
+  cut-off: the log is shared (it seeds the Fleet's last payload and every new snapshot), so a server-side clear would empty it for every tab. `size`, `qos` and `retain` are not
+  fields: the page computes the size in bytes from the payload, and QoS 1 and retain off are constants of the contract (`docs/telemetry-contract.md`, section 3).
+- **Security posture.** Nothing is written to disk and nothing authenticates, as before. What an unauthenticated caller on loopback can now do beyond the burst is resend a message
+  the simulator already published, as often as it asks. Same trust level as anomalies, holds and the burst. Nothing was hardened.

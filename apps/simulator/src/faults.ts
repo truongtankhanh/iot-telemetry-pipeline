@@ -43,8 +43,11 @@ export const MALFORMED_KINDS = [
 ] as const;
 export type MalformedKind = (typeof MALFORMED_KINDS)[number];
 
-/** Marks a message that is not a plain one, on the `published` event. Delay and reorder leave no mark in the message. */
-export type FaultTag = 'duplicate' | 'burst' | `malformed:${MalformedKind}`;
+/**
+ * Marks a message that is not a plain one, on the `published` event. Delay and reorder leave no mark in the message.
+ * `republish` is a message the operator sent again from the log, not one a fault made.
+ */
+export type FaultTag = 'duplicate' | 'burst' | 'republish' | `malformed:${MalformedKind}`;
 
 export const FAULT_LIMITS = {
   /** Under `SEQUENCE_GRACE_MS` (30 s), so that a delay alone does not make ingest count a message as lost. */

@@ -24,6 +24,7 @@ import {
   type RoutesContext,
   type StateView,
 } from './control-routes.ts';
+import type { PublishedMessage } from './engine.ts';
 import { FaultEffect } from './fault-effect.ts';
 import type { LinkControl } from './faults.ts';
 import {
@@ -135,6 +136,9 @@ async function setup(
     ...(wallClock ? { clock: systemClock } : {}),
     ...(link ? { link } : {}),
   });
+  // The publish log as the control server keeps it, without the sampling: every message the engine reports.
+  const logged: PublishedMessage[] = [];
+  engine.on('published', (message) => logged.push(message));
   if (started && !wallClock) await engine.start();
   const store = new ObservationStore();
   const broker = new BrokerLink('mqtt://u:p@localhost:1883', true);
@@ -163,13 +167,14 @@ async function setup(
     broker,
     rules,
     effect,
+    messages: { find: (id) => logged.find((m) => m.id === id), capacity: 200 },
   };
   const handle = createRoutes(context);
   const call = (method: string, path: string, body?: unknown): Promise<RouteResponse> => {
     const url = new URL(path, 'http://localhost');
     return handle({ method, path: url.pathname, query: url.searchParams, body });
   };
-  return { engine, publisher, store, broker, recorded, context, call, feed, effect };
+  return { engine, publisher, store, broker, recorded, context, call, feed, effect, logged };
 }
 
 const view = (response: RouteResponse) => response.body as StateView;
@@ -2147,6 +2152,106 @@ describe('POST /api/faults/burst', () => {
     const before = publisher.sent.length;
     await call('POST', '/api/faults/burst', { count: 6 });
     assert.equal(publisher.sent.length - before, 6);
+  });
+});
+
+describe('POST /api/messages/:id/republish', () => {
+  const republish = (call: Awaited<ReturnType<typeof setup>>['call'], id: number | string) =>
+    call('POST', `/api/messages/${id}/republish`);
+
+  it('sends the logged message again, byte for byte, and answers with it and the state view', async () => {
+    const { call, publisher, logged } = await setup();
+    const original = logged[0] as PublishedMessage;
+    const before = publisher.sent.length;
+
+    const response = await republish(call, original.id);
+
+    assert.equal(response.status, 200);
+    const body = response.body as { message: PublishedMessage } & StateView;
+    assert.equal(body.message.seq, original.seq);
+    assert.equal(body.message.ts, original.ts);
+    assert.equal(body.message.topic, original.topic);
+    assert.equal(body.message.payload, original.payload);
+    assert.equal(body.message.fault, 'republish');
+    assert.ok(body.message.id > logged[0]!.id);
+    assert.equal(publisher.sent.length, before + 1);
+    assert.deepEqual(publisher.sent.at(-1), { topic: original.topic, payload: original.payload });
+    assert.equal(body.engine.published, before + 1);
+    assert.ok(Array.isArray(body.devices));
+  });
+
+  it('can republish its own republish', async () => {
+    const { call, publisher } = await setup();
+    const first = (await republish(call, 1)).body as { message: PublishedMessage };
+    const second = await republish(call, first.message.id);
+    assert.equal(second.status, 200);
+    assert.equal(
+      (second.body as { message: PublishedMessage }).message.payload,
+      first.message.payload,
+    );
+    assert.equal(publisher.sent.length, 3 + 2); // the first tick of three devices, then two
+  });
+
+  it('names the id it refuses', async () => {
+    const { call, publisher } = await setup();
+    const before = publisher.sent.length;
+    for (const id of ['0', 'abc', '1.5', '-1', '99999999999999999999']) {
+      assertEnvelope(await republish(call, id), 400, /"id"/);
+    }
+    assert.equal(publisher.sent.length, before);
+  });
+
+  it('answers 404 when the message is no longer in the log, and says how many are kept', async () => {
+    const { call, publisher } = await setup();
+    const before = publisher.sent.length;
+    assertEnvelope(await republish(call, 9999), 404, /not in the publish log.*last 200/);
+    assert.equal(publisher.sent.length, before);
+  });
+
+  it('answers 409 while the link is down, and publishes nothing', async () => {
+    const { call, publisher } = await setup({ link: new FakeLink() });
+    await call('PUT', '/api/faults/link-loss');
+    const before = publisher.sent.length;
+    assertEnvelope(await republish(call, 1), 409, /link/);
+    assert.equal(publisher.sent.length, before);
+  });
+
+  it('answers 502 with the broker’s reason when the publish is refused, and starts no effect session', async () => {
+    const { call, publisher, effect } = await setup();
+    publisher.publish = async () => {
+      throw new Error('broker said no');
+    };
+    assertEnvelope(await republish(call, 1), 502, /did not accept.*broker said no/);
+    assert.equal(effect.view(), null);
+  });
+
+  it('answers 405 with Allow: POST to a GET', async () => {
+    const { call } = await setup();
+    const response = await call('GET', '/api/messages/1/republish');
+    assertEnvelope(response, 405);
+    assert.equal(response.headers?.Allow, 'POST');
+  });
+
+  it('starts the effect session once, with the counters from before the repeat, and keeps it on a second one', async () => {
+    const { call, feed, effect } = await setup();
+    const baseline = [
+      { name: 'telemetry_readings_total', labels: { result: 'stored' }, value: 10 },
+      { name: 'telemetry_readings_total', labels: { result: 'duplicate' }, value: 0 },
+      { name: 'telemetry_messages_total', labels: { result: 'accepted' }, value: 5 },
+    ];
+    feed.current = { samples: baseline, lastOkAt: '2026-10-01T05:00:01.000Z', stale: false };
+    assert.equal(effect.view(), null);
+
+    const first = await republish(call, 1);
+    assert.deepEqual(view(first).faultEffect?.baseline, baseline);
+
+    feed.current = {
+      samples: baseline.map((s) => ({ ...s, value: s.value + 7 })),
+      lastOkAt: '2026-10-01T05:00:02.000Z',
+      stale: false,
+    };
+    const second = await republish(call, 1);
+    assert.deepEqual(view(second).faultEffect?.baseline, baseline);
   });
 });
 

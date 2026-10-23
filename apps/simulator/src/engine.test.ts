@@ -8,6 +8,7 @@ import {
   type EngineOptions,
   type Publisher,
   type PublishedMessage,
+  type RealTime,
   type StateChange,
 } from './engine.ts';
 import {
@@ -1452,5 +1453,241 @@ describe('Engine faults: settings, events and lifecycle', () => {
     await clock.advance(10_000);
     assert.equal(publisher.sent.length, 0);
     assert.equal(engine.snapshot().faults.held, 0);
+  });
+});
+
+/** The real clocks of the engine, fixed by the test; the manual clock stays at 2026-10-01. */
+class FakeRealTime implements RealTime {
+  wallMs = Date.parse('2026-10-23T08:00:00.000Z');
+  monoMs = 1000;
+
+  wall(): number {
+    return this.wallMs;
+  }
+
+  mono(): number {
+    return this.monoMs;
+  }
+}
+
+/** A publisher whose PUBACK takes `ackMs` on the fake monotonic clock. */
+class TimedPublisher extends FakePublisher {
+  ackMs = 3;
+  private readonly realTime: FakeRealTime;
+
+  // No parameter property: Node strips types and does not transform them.
+  constructor(realTime: FakeRealTime) {
+    super();
+    this.realTime = realTime;
+  }
+
+  override async publish(topic: string, payload: string, options: { qos: 1 }): Promise<void> {
+    await super.publish(topic, payload, options);
+    this.realTime.monoMs += this.ackMs;
+  }
+}
+
+function setupTimed(options: Partial<EngineOptions> = {}) {
+  const realTime = new FakeRealTime();
+  const publisher = new TimedPublisher(realTime);
+  const clock = new ManualClock(T0);
+  const engine = new Engine({
+    devices: [dc1, dc2],
+    publisher,
+    clock,
+    realTime,
+    intervalMs: 2000,
+    random: () => 0.5,
+    ...options,
+  });
+  return { engine, clock, publisher, realTime };
+}
+
+describe('Engine published messages: id, time and PUBACK', () => {
+  it('gives every message an id from 1, in the order they are emitted, copies included', async () => {
+    const { engine } = setupTimed();
+    const heard = listen(engine);
+    engine.setFaultScope({ mode: 'selected', deviceIds: ['dc-env-01'] });
+    engine.setFault('duplicate', { percent: 100 });
+    await engine.start();
+    assert.deepEqual(
+      heard.published.map((m) => m.id),
+      [1, 2, 3],
+    );
+  });
+
+  it('stamps the real wall time of the acknowledgement, not the engine clock', async () => {
+    const { engine, clock, realTime } = setupTimed();
+    const heard = listen(engine);
+    await engine.start();
+    await clock.advance(2000);
+    assert.equal(heard.published[0]?.at, '2026-10-23T08:00:00.000Z');
+    realTime.wallMs += 1500;
+    await clock.advance(2000);
+    assert.equal(heard.published.at(-1)?.at, '2026-10-23T08:00:01.500Z');
+    // The payload's own time is the engine's.
+    assert.equal(heard.published.at(-1)?.ts, iso(4000));
+  });
+
+  it('measures the PUBACK time on the monotonic clock, to a tenth of a millisecond', async () => {
+    const { engine, publisher } = setupTimed();
+    const heard = listen(engine);
+    publisher.ackMs = 3.14159;
+    await engine.start();
+    assert.equal(heard.published[0]?.ackMs, 3.1);
+    publisher.ackMs = 2;
+    await engine.step();
+    assert.equal(heard.published.at(-1)?.ackMs, 2);
+  });
+
+  it('uses the system clocks when none are given', async () => {
+    const { engine } = setup();
+    const heard = listen(engine);
+    const before = Date.now();
+    await engine.start();
+    const message = heard.published[0] as PublishedMessage;
+    const at = Date.parse(message.at);
+    assert.ok(at >= before && at <= Date.now() + 1000, message.at);
+    assert.ok(Number.isFinite(message.ackMs) && message.ackMs >= 0, String(message.ackMs));
+  });
+
+  it('does not read the random source for the new fields', async () => {
+    let reads = 0;
+    const counting = () => {
+      reads++;
+      return 0.5;
+    };
+    const plain = setup({ random: counting });
+    await plain.engine.start();
+    const withNew = reads;
+    reads = 0;
+    const timed = setupTimed({ random: counting });
+    await timed.engine.start();
+    assert.equal(reads, withNew);
+  });
+});
+
+describe('Engine republish', () => {
+  async function started(options: Partial<EngineOptions> = {}) {
+    const rig = setupTimed(options);
+    const heard = listen(rig.engine);
+    await rig.engine.start();
+    const original = heard.published[0] as PublishedMessage;
+    return { ...rig, heard, original };
+  }
+
+  it('sends the same topic, payload, seq and ts again, as a new message tagged republish', async () => {
+    const { engine, publisher, heard, original } = await started();
+    const sentBefore = publisher.sent.length;
+    const again = await engine.republish(original);
+
+    assert.equal(publisher.sent.length, sentBefore + 1);
+    assert.deepEqual(publisher.sent.at(-1), {
+      topic: original.topic,
+      payload: original.payload,
+      options: { qos: 1 },
+    });
+    assert.equal(again.seq, original.seq);
+    assert.equal(again.ts, original.ts);
+    assert.equal(again.payload, original.payload);
+    assert.equal(again.fault, 'republish');
+    assert.ok(again.id > original.id);
+    assert.equal(heard.published.at(-1), again);
+  });
+
+  it('is counted like any message handed to the publisher', async () => {
+    const { engine, original } = await started();
+    const before = engine.published;
+    await engine.republish(original);
+    assert.equal(engine.published, before + 1);
+  });
+
+  it('emits published first and then the state change', async () => {
+    const { engine, original } = await started();
+    const order: string[] = [];
+    engine.on('published', () => order.push('published'));
+    engine.on('state', (change) => order.push(change.type));
+    await engine.republish(original);
+    assert.deepEqual(order, ['published', 'republish']);
+  });
+
+  it('says which device and seq in the state change', async () => {
+    const { engine, heard, original } = await started();
+    await engine.republish(original);
+    assert.deepEqual(heard.states.at(-1), {
+      type: 'republish',
+      deviceId: original.deviceId,
+      seq: original.seq,
+    });
+  });
+
+  it('replaces the tag of the original, even a malformed or duplicate one', async () => {
+    const { engine, original } = await started();
+    for (const fault of ['duplicate', 'burst', 'malformed:json'] as const) {
+      const again = await engine.republish({ ...original, fault } as PublishedMessage);
+      assert.equal(again.fault, 'republish');
+    }
+  });
+
+  it('applies no fault, reads no random value, and ignores the scope', async () => {
+    let reads = 0;
+    const { engine, publisher, heard, original } = await started({
+      random: () => {
+        reads++;
+        return 0;
+      },
+    });
+    engine.setFault('drop', { percent: 100 });
+    engine.setFault('malformed', { percent: 100, kinds: ['json'] });
+    engine.setFault('duplicate', { percent: 100 });
+    engine.setFault('delay', { delayMs: 500, jitterMs: 0 });
+    engine.setFault('reorder', { window: 5 });
+    engine.setFaultScope({ mode: 'selected', deviceIds: [original.deviceId] });
+    const readsBefore = reads;
+    const sentBefore = publisher.sent.length;
+
+    await engine.republish(original);
+
+    assert.equal(publisher.sent.length, sentBefore + 1);
+    assert.equal(publisher.sent.at(-1)?.payload, original.payload);
+    assert.equal(reads, readsBefore);
+    assert.deepEqual(heard.dropped, []);
+    assert.equal(engine.snapshot().faults.held, 0);
+  });
+
+  it('is refused while the link is down, and publishes nothing', async () => {
+    const { engine, publisher, heard, original } = await started({ link: new FakeLink() });
+    await engine.cutLink();
+    const sentBefore = publisher.sent.length;
+    const publishedBefore = engine.published;
+    const statesBefore = heard.states.length;
+
+    await assert.rejects(() => engine.republish(original), FaultConflictError);
+
+    assert.equal(publisher.sent.length, sentBefore);
+    assert.equal(engine.published, publishedBefore);
+    assert.equal(heard.states.length, statesBefore);
+  });
+
+  it('rejects when the broker refuses the publish, without a published event, a state change or a tick-error', async () => {
+    const { engine, publisher, heard, original } = await started();
+    const publishedBefore = heard.published.length;
+    const statesBefore = heard.states.length;
+    publisher.failOn = () => true;
+
+    await assert.rejects(() => engine.republish(original), /publish failed/);
+
+    assert.equal(heard.published.length, publishedBefore);
+    assert.equal(heard.states.length, statesBefore);
+    assert.deepEqual(heard.errors, []);
+  });
+
+  it('works on a stopped engine and on a simulated clock, with the same bytes', async () => {
+    const { engine, clock, publisher, original } = await started();
+    await clock.advance(2000);
+    engine.stop();
+    const again = await engine.republish(original);
+    assert.equal(again.ts, original.ts);
+    assert.equal(publisher.sent.at(-1)?.payload, original.payload);
   });
 });

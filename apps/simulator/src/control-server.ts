@@ -16,6 +16,7 @@ import { FaultEffect } from './fault-effect.ts';
 import { EventStream, type EventStreamOptions } from './event-stream.ts';
 import type { IngestPoller } from './ingest-poller.ts';
 import { type ObservationDraft, ObservationStore, RingBuffer } from './observation-store.ts';
+import { PublishSampler, type SamplerOptions } from './publish-sampler.ts';
 import { type RulesView, rulesUnavailable } from './rules-source.ts';
 import type { ScenarioLibrary } from './scenario-library.ts';
 import { ScenarioRuns } from './scenario-runs.ts';
@@ -50,6 +51,8 @@ export interface ControlServerOptions {
   now?: () => number;
   log?: (line: string) => void;
   stream?: EventStreamOptions;
+  /** The budget and window of the sampling of `published` events; the defaults are for production, a test narrows them. */
+  sampling?: Pick<SamplerOptions, 'budgetPerS' | 'windowMs'>;
   maxBodyBytes?: number;
 }
 
@@ -90,6 +93,8 @@ export class ControlServer {
   private readonly server: Server;
   private readonly stream: EventStream;
   private readonly publishLog = new RingBuffer<PublishedMessage>(PUBLISH_LOG_SIZE);
+  private readonly sampler: PublishSampler;
+  private samplingTimer: NodeJS.Timeout | undefined;
   private readonly context: RoutesContext;
   private readonly handle: ReturnType<typeof createRoutes>;
   private readonly allowedHosts: Set<string>;
@@ -105,6 +110,7 @@ export class ControlServer {
     this.maxBodyBytes = options.maxBodyBytes ?? MAX_BODY_BYTES;
     this.now = options.now ?? Date.now;
     this.log = options.log ?? ((line) => console.log(line));
+    this.sampler = new PublishSampler({ ...options.sampling, now: this.now });
     this.allowedHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
     const bound = options.config.host.toLowerCase();
     if (!WILDCARD_HOSTS.has(bound)) {
@@ -123,6 +129,10 @@ export class ControlServer {
       broker: options.broker,
       rules: options.rules ?? rulesUnavailable('no rules file was given'),
       effect: new FaultEffect({ now: this.now }),
+      messages: {
+        find: (id) => this.publishLog.toArray().findLast((message) => message.id === id),
+        capacity: PUBLISH_LOG_SIZE,
+      },
     };
     this.handle = createRoutes(this.context);
     this.server = createServer((req, res) => void this.onRequest(req, res));
@@ -168,6 +178,7 @@ export class ControlServer {
     this.detach?.();
     this.detach = undefined;
     this.options.poller.stop();
+    this.stopSamplingTimer();
     this.stream.close();
     if (!this.server.listening) return;
     this.server.closeAllConnections();
@@ -181,6 +192,26 @@ export class ControlServer {
   /** Stores an observation and tells the stream about it. */
   private observe(draft: ObservationDraft, at: string = this.stamp()): void {
     this.stream.send('observation', this.store.append(draft, at));
+  }
+
+  /**
+   * While sampling is going on, a timer closes each window so that the last one is reported when the traffic stops;
+   * it ends itself with the closing report (`active: false`).
+   */
+  private watchSampling(): void {
+    if (this.samplingTimer !== undefined || !this.sampler.active) return;
+    const tick = this.safely('sampling', () => {
+      const report = this.sampler.roll();
+      if (report) this.stream.send('sampling', report);
+      if (!this.sampler.active) this.stopSamplingTimer();
+    });
+    this.samplingTimer = setInterval(tick, this.sampler.state().windowMs);
+    this.samplingTimer.unref();
+  }
+
+  private stopSamplingTimer(): void {
+    clearInterval(this.samplingTimer);
+    this.samplingTimer = undefined;
   }
 
   private safely<A extends unknown[]>(
@@ -204,9 +235,15 @@ export class ControlServer {
       this.stream.send('state', change);
       this.observe({ kind: 'engine-state', data: { ...change } });
     });
+    // Every message is counted; only some are kept and forwarded (see `PublishSampler`), and the stream says when it skips.
     const onPublished = this.safely('published', (message: PublishedMessage) => {
-      this.publishLog.push(message);
-      this.stream.send('published', message);
+      const { forward, report } = this.sampler.offer();
+      if (report) this.stream.send('sampling', report);
+      if (forward) {
+        this.publishLog.push(message);
+        this.stream.send('published', message);
+      }
+      this.watchSampling();
     });
     // A message that was built and never sent: the stream tells a page about it, the publish log (what was sent) does not.
     const onDropped = this.safely('dropped', (message: DroppedMessage) => {
@@ -365,7 +402,13 @@ export class ControlServer {
   }
 
   private openStream(res: ServerResponse): void {
-    const snapshot = { ...buildStateView(this.context), publishLog: this.publishLog.toArray() };
+    const { total, ...sampling } = this.sampler.state();
+    const snapshot = {
+      ...buildStateView(this.context),
+      publishLog: this.publishLog.toArray(),
+      publishTotal: total,
+      sampling,
+    };
     if (!this.stream.add(res, { event: 'snapshot', data: snapshot })) {
       this.reply(res, {
         status: 503,

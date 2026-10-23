@@ -983,3 +983,158 @@ describe('ControlServer and the faults', () => {
     assert.ok(log.every((m) => m.fault === 'burst'));
   });
 });
+
+describe('ControlServer sampling', () => {
+  const published = (client: StreamClient) => client.events.filter((e) => e.event === 'published');
+  const sampling = (client: StreamClient) => client.events.filter((e) => e.event === 'sampling');
+
+  it('opens with the count of every message and says it is not sampling', async () => {
+    const { port } = await startServer();
+    const client = await openStream(port);
+    const snapshot = await client.waitFor((e) => e.event === 'snapshot');
+    assert.equal(snapshot.data.publishTotal, 3);
+    assert.deepEqual(snapshot.data.sampling, {
+      active: false,
+      skipped: 0,
+      budgetPerS: 250,
+      windowMs: 1000,
+    });
+  });
+
+  it('forwards the budget of a window, keeps those in the log, and counts the rest', async () => {
+    let wall = T0;
+    const { port } = await startServer({
+      now: () => wall,
+      sampling: { budgetPerS: 50, windowMs: 1000 },
+    });
+    const client = await openStream(port);
+    await client.waitFor((e) => e.event === 'snapshot');
+
+    const burst = await send(port, 'POST', '/api/faults/burst', { count: 300 });
+    assert.equal(burst.json().sent, 300);
+
+    // 3 at start and 300 in the burst were offered; 50 went through, 3 of them before the page opened.
+    await client.waitFor((e) => e.event === 'state' && e.data.type === 'burst');
+    assert.equal(published(client).length, 47);
+    assert.deepEqual(sampling(client), []); // the window is still open
+
+    const late = await openStream(port);
+    const snapshot = await late.waitFor((e) => e.event === 'snapshot');
+    assert.equal(snapshot.data.publishTotal, 303);
+    assert.equal((snapshot.data.publishLog as unknown[]).length, 50);
+    assert.deepEqual(snapshot.data.sampling, {
+      active: true,
+      skipped: 253,
+      budgetPerS: 50,
+      windowMs: 1000,
+    });
+
+    // The next window: the next message closes this one and carries its report; the new window forwards again.
+    wall += 1000;
+    await send(port, 'POST', '/api/step');
+    const report = await client.waitFor((e) => e.event === 'sampling');
+    assert.deepEqual(report.data, {
+      total: 303,
+      skipped: 253,
+      forwarded: 50,
+      windowMs: 1000,
+      budgetPerS: 50,
+      active: true,
+    });
+    await client.waitFor((e) => e.event === 'published' && e.data.seq === 2);
+  });
+
+  it('reports the last window by itself when the traffic stops, closes the stretch, and then goes quiet', async () => {
+    const { port } = await startServer({
+      now: Date.now,
+      sampling: { budgetPerS: 3, windowMs: 50 },
+    });
+    const client = await openStream(port);
+    await client.waitFor((e) => e.event === 'snapshot');
+
+    await send(port, 'POST', '/api/faults/burst', { count: 20 });
+
+    const active = await client.waitFor((e) => e.event === 'sampling' && e.data.active === true);
+    assert.ok(Number(active.data.skipped) > 0);
+    const closing = await client.waitFor((e) => e.event === 'sampling' && e.data.active === false);
+    assert.equal(closing.data.skipped, 0);
+    assert.equal(closing.data.total, 23);
+
+    const frames = sampling(client).length;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(sampling(client).length, frames);
+  });
+});
+
+describe('ControlServer republish', () => {
+  it('sends a logged message again: it streams, enters the log, and is an observation', async () => {
+    const { port, publisher } = await startServer();
+    const client = await openStream(port);
+    const snapshot = await client.waitFor((e) => e.event === 'snapshot');
+    const original = (snapshot.data.publishLog as Json[])[0] as Json;
+    const before = publisher.sent.length;
+
+    const response = await send(port, 'POST', `/api/messages/${original.id}/republish`);
+
+    assert.equal(response.status, 200);
+    const message = response.json().message as Json;
+    assert.equal(message.seq, original.seq);
+    assert.equal(message.payload, original.payload);
+    assert.equal(message.fault, 'republish');
+    assert.equal(publisher.sent.length, before + 1);
+
+    const streamed = await client.waitFor(
+      (e) => e.event === 'published' && e.data.fault === 'republish',
+    );
+    assert.equal(streamed.data.id, message.id);
+    const state = await client.waitFor((e) => e.event === 'state' && e.data.type === 'republish');
+    assert.deepEqual(state.data, {
+      type: 'republish',
+      deviceId: original.deviceId,
+      seq: original.seq,
+    });
+    await client.waitFor(
+      (e) => e.event === 'observation' && (e.data.data as Json).type === 'republish',
+    );
+
+    const late = await openStream(port);
+    const lateSnapshot = await late.waitFor((e) => e.event === 'snapshot');
+    const log = lateSnapshot.data.publishLog as Json[];
+    assert.equal(log.at(-1)?.id, message.id);
+    assert.equal(lateSnapshot.data.publishTotal, 4);
+  });
+
+  it('answers 404 for a message that is not in the log', async () => {
+    const { port } = await startServer();
+    const response = await send(port, 'POST', '/api/messages/9999/republish');
+    assert.equal(response.status, 404);
+    assert.match(String(response.json().message), /last 200/);
+  });
+
+  it('keeps the log to what was forwarded: a republish past the budget is sent and answered, but not logged', async () => {
+    // The clock stands still, so the window of the first three messages never ends.
+    const { port, publisher } = await startServer({ sampling: { budgetPerS: 3 } });
+    const client = await openStream(port);
+    await client.waitFor((e) => e.event === 'snapshot');
+    const before = publisher.sent.length;
+
+    const response = await send(port, 'POST', '/api/messages/1/republish');
+
+    assert.equal(response.status, 200);
+    assert.equal(publisher.sent.length, before + 1);
+    const message = response.json().message as Json;
+    const late = await openStream(port);
+    const snapshot = await late.waitFor((e) => e.event === 'snapshot');
+    assert.equal((snapshot.data.publishLog as unknown[]).length, 3);
+    assert.equal(snapshot.data.publishTotal, 4);
+    assert.equal((snapshot.data.sampling as Json).skipped, 1);
+    assert.equal(
+      client.events.some((e) => e.event === 'published' && e.data.fault === 'republish'),
+      false,
+    );
+
+    // It is not in the log, so it cannot be sent again by id.
+    const again = await send(port, 'POST', `/api/messages/${message.id}/republish`);
+    assert.equal(again.status, 404);
+  });
+});
