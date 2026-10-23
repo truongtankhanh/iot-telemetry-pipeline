@@ -82,3 +82,21 @@
     padding: 16px;
   }
 }
+
+/* Presenter mode (the guided demo): no navigation, so one column and one row under the header, at every width. It comes last and is as
+   specific as the rules above, so it wins over the rail and the narrow layout. */
+.app[data-presenter='true'] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--header-h) minmax(0, 1fr);
+}
+
+.app[data-presenter='true'] .main {
+  padding: 28px 36px 32px;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .app[data-presenter='true'] .main {
+    padding: 16px;
+  }
+}

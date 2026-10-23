@@ -7,6 +7,7 @@ import { stateViewFixture as fixture } from './api/fixtures/stateView';
 import type { StateView } from './api/types';
 import { StudioFrame } from './App';
 import { appRoutes } from './lib/routes';
+import { DemoSessionStore } from './state/demoSessionStore';
 import { createStudioStore, type StudioStore } from './state/store';
 import { StudioProvider } from './state/StudioProvider';
 import { installReactFlowStubs } from './pages/topology/topologyTestSupport';
@@ -26,16 +27,19 @@ function renderStudio({
   store = createStudioStore(),
   view = base as StateView | null,
   routes = appRoutes({ foundations: true }),
+  demo,
 }: {
   path?: string;
   store?: StudioStore;
   view?: StateView | null;
   routes?: ReturnType<typeof appRoutes>;
+  /** The guided demo's session; a test that presents a demo passes one that has started. */
+  demo?: DemoSessionStore;
 } = {}) {
   store.getState().setLink('live', NOW);
   if (view !== null) store.getState().setView(view, NOW);
   const result = render(
-    <StudioProvider store={store}>
+    <StudioProvider store={store} demo={demo}>
       <MemoryRouter initialEntries={[path]}>
         <StudioFrame routes={routes} />
       </MemoryRouter>
@@ -288,6 +292,66 @@ describe('the palette’s actions', () => {
     await userEvent.keyboard('>reset');
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Reset' })).toHaveFocus());
+  });
+});
+
+describe('the guided demo', () => {
+  const presenting = () => {
+    const demo = new DemoSessionStore();
+    demo.dispatch({ type: 'start', scriptId: 'overheat-to-incident', stepCount: 6, now: NOW });
+    return demo;
+  };
+
+  it('opens the Demo page and not the placeholder, with the navigation, until a demo is presented', async () => {
+    renderStudio({ path: '/demo' });
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Guided demo' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Coming with SIM-14/)).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Pages' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start presenter' })).toBeInTheDocument();
+    expect(document.title).toBe('Demo · Simulator Studio');
+  });
+
+  it('goes to the Demo with g then d', async () => {
+    renderStudio({ path: '/fleet' });
+    await userEvent.keyboard('gd');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Guided demo' }),
+    ).toBeInTheDocument();
+  });
+
+  it('drops the navigation and swaps the header while a demo is presented, and brings them back on Esc, without stopping anything', async () => {
+    const demo = presenting();
+    renderStudio({ path: '/demo', demo });
+    expect(await screen.findByRole('button', { name: /Exit presenter/ })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull();
+    expect(screen.getByText('Step 1 of 6', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Demo steps' })).toBeInTheDocument();
+
+    const writes = () =>
+      vi.mocked(fetch).mock.calls.filter(([, init]) => (init?.method ?? 'GET') !== 'GET').length;
+    const before = writes();
+    await userEvent.keyboard('{Escape}');
+    expect(await screen.findByRole('navigation', { name: 'Pages' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Exit presenter/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Resume at step 1' })).toBeInTheDocument();
+    expect(demo.get().status).toBe('paused-for-exit');
+    expect(writes()).toBe(before);
+  });
+
+  it('exits from the header’s button too', async () => {
+    const demo = presenting();
+    renderStudio({ path: '/demo', demo });
+    await userEvent.click(await screen.findByRole('button', { name: /Exit presenter/ }));
+    expect(demo.get().status).toBe('paused-for-exit');
+    expect(await screen.findByRole('navigation', { name: 'Pages' })).toBeInTheDocument();
+  });
+
+  it('is presenter mode on the Demo page only: the same session on another page has the ordinary shell', async () => {
+    renderStudio({ path: '/fleet', demo: presenting() });
+    expect(await screen.findByRole('navigation', { name: 'Pages' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Exit presenter/ })).toBeNull();
   });
 });
 

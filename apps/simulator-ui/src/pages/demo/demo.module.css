@@ -1,0 +1,445 @@
+/* The guided demo (frame 08): large type for a projector, the steps on the left and the current one on the right. Nothing is below 13 px. */
+
+.pres {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .pres {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- the step list ---- */
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-3);
+}
+
+.stepNumber {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: var(--fs-body);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.stepTitle {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.stepSummary {
+  display: block;
+  font-size: var(--fs-body);
+  color: var(--text-tertiary);
+}
+
+.step[data-standing='done'] .stepNumber {
+  background: var(--tint-ok);
+  color: var(--success);
+}
+
+.step[data-standing='done'] .stepTitle {
+  color: var(--text-secondary);
+}
+
+.step[data-standing='current'] {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.step[data-standing='current'] .stepNumber {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.scriptLine {
+  padding: 14px 14px 0;
+  font-size: var(--fs-body);
+  color: var(--text-tertiary);
+}
+
+/* ---- the current step ---- */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid rgba(71, 215, 255, 0.12);
+  border-radius: var(--radius-3);
+  box-shadow:
+    inset 0 1px 0 rgba(120, 225, 255, 0.1),
+    var(--shadow-1);
+  min-width: 0;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 32px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.big {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.say {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+/* What the step waits for. The tone says it in words too ("Late"), never by colour alone. */
+.wait {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-3);
+  background: var(--surface-0);
+  border: 1px dashed var(--accent-line);
+}
+
+.wait[data-tone='warn'] {
+  border-color: rgba(255, 194, 61, 0.6);
+  background: var(--tint-warn);
+}
+
+.wait[data-tone='bad'] {
+  border-color: rgba(255, 98, 128, 0.6);
+  background: var(--tint-bad);
+}
+
+.wait[data-tone='ok'] {
+  border-style: solid;
+  border-color: rgba(61, 240, 174, 0.4);
+  background: var(--tint-ok);
+}
+
+.waitText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.waitTitle {
+  font-family: var(--font-ui);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.waitDetail {
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.spin {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid var(--surface-3);
+  border-top-color: var(--accent);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+.value {
+  font-family: var(--font-ui);
+  font-size: var(--fs-numeral);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.value[data-breach='true'] {
+  color: var(--sev-high);
+}
+
+.value small {
+  margin-left: 3px;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.hot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hotItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+.hotItem[data-done='true'] svg {
+  color: var(--success);
+}
+
+.hotItem[data-done='false'] svg {
+  color: var(--text-tertiary);
+}
+
+.notes {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-3);
+  background: var(--surface-0);
+  border: 1px solid var(--border-subtle);
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 32px;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0 0 var(--radius-3) var(--radius-3);
+  background: var(--surface-0);
+}
+
+.hint {
+  font-size: var(--fs-body);
+  color: var(--text-tertiary);
+}
+
+.notice {
+  margin: 0;
+  padding: 0 32px 20px;
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+.notice[data-tone='bad'] {
+  color: var(--danger);
+}
+
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: var(--fs-body);
+  color: var(--text-tertiary);
+}
+
+/* ---- the pipeline so far ---- */
+
+.strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+}
+
+.stage[data-state='live'] {
+  border-color: var(--accent-line);
+}
+
+.stage[data-state='live'] .stageHead {
+  color: var(--accent);
+}
+
+.stage[data-state='fired'] {
+  border-color: rgba(255, 143, 58, 0.6);
+}
+
+.stage[data-state='fired'] .stageHead {
+  color: var(--sev-high);
+}
+
+.stage[data-state='done'] {
+  border-color: rgba(61, 240, 174, 0.4);
+}
+
+.stage[data-state='done'] .stageHead {
+  color: var(--success);
+}
+
+.stage[data-state='idle'] {
+  background: var(--surface-0);
+}
+
+.stage[data-dimmed='true'] {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.stageHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stageValue {
+  font-family: var(--font-ui);
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.stageValue small {
+  margin-left: 3px;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.stageCaption {
+  font-size: var(--fs-min);
+  color: var(--text-tertiary);
+  line-height: 1.3;
+}
+
+.link {
+  flex: 0 0 40px;
+  align-self: center;
+  height: 2px;
+  background: var(--edge-flow);
+}
+
+.link[data-idle='true'] {
+  background: var(--border-subtle);
+}
+
+@media (max-width: 1000px) {
+  .strip {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .link {
+    display: none;
+  }
+}
+
+/* ---- the start screen ---- */
+
+.start {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 860px;
+}
+
+.startSteps {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.startSteps small {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: var(--fs-body);
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
