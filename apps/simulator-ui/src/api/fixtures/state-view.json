@@ -368,5 +368,14 @@
     "simulated": true
   },
   "observationCursor": 0,
-  "faultEffect": null
+  "faultEffect": null,
+  "benchmark": {
+    "available": true,
+    "reason": null,
+    "database": "localhost:5433/telemetry",
+    "maxMessages": 250000,
+    "running": false,
+    "current": null,
+    "runs": []
+  }
 }

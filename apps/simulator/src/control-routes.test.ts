@@ -12,8 +12,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, it } from 'node:test';
 import { AlertObserver, type IngestAlert } from './alert-observer.ts';
+import { BenchmarkRun, type FleetView } from './benchmark-run.ts';
 import { BrokerLink } from './broker-link.ts';
-import { systemClock } from './clock.ts';
+import { ManualClock, systemClock } from './clock.ts';
 import {
   buildStateView,
   createRoutes,
@@ -44,7 +45,7 @@ import { loadScenarioFolder, ScenarioLibrary } from './scenario-library.ts';
 import { ScenarioRuns } from './scenario-runs.ts';
 import { FolderScenarioStore, type ScenarioStore, serializeScenario } from './scenario-store.ts';
 import type { DeviceSpec } from './signals.ts';
-import { DEVICES, setupEngine, T0 } from './test-support.ts';
+import { DEVICES, FakeBenchChild, setupEngine, T0 } from './test-support.ts';
 
 const OVERHEAT: ScenarioDocument = {
   name: 'overheat',
@@ -122,6 +123,8 @@ async function setup(
     scenarioStore?: ScenarioStore;
     /** The simulator's connection to the broker, for the link-loss fault; without it that fault is refused. */
     link?: LinkControl;
+    /** A server built without a benchmark configuration: the benchmark says it is not available. */
+    noBenchmark?: boolean;
   } = {},
 ) {
   const {
@@ -131,6 +134,7 @@ async function setup(
     broken = false,
     scenarioStore,
     link,
+    noBenchmark = false,
   } = options;
   const { engine, publisher } = setupEngine({
     ...(wallClock ? { clock: systemClock } : {}),
@@ -156,6 +160,27 @@ async function setup(
   // What the fake ingest says about its counters now; a test changes it between two commands.
   const feed: { current: MetricsFeed } = { current: INGEST.metrics() };
   const effect = new FaultEffect({ now: () => T0 + 5000 });
+  // The benchmark is the real owner with a fake process and a manual clock, so the routes are tested against its own answers.
+  const benchmarkChildren: FakeBenchChild[] = [];
+  const benchmarkFleet: FleetView = { running: [], scenarios: [] };
+  const benchmark = new BenchmarkRun({
+    ...(noBenchmark
+      ? {}
+      : {
+          brokerUrl: 'mqtt://localhost:1883',
+          databaseUrl: 'postgres://u:s3cret@db.example:5433/telemetry',
+        }),
+    devices: DEVICES,
+    ingest: INGEST.state,
+    fleet: () => benchmarkFleet,
+    spawn: () => {
+      const child = new FakeBenchChild();
+      benchmarkChildren.push(child);
+      return child;
+    },
+    checkDatabase: async () => ({ ok: true }),
+    clock: new ManualClock(T0),
+  });
   const context: RoutesContext = {
     engine,
     devices: DEVICES,
@@ -168,13 +193,28 @@ async function setup(
     rules,
     effect,
     messages: { find: (id) => logged.find((m) => m.id === id), capacity: 200 },
+    benchmark,
   };
   const handle = createRoutes(context);
   const call = (method: string, path: string, body?: unknown): Promise<RouteResponse> => {
     const url = new URL(path, 'http://localhost');
     return handle({ method, path: url.pathname, query: url.searchParams, body });
   };
-  return { engine, publisher, store, broker, recorded, context, call, feed, effect, logged };
+  return {
+    engine,
+    publisher,
+    store,
+    broker,
+    recorded,
+    context,
+    call,
+    feed,
+    effect,
+    logged,
+    benchmark,
+    benchmarkChildren,
+    benchmarkFleet,
+  };
 }
 
 const view = (response: RouteResponse) => response.body as StateView;
@@ -1869,6 +1909,7 @@ describe('GET /api/observations and the fixture of the UI', () => {
     delivery: true,
     incident: true,
     dependency: true,
+    benchmark: true,
   } satisfies Record<ObservationKind, true>;
 
   it('has one event of every kind, oldest id last', () => {
@@ -2398,5 +2439,293 @@ describe('the effect session over the API', () => {
     assert.deepEqual(view(reset).faultEffect?.baseline, [
       counter('telemetry_sequence_gaps_total', 30),
     ]);
+  });
+});
+
+describe('the benchmark routes', () => {
+  const START = { messages: 1000, confirm: true };
+  const bodyOf = (response: RouteResponse) => response.body as Record<string, unknown>;
+
+  /** Starts a run through the route and answers its (fake) process. */
+  async function begin(context: Awaited<ReturnType<typeof setup>>) {
+    const response = await context.call('POST', '/api/benchmark', START);
+    assert.equal(response.status, 200);
+    return context.benchmarkChildren.at(-1)!;
+  }
+
+  function end(child: FakeBenchChild): void {
+    child.done('completed');
+    child.exit('exited with code 0');
+  }
+
+  describe('GET /api/benchmark and /api/benchmark/preflight', () => {
+    it('gives the benchmark with its series, the database by host, port and name, and no credentials', async () => {
+      const { call } = await setup();
+      const response = await call('GET', '/api/benchmark');
+      assert.equal(response.status, 200);
+      assert.deepEqual(response.body, {
+        benchmark: {
+          available: true,
+          reason: null,
+          database: 'db.example:5433/telemetry',
+          maxMessages: 250_000,
+          running: false,
+          current: null,
+          runs: [],
+        },
+      });
+      assert.ok(!JSON.stringify(response.body).includes('s3cret'));
+    });
+
+    it('has the series of the run that is going and of the runs that are over', async () => {
+      const context = await setup();
+      const child = await begin(context);
+      const running = bodyOf(await context.call('GET', '/api/benchmark')).benchmark as {
+        current: { series: unknown[] };
+      };
+      assert.deepEqual(running.current.series, []);
+      end(child);
+      const finished = bodyOf(await context.call('GET', '/api/benchmark')).benchmark as {
+        current: unknown;
+        runs: { series: unknown[]; outcome: string }[];
+      };
+      assert.equal(finished.current, null);
+      assert.equal(finished.runs[0]?.outcome, 'completed');
+      assert.deepEqual(finished.runs[0]?.series, []);
+    });
+
+    it('answers the three checks, and says what is wrong', async () => {
+      const { call, benchmarkFleet } = await setup();
+      const ok = bodyOf(await call('GET', '/api/benchmark/preflight')).checks as {
+        id: string;
+        ok: boolean;
+      }[];
+      assert.deepEqual(
+        ok.map((c) => [c.id, c.ok]),
+        [
+          ['ingest', true],
+          ['database', true],
+          ['fleet', true],
+        ],
+      );
+      benchmarkFleet.running.push('dc-env-01');
+      const busy = bodyOf(await call('GET', '/api/benchmark/preflight')).checks as {
+        id: string;
+        ok: boolean;
+        reason: string;
+      }[];
+      assert.equal(busy[2]?.ok, false);
+      assert.match(busy[2]?.reason ?? '', /dc-env-01 is running/);
+    });
+
+    it('is the state view that carries the summary, without a series', async () => {
+      const context = await setup();
+      await begin(context);
+      const state = view(await context.call('GET', '/api/state')).benchmark;
+      assert.equal(state.running, true);
+      assert.equal(state.current?.id, 1);
+      assert.equal('series' in (state.current ?? {}), false);
+      assert.deepEqual(state, buildStateView(context.context).benchmark);
+    });
+  });
+
+  describe('POST /api/benchmark', () => {
+    it('starts a run, answers it with the state view, and sends the process the settings', async () => {
+      const context = await setup();
+      const response = await context.call('POST', '/api/benchmark', START);
+      assert.equal(response.status, 200);
+      const body = response.body as StateView & { run: { id: number; phase: string } };
+      assert.equal(body.run.id, 1);
+      assert.equal(body.run.phase, 'starting');
+      assert.equal(body.benchmark.running, true);
+      const [child] = context.benchmarkChildren;
+      assert.equal(child?.sent.length, 1);
+      assert.deepEqual(
+        { ...child?.sent[0], devices: undefined },
+        {
+          type: 'start',
+          broker: 'mqtt://localhost:1883',
+          database: 'postgres://u:s3cret@db.example:5433/telemetry',
+          devices: undefined,
+          messages: 1000,
+          timeoutS: 120,
+          run: 1,
+        },
+      );
+    });
+
+    it('refuses a body that is not a size and a confirmation, naming the field, and starts nothing', async () => {
+      const context = await setup();
+      const bad: [unknown, RegExp][] = [
+        [undefined, /"messages"/],
+        [{}, /"messages"/],
+        [{ messages: 0, confirm: true }, /"messages" must be a whole number from 1 to 250,000/],
+        [{ messages: 250_001, confirm: true }, /"messages"/],
+        [{ messages: 1.5, confirm: true }, /"messages"/],
+        [{ messages: '100', confirm: true }, /"messages"/],
+        [{ messages: 100 }, /"confirm" must be true/],
+        [{ messages: 100, confirm: 'yes' }, /"confirm" must be true/],
+        [{ messages: 100, confirm: true, timeout: 5 }, /"timeout" is not a known field/],
+        [[], /JSON object/],
+      ];
+      for (const [body, message] of bad) {
+        assertEnvelope(await context.call('POST', '/api/benchmark', body), 400, message);
+      }
+      assert.equal(context.benchmarkChildren.length, 0);
+      assert.equal(context.benchmark.running, false);
+    });
+
+    it('is 409 while a run is going', async () => {
+      const context = await setup();
+      await begin(context);
+      assertEnvelope(
+        await context.call('POST', '/api/benchmark', START),
+        409,
+        /benchmark is running/,
+      );
+      assert.equal(context.benchmarkChildren.length, 1);
+    });
+
+    it('is 409 with the checks when one fails, and starts nothing', async () => {
+      const context = await setup();
+      context.benchmarkFleet.running.push('dc-env-01', 'lib-air-01');
+      const response = await context.call('POST', '/api/benchmark', START);
+      assertEnvelope(response, 409, /fleet paused failed/);
+      const checks = bodyOf(response).checks as { id: string; ok: boolean }[];
+      assert.deepEqual(
+        checks.map((c) => [c.id, c.ok]),
+        [
+          ['ingest', true],
+          ['database', true],
+          ['fleet', false],
+        ],
+      );
+      assert.equal(context.benchmarkChildren.length, 0);
+    });
+
+    it('is 503 when the benchmark is not available, whatever else is wrong', async () => {
+      const { call, benchmarkChildren } = await setup({ noBenchmark: true });
+      assertEnvelope(
+        await call('POST', '/api/benchmark', START),
+        503,
+        /not available: not configured/,
+      );
+      assert.equal(benchmarkChildren.length, 0);
+      const state = bodyOf(await call('GET', '/api/benchmark')).benchmark as {
+        available: boolean;
+        reason: string;
+      };
+      assert.equal(state.available, false);
+      assert.equal(state.reason, 'not configured');
+    });
+  });
+
+  describe('POST /api/benchmark/stop', () => {
+    it('stops the run and answers when it has ended', async () => {
+      const context = await setup();
+      const child = await begin(context);
+      const pending = context.call('POST', '/api/benchmark/stop');
+      assert.deepEqual(child.sent.at(-1), { type: 'stop' });
+      child.done('stopped');
+      child.exit('exited with code 0');
+      const response = await pending;
+      assert.equal(response.status, 200);
+      assert.equal(view(response).benchmark.running, false);
+      assert.equal(view(response).benchmark.runs[0]?.outcome, 'stopped');
+    });
+
+    it('is 409 when no benchmark is running', async () => {
+      const { call } = await setup();
+      assertEnvelope(await call('POST', '/api/benchmark/stop'), 409, /No benchmark is running/);
+    });
+  });
+
+  describe('methods', () => {
+    it('is 405 with Allow for a method the path does not have', async () => {
+      const { call } = await setup();
+      for (const [method, path, allow] of [
+        ['DELETE', '/api/benchmark', 'GET, POST'],
+        ['PUT', '/api/benchmark', 'GET, POST'],
+        ['GET', '/api/benchmark/stop', 'POST'],
+        ['POST', '/api/benchmark/preflight', 'GET'],
+      ] as const) {
+        const response = await call(method, path);
+        assertEnvelope(response, 405);
+        assert.equal(response.headers?.Allow, allow, `${method} ${path}`);
+      }
+    });
+  });
+
+  describe('the lock while a run is going', () => {
+    // Every command that publishes, schedules publishing or releases held messages; `after` is what it answers when no run is going.
+    const LOCKED: { name: string; method: string; path: string; body?: unknown; after: number }[] =
+      [
+        {
+          name: 'start a device',
+          method: 'POST',
+          path: '/api/devices/dc-env-01/start',
+          after: 200,
+        },
+        { name: 'step', method: 'POST', path: '/api/step', after: 200 },
+        {
+          name: 'burst',
+          method: 'POST',
+          path: '/api/faults/burst',
+          body: { count: 5 },
+          after: 200,
+        },
+        { name: 'republish', method: 'POST', path: '/api/messages/1/republish', after: 200 },
+        { name: 'run a scenario', method: 'POST', path: '/api/scenarios/overheat/run', after: 200 },
+        {
+          name: 'cut the link',
+          method: 'PUT',
+          path: '/api/faults/link-loss',
+          body: { forS: 30 },
+          after: 200,
+        },
+        { name: 'restore the link', method: 'DELETE', path: '/api/faults/link-loss', after: 200 },
+        { name: 'clear all faults', method: 'DELETE', path: '/api/faults', after: 200 },
+        { name: 'reset', method: 'POST', path: '/api/reset', after: 200 },
+      ];
+
+    for (const { name, method, path, body, after } of LOCKED) {
+      it(`refuses to ${name} with 409 while a benchmark runs, and not afterwards`, async () => {
+        const context = await setup({ link: new FakeLink() });
+        const child = await begin(context);
+        assertEnvelope(
+          await context.call(method, path, body),
+          409,
+          /A benchmark is running; stop it first/,
+        );
+
+        end(child);
+        const answer = await context.call(method, path, body);
+        assert.equal(answer.status, after, `${method} ${path} after the run`);
+      });
+    }
+
+    it('leaves open what only changes a paused fleet, every read and Stop', async () => {
+      const context = await setup();
+      await begin(context);
+      const open: [string, string, unknown?][] = [
+        ['POST', '/api/devices/dc-env-01/pause'],
+        ['POST', '/api/devices/dc-env-01/stop'],
+        ['PUT', '/api/devices/dc-env-01/interval', { intervalMs: 5000 }],
+        ['PUT', '/api/devices/dc-env-01/holds/temperature_c', { value: 22 }],
+        ['DELETE', '/api/devices/dc-env-01/holds/temperature_c'],
+        ['GET', '/api/state'],
+        ['GET', '/api/observations'],
+        ['GET', '/api/benchmark'],
+        ['GET', '/api/benchmark/preflight'],
+      ];
+      for (const [method, path, body] of open) {
+        const response = await context.call(method, path, body);
+        assert.equal(response.status, 200, `${method} ${path}`);
+      }
+      const stopping = context.call('POST', '/api/benchmark/stop');
+      context.benchmarkChildren[0]?.done('stopped');
+      context.benchmarkChildren[0]?.exit('exited with code 0');
+      assert.equal((await stopping).status, 200);
+    });
   });
 });

@@ -104,6 +104,9 @@ describe('selectForwarded', () => {
         'telemetry_messages_total',
         'telemetry_messages_total',
         'telemetry_sequence_gaps_total',
+        // The two buckets of the fixture's lag histogram are forwarded now (the Analytics page reads them).
+        'telemetry_ingest_lag_seconds_bucket',
+        'telemetry_ingest_lag_seconds_bucket',
         'telemetry_ingest_lag_seconds_sum',
         'telemetry_ingest_lag_seconds_count',
       ],
@@ -122,8 +125,35 @@ describe('selectForwarded', () => {
     );
   });
 
-  it('forwards eight metric names', () => {
-    assert.equal(FORWARDED_METRICS.length, 8);
-    assert.equal(new Set(FORWARDED_METRICS).size, 8);
+  it('keeps the flush buckets (finite and +Inf) and the buffered readings', () => {
+    const kept = selectForwarded(
+      parseExposition(
+        [
+          'telemetry_flush_duration_seconds_bucket{le="0.005"} 3',
+          'telemetry_flush_duration_seconds_bucket{le="+Inf"} 9',
+          'telemetry_flush_duration_seconds_sum 0.42',
+          'telemetry_flush_duration_seconds_count 9',
+          'telemetry_ingest_lag_seconds_bucket{le="60"} 9',
+          'telemetry_buffered_readings 0',
+          'telemetry_batch_size_bucket{le="1"} 4',
+        ].join('\n'),
+      ),
+    );
+    assert.deepEqual(
+      kept.map((s) => [s.name, s.labels.le ?? null, s.value]),
+      [
+        ['telemetry_flush_duration_seconds_bucket', '0.005', 3],
+        ['telemetry_flush_duration_seconds_bucket', '+Inf', 9],
+        ['telemetry_flush_duration_seconds_sum', null, 0.42],
+        ['telemetry_flush_duration_seconds_count', null, 9],
+        ['telemetry_ingest_lag_seconds_bucket', '60', 9],
+        ['telemetry_buffered_readings', null, 0],
+      ],
+    );
+  });
+
+  it('forwards thirteen metric names', () => {
+    assert.equal(FORWARDED_METRICS.length, 13);
+    assert.equal(new Set(FORWARDED_METRICS).size, 13);
   });
 });

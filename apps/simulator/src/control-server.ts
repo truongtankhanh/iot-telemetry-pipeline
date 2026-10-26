@@ -1,6 +1,12 @@
 import { createReadStream } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import {
+  type BenchmarkOptions,
+  type BenchmarkPoint,
+  BenchmarkRun,
+  type BenchmarkRunSummary,
+} from './benchmark-run.ts';
 import type { BrokerLink } from './broker-link.ts';
 import type { ControlConfig } from './control-config.ts';
 import {
@@ -14,7 +20,7 @@ import {
 import type { DroppedMessage, Engine, PublishedMessage, StateChange } from './engine.ts';
 import { FaultEffect } from './fault-effect.ts';
 import { EventStream, type EventStreamOptions } from './event-stream.ts';
-import type { IngestPoller } from './ingest-poller.ts';
+import type { IngestPoller, MetricsFeed } from './ingest-poller.ts';
 import { type ObservationDraft, ObservationStore, RingBuffer } from './observation-store.ts';
 import { PublishSampler, type SamplerOptions } from './publish-sampler.ts';
 import { type RulesView, rulesUnavailable } from './rules-source.ts';
@@ -53,6 +59,14 @@ export interface ControlServerOptions {
   stream?: EventStreamOptions;
   /** The budget and window of the sampling of `published` events; the defaults are for production, a test narrows them. */
   sampling?: Pick<SamplerOptions, 'budgetPerS' | 'windowMs'>;
+  /**
+   * What the benchmark needs to run: the broker and the database it publishes to and counts in. Without it the state says the
+   * benchmark is not available ("not configured"). `spawn`, `checkDatabase` and `clock` are for tests.
+   */
+  benchmark?: Pick<
+    BenchmarkOptions,
+    'brokerUrl' | 'databaseUrl' | 'spawn' | 'checkDatabase' | 'clock'
+  >;
   maxBodyBytes?: number;
 }
 
@@ -94,6 +108,7 @@ export class ControlServer {
   private readonly stream: EventStream;
   private readonly publishLog = new RingBuffer<PublishedMessage>(PUBLISH_LOG_SIZE);
   private readonly sampler: PublishSampler;
+  private readonly benchmark: BenchmarkRun;
   private samplingTimer: NodeJS.Timeout | undefined;
   private readonly context: RoutesContext;
   private readonly handle: ReturnType<typeof createRoutes>;
@@ -118,11 +133,25 @@ export class ControlServer {
     }
     // A command that has done its work must not fail because the timeline could not note it.
     const record = this.safely('record', (draft: ObservationDraft) => this.observe(draft));
+    const runs = new ScenarioRuns({ engine: options.engine, record, now: this.now });
+    // The benchmark runs in a process of its own; it needs to know from here whether the fleet is publishing and what ingest says.
+    this.benchmark = new BenchmarkRun({
+      ...options.benchmark,
+      devices: options.devices,
+      ingest: () => options.poller.state(),
+      fleet: () => ({
+        running: options.engine
+          .snapshot()
+          .devices.filter((device) => device.state === 'running')
+          .map((device) => device.id),
+        scenarios: runs.active().map((run) => run.scenario),
+      }),
+    });
     this.context = {
       engine: options.engine,
       devices: options.devices,
       library: options.library,
-      runs: new ScenarioRuns({ engine: options.engine, record, now: this.now }),
+      runs,
       store: this.store,
       ingest: options.poller,
       config: { ingestUrl: options.config.ingestUrl, consoleUrl: options.config.consoleUrl },
@@ -133,6 +162,7 @@ export class ControlServer {
         find: (id) => this.publishLog.toArray().findLast((message) => message.id === id),
         capacity: PUBLISH_LOG_SIZE,
       },
+      benchmark: this.benchmark,
     };
     this.handle = createRoutes(this.context);
     this.server = createServer((req, res) => void this.onRequest(req, res));
@@ -175,6 +205,8 @@ export class ControlServer {
 
   /** Stops polling and forwarding, ends the streams and closes the listener. */
   async close(): Promise<void> {
+    // First, so that the end of a run that is going is still seen by the clients that are connected.
+    await this.benchmark.close();
     this.detach?.();
     this.detach = undefined;
     this.options.poller.stop();
@@ -212,6 +244,30 @@ export class ControlServer {
   private stopSamplingTimer(): void {
     clearInterval(this.samplingTimer);
     this.samplingTimer = undefined;
+  }
+
+  /** The timeline notes that a heavy run began and how it ended; the phases in between are for the stream. */
+  private recordBenchmark(run: BenchmarkRunSummary): void {
+    if (run.phase === 'starting') {
+      this.observe({
+        kind: 'benchmark',
+        data: { event: 'started', run: run.id, messages: run.settings.messages },
+      });
+    } else if (run.phase === 'ended') {
+      this.observe({
+        kind: 'benchmark',
+        data: {
+          event: 'finished',
+          run: run.id,
+          outcome: run.outcome,
+          reason: run.reason,
+          messages: run.settings.messages,
+          readingsStored: run.result?.readingsStored ?? run.stored,
+          endToEndSeconds: run.result?.endToEndSeconds ?? null,
+          messagesPerSecond: run.result?.messagesPerSecond ?? null,
+        },
+      });
+    }
   }
 
   private safely<A extends unknown[]>(
@@ -265,11 +321,27 @@ export class ControlServer {
       this.observe(draft, at),
     );
     const onBroker = this.safely('broker', (state) => this.stream.send('broker', state));
+    // A page learns of a run's start, phases and end from `change`, and of its series from `point`, one a second.
+    const onBenchmarkMetrics = this.safely('benchmark metrics', (feed: MetricsFeed) =>
+      this.benchmark.onMetrics(feed),
+    );
+    const onBenchmarkChange = this.safely('benchmark', (run: BenchmarkRunSummary) => {
+      this.stream.send('benchmark', { run, point: null });
+      this.recordBenchmark(run);
+    });
+    const onBenchmarkPoint = this.safely(
+      'benchmark point',
+      (point: BenchmarkPoint, run: BenchmarkRunSummary) =>
+        this.stream.send('benchmark', { run, point }),
+    );
     broker.on('change', onBroker);
     poller.on('ingest', onIngest);
     poller.on('alerts', onAlerts);
     poller.on('metrics', onMetrics);
+    poller.on('metrics', onBenchmarkMetrics);
     poller.on('observation', onObservation);
+    this.benchmark.on('change', onBenchmarkChange);
+    this.benchmark.on('point', onBenchmarkPoint);
 
     return () => {
       engine.off('state', onState);
@@ -279,7 +351,10 @@ export class ControlServer {
       poller.off('ingest', onIngest);
       poller.off('alerts', onAlerts);
       poller.off('metrics', onMetrics);
+      poller.off('metrics', onBenchmarkMetrics);
       poller.off('observation', onObservation);
+      this.benchmark.off('change', onBenchmarkChange);
+      this.benchmark.off('point', onBenchmarkPoint);
       broker.off('change', onBroker);
     };
   }

@@ -2,6 +2,14 @@ import { METRIC_NAMES, type MetricName } from '@itp/telemetry-contract';
 import { STATUS_CODES } from 'node:http';
 import { type AlertCause, alertCause, parseScenarioRun } from './alert-cause.ts';
 import type { IngestAlert, ObservedAlert } from './alert-observer.ts';
+import {
+  BenchmarkBusyError,
+  type BenchmarkRun,
+  type BenchmarkSummary,
+  BenchmarkUnavailableError,
+  parseBenchmarkStart,
+  PreflightFailedError,
+} from './benchmark-run.ts';
 import type { BrokerState } from './broker-link.ts';
 import {
   type AlertsFeed,
@@ -109,6 +117,8 @@ export interface RoutesContext {
   effect: FaultEffect;
   /** The publish log: the last `capacity` messages the broker acknowledged and the stream forwarded, newest last. */
   messages: { find(id: number): PublishedMessage | undefined; capacity: number };
+  /** The benchmark run, or the account of why there is none (`available: false`). */
+  benchmark: BenchmarkRun;
 }
 
 /** Everything a client needs to draw the current state; the answer to every command. */
@@ -133,6 +143,8 @@ export interface StateView {
   observationCursor: number;
   /** The session of the effect panel (`fault-effect.ts`); `null` until a fault has been switched on. */
   faultEffect: FaultEffectView | null;
+  /** The benchmark without its series (`GET /api/benchmark` has them): what it needs, whether one is running, the last runs. */
+  benchmark: BenchmarkSummary;
 }
 
 /**
@@ -232,6 +244,7 @@ export function buildStateView(context: RoutesContext): StateView {
     },
     observationCursor: context.store.latestId(),
     faultEffect: context.effect.view(),
+    benchmark: context.benchmark.view(),
   };
 }
 
@@ -382,6 +395,16 @@ export function createRoutes(context: RoutesContext) {
     return device;
   }
 
+  /**
+   * A command that publishes, schedules publishing or releases held messages is refused while a benchmark runs: it would add to
+   * the run that is being measured. Settings of a paused fleet, reads and the benchmark's own Stop stay open. The server refuses
+   * here, whatever the page disabled.
+   */
+  function refuseWhileBenchmarking(): void {
+    if (context.benchmark.running)
+      throw new HttpError(409, 'A benchmark is running; stop it first');
+  }
+
   function checkMetric(device: DeviceSpec, metric: string): MetricName {
     if (!METRIC_NAMES.includes(metric as MetricName)) {
       throw new HttpError(400, `Unknown metric "${metric}"`);
@@ -457,6 +480,7 @@ export function createRoutes(context: RoutesContext) {
     ['stop', (id: string) => engine.stopDevice(id)],
   ] as const) {
     on('POST', `/api/devices/:id/${action}`, ({ id }) => {
+      if (action === 'start') refuseWhileBenchmarking();
       run(findDevice(id).id);
       return ok(view());
     });
@@ -649,6 +673,7 @@ export function createRoutes(context: RoutesContext) {
   });
 
   on('POST', '/api/scenarios/:name/run', ({ name }, request) => {
+    refuseWhileBenchmarking();
     const entry = findScenario(name);
     const body = bodyObject(request);
     if (body.replace !== undefined && typeof body.replace !== 'boolean') {
@@ -710,6 +735,7 @@ export function createRoutes(context: RoutesContext) {
   });
 
   on('POST', '/api/faults/burst', async (_params, request) => {
+    refuseWhileBenchmarking();
     const parsed = parseBurst(request.body);
     if (!parsed.ok) throw new HttpError(400, parsed.reason);
     const feed = context.ingest.metrics();
@@ -727,6 +753,7 @@ export function createRoutes(context: RoutesContext) {
     'PUT',
     '/api/faults/:kind',
     async ({ kind }, request) => {
+      if (kind === 'link-loss') refuseWhileBenchmarking();
       const parsed = parseFaultConfig(kind as FaultKind, request.body);
       if (!parsed.ok) throw new HttpError(400, parsed.reason);
       const feed = context.ingest.metrics();
@@ -746,6 +773,7 @@ export function createRoutes(context: RoutesContext) {
     'DELETE',
     '/api/faults/:kind',
     async ({ kind }) => {
+      if (kind === 'link-loss') refuseWhileBenchmarking();
       if (kind === 'link-loss') {
         await linkAction('The link could not be restored', () => engine.restoreLink());
       } else {
@@ -757,6 +785,8 @@ export function createRoutes(context: RoutesContext) {
   );
 
   on('DELETE', '/api/faults', async () => {
+    // Clearing releases the messages that were held back, which are publishing.
+    refuseWhileBenchmarking();
     await linkAction('Faults were cleared, but the link could not be restored', () =>
       engine.clearFaults(),
     );
@@ -764,6 +794,7 @@ export function createRoutes(context: RoutesContext) {
   });
 
   on('POST', '/api/messages/:id/republish', async ({ id }) => {
+    refuseWhileBenchmarking();
     const messageId = /^\d+$/.test(id) ? Number(id) : NaN;
     if (!Number.isSafeInteger(messageId) || messageId < 1) {
       throw new HttpError(400, '"id" must be a whole number of 1 or more');
@@ -791,12 +822,43 @@ export function createRoutes(context: RoutesContext) {
     return ok({ message: sent, ...view() });
   });
 
+  // The benchmark. It publishes up to MAX_MESSAGES messages from a process of its own and writes their readings to the database
+  // in `DATABASE_URL`, so a start needs `confirm: true`, passes the checks again here, and is refused while another is going.
+  on('GET', '/api/benchmark', () => ok({ benchmark: context.benchmark.detail() }));
+
+  on('GET', '/api/benchmark/preflight', async () =>
+    ok({ checks: await context.benchmark.preflight() }),
+  );
+
+  on('POST', '/api/benchmark', async (_params, request) => {
+    const parsed = parseBenchmarkStart(request.body);
+    if (!parsed.ok) throw new HttpError(400, parsed.reason);
+    try {
+      const run = await context.benchmark.start(parsed.value);
+      return ok({ run, ...view() });
+    } catch (error) {
+      if (error instanceof BenchmarkUnavailableError) throw new HttpError(503, error.message);
+      if (error instanceof PreflightFailedError) {
+        throw new HttpError(409, error.message, { checks: error.checks });
+      }
+      if (error instanceof BenchmarkBusyError) throw new HttpError(409, error.message);
+      throw error;
+    }
+  });
+
+  on('POST', '/api/benchmark/stop', async () => {
+    if (!(await context.benchmark.stop())) throw new HttpError(409, 'No benchmark is running');
+    return ok(view());
+  });
+
   on('POST', '/api/reset', () => {
+    refuseWhileBenchmarking();
     engine.reset();
     return ok(view());
   });
 
   on('POST', '/api/step', async () => {
+    refuseWhileBenchmarking();
     if (!engine.snapshot().simulated) {
       throw new HttpError(
         409,

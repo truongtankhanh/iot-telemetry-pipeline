@@ -11,7 +11,7 @@ import { ControlServer, type ControlServerOptions } from './control-server.ts';
 import { IngestPoller } from './ingest-poller.ts';
 import { ObservationStore } from './observation-store.ts';
 import { ScenarioLibrary } from './scenario-library.ts';
-import { DEVICES, FakeIngest, setupEngine, T0 } from './test-support.ts';
+import { DEVICES, FakeBenchChild, FakeIngest, setupEngine, T0 } from './test-support.ts';
 
 /** The tests here talk to a real server on a loopback port the system picks (port 0). */
 
@@ -1136,5 +1136,122 @@ describe('ControlServer republish', () => {
     // It is not in the log, so it cannot be sent again by id.
     const again = await send(port, 'POST', `/api/messages/${message.id}/republish`);
     assert.equal(again.status, 404);
+  });
+});
+
+describe('ControlServer and the benchmark', () => {
+  const START = { messages: 1000, confirm: true };
+
+  /** A server whose benchmark has a fake process and a clock that does not move, so no timer outlives a test. */
+  async function startWithBenchmark() {
+    const children: FakeBenchChild[] = [];
+    const started = await startServer({
+      benchmark: {
+        brokerUrl: 'mqtt://localhost:1883',
+        databaseUrl: 'postgres://u:s3cret@db.example:5433/telemetry',
+        spawn: () => {
+          const child = new FakeBenchChild();
+          children.push(child);
+          return child;
+        },
+        checkDatabase: async () => ({ ok: true }),
+        clock: new ManualClock(T0),
+      },
+    });
+    // Ingest has to have been read once, and the fleet has to be paused, as the pre-flight demands.
+    const client = await openStream(started.port);
+    await client.waitFor(ingestReady);
+    for (const device of DEVICES)
+      await send(started.port, 'POST', `/api/devices/${device.id}/pause`);
+    return { ...started, children, client };
+  }
+
+  it('says it is not available when the server was built without it, and starts nothing', async () => {
+    const { port } = await startServer();
+    const state = (await get(port, '/api/state')).json();
+    assert.deepEqual((state.benchmark as Json).available, false);
+    assert.equal((state.benchmark as Json).reason, 'not configured');
+    const response = await send(port, 'POST', '/api/benchmark', START);
+    assert.equal(response.status, 503);
+  });
+
+  it('starts a run over HTTP: it is on the stream as benchmark events, in the first message of a client that connects mid-run, and on the timeline', async () => {
+    const { port, children, ingest, pollerClock, client } = await startWithBenchmark();
+
+    const response = await send(port, 'POST', '/api/benchmark', START);
+    assert.equal(response.status, 200);
+    assert.equal((response.json().run as Json).id, 1);
+
+    const began = await client.waitFor(
+      (e) => e.event === 'benchmark' && (e.data.run as Json).phase === 'starting',
+    );
+    assert.equal(began.data.point, null);
+    await client.waitFor(
+      (e) =>
+        e.event === 'observation' &&
+        (e.data.data as Json).event === 'started' &&
+        e.data.kind === 'benchmark',
+    );
+
+    // A client that connects now sees the run in the state of its first message, without a series.
+    const late = await openStream(port);
+    const snapshot = await late.waitFor((e) => e.event === 'snapshot');
+    const benchmark = snapshot.data.benchmark as Json;
+    assert.equal(benchmark.running, true);
+    assert.equal((benchmark.current as Json).id, 1);
+    assert.equal('series' in (benchmark.current as Json), false);
+
+    // A read of ingest while it runs adds a point to the series and to the stream.
+    children[0]?.progress('publishing', 100, null);
+    ingest.metrics = 'telemetry_readings_total{result="stored"} 5\n';
+    await pollerClock.advance(1000);
+    const point = await client.waitFor((e) => e.event === 'benchmark' && e.data.point !== null);
+    assert.equal((point.data.point as Json).published, 100);
+    const detail = (await get(port, '/api/benchmark')).json().benchmark as Json;
+    assert.equal(((detail.current as Json).series as unknown[]).length >= 1, true);
+
+    // It ends: the stream says so, and so does the timeline.
+    children[0]?.done('completed');
+    children[0]?.exit('exited with code 0');
+    await client.waitFor(
+      (e) => e.event === 'benchmark' && (e.data.run as Json).outcome === 'completed',
+    );
+    const finished = await client.waitFor(
+      (e) =>
+        e.event === 'observation' &&
+        e.data.kind === 'benchmark' &&
+        (e.data.data as Json).event === 'finished',
+    );
+    assert.equal((finished.data.data as Json).outcome, 'completed');
+    assert.equal((finished.data.data as Json).readingsStored, 2000);
+    assert.ok(!JSON.stringify(client.events).includes('s3cret'));
+  });
+
+  it('refuses the commands that publish while it runs, and answers Stop while the process is silent', async () => {
+    const { port, children } = await startWithBenchmark();
+    assert.equal((await send(port, 'POST', '/api/benchmark', START)).status, 200);
+    assert.equal((await send(port, 'POST', '/api/devices/dc-env-01/start')).status, 409);
+    assert.equal((await send(port, 'POST', '/api/faults/burst', { count: 5 })).status, 409);
+
+    const stop = send(port, 'POST', '/api/benchmark/stop');
+    // The process says nothing; the answer comes when it has ended.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    children[0]?.done('stopped');
+    children[0]?.exit('exited with code 0');
+    const answered = await stop;
+    assert.equal(answered.status, 200);
+    assert.equal(((answered.json().benchmark as Json).runs as Json[])[0]?.outcome, 'stopped');
+  });
+
+  it('ends a run that is going when it is closed, and leaves no process', async () => {
+    const { server, children, port } = await startWithBenchmark();
+    assert.equal((await send(port, 'POST', '/api/benchmark', START)).status, 200);
+    const closing = server.close();
+    // The fake process answers the stop request as a real one would.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(children[0]?.sent.at(-1), { type: 'stop' });
+    children[0]?.done('stopped');
+    children[0]?.exit('exited with code 0');
+    await closing;
   });
 });

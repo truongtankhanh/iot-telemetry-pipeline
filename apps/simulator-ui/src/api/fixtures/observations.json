@@ -1,5 +1,20 @@
 [
   {
+    "id": 10,
+    "at": "2026-10-20T08:02:10.400Z",
+    "kind": "benchmark",
+    "data": {
+      "event": "finished",
+      "run": 1,
+      "outcome": "completed",
+      "reason": null,
+      "messages": 100000,
+      "readingsStored": 200001,
+      "endToEndSeconds": 9.92,
+      "messagesPerSecond": 10081
+    }
+  },
+  {
     "id": 9,
     "at": "2026-10-20T08:01:32.100Z",
     "kind": "dependency",

@@ -2,6 +2,9 @@
  * Fakes shared by the tests of the control server. Not a `*.test.ts`, so `node --test src/*.test.ts`
  * does not run it; the engine's own tests keep their local fakes and are not touched.
  */
+import type { ParentMessage } from './bench-protocol.ts';
+import type { BenchResult } from './bench-run.ts';
+import type { BenchChild } from './benchmark-run.ts';
 import { ManualClock } from './clock.ts';
 import { Engine, type EngineOptions, type Publisher } from './engine.ts';
 import type { FetchLike } from './ingest-poller.ts';
@@ -106,5 +109,54 @@ export class FakeIngest {
     return new Response(JSON.stringify(rows), {
       ...(this.nextCursor === null ? {} : { headers: { 'X-Next-Cursor': this.nextCursor } }),
     });
+  }
+}
+
+/** What a finished benchmark run reports: 1,000 messages of the three test devices' size. */
+export const BENCH_RESULT: BenchResult = {
+  messages: 1000,
+  readingsExpected: 2000,
+  readingsStored: 2000,
+  publishSeconds: 0.1,
+  endToEndSeconds: 0.5,
+  messagesPerSecond: 2000,
+  readingsPerSecond: 4000,
+  vcpu: 8,
+  node: '24.0.0',
+};
+
+/** The benchmark process, as the tests of the owner, the routes and the server fake it: it says what it is told to. */
+export class FakeBenchChild implements BenchChild {
+  readonly sent: ParentMessage[] = [];
+  readonly kills: NodeJS.Signals[] = [];
+  /** A signal that makes this process exit, as the real one does for SIGTERM and SIGKILL. */
+  exitsOn: NodeJS.Signals | undefined;
+  private messageListener: ((value: unknown) => void) | undefined;
+  private exitListener: ((how: string) => void) | undefined;
+
+  send(message: ParentMessage): void {
+    this.sent.push(message);
+  }
+  kill(signal: NodeJS.Signals): void {
+    this.kills.push(signal);
+    if (signal === this.exitsOn) this.exit(`killed by ${signal}`);
+  }
+  onMessage(listener: (value: unknown) => void): void {
+    this.messageListener = listener;
+  }
+  onExit(listener: (how: string) => void): void {
+    this.exitListener = listener;
+  }
+  say(value: unknown): void {
+    this.messageListener?.(value);
+  }
+  progress(phase: 'publishing' | 'waiting', published: number, stored: number | null): void {
+    this.say({ type: 'progress', progress: { phase, published, stored, elapsedMs: 10 } });
+  }
+  done(outcome: 'completed' | 'incomplete' | 'stopped', result: BenchResult = BENCH_RESULT): void {
+    this.say({ type: 'done', outcome, result });
+  }
+  exit(how: string): void {
+    this.exitListener?.(how);
   }
 }
