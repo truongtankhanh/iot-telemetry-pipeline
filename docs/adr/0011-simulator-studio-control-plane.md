@@ -845,3 +845,51 @@ what Studio already has (the state, the observation log, the readings, the scena
   again, or holds the value again, and begins the wait again from now; it never calls the engine's reset, which would also clear what the presenter set by hand. `N` shows the step's notes, when it has some.
 - **Not done here.** Camera steps and inject-from-scene (SIM-21); other scripts, an editor or an import for scripts; a server-side script store; a palette item that starts the demo; the session
   surviving a reload.
+
+## Amendment, 2026-10-26: the benchmark (SIM-15, simulator half)
+
+The Analytics page ([frame 09](../design/simulator/mockups/09-benchmark.dc.html)) starts the benchmark, shows its progress and keeps its results for the session. The benchmark was a
+script (`bench.ts`) that nothing else could start, watch or stop. This decides brief open question 4 and what a run may do to the demo's database. No dependency, no route in ingest, no change
+to the contract, the metric names, Compose, Kubernetes or CI.
+
+- **One module for the command line and Studio.** The loop moved to `bench-run.ts` (`runBenchmark`, with an injected `BenchIo` and an `AbortSignal`); `bench.ts` is `parseArgs`, the table and the
+  `--json` line, with the arguments, output and exit codes it had (`run-baseline.sh` reads the line; `run-gap-check.sh` calls it). The brief's R2 (the CLI and the benchmark keep working) is met by
+  that, and "the numbers equal `pnpm bench`" can only mean the same code, fields, formulas and rounding (two runs of the same settings differ by several per cent, `docs/benchmarks.md`). A test pins
+  the fields and the formulas. Invalid input to the CLI is now an error where it used to print zeros; valid input is byte for byte what it was.
+- **Decided: a child process** (`bench-worker.ts`, `fork`, owned by `BenchmarkRun`). The run saturates the broker connection and a core. In the control server's own process it would share the event loop
+  with the stream, the poller (whose 800 ms timeouts would turn a busy loop into a false "ingest unreachable" during the very run the page shows) and the Stop route. The cost is an IPC protocol
+  (`bench-protocol.ts`, every message read through a guard and dropped if it does not fit), a stop that cannot rely on the child's good behaviour (a message, `SIGTERM` after 5 s, `SIGKILL` 3 s later,
+  a kill after 120 s of silence), and a child that must not outlive the server (the channel closing aborts it; closing the server ends the run first). The settings, the database URL included, travel
+  over IPC, not on a command line. Closing a tab changes nothing: the run belongs to the server, and the first message of the stream carries it.
+- **The lock is a rule of the routes, not of the engine.** The benchmark does not go through the engine, so there is nothing for the engine to refuse. The server answers `409` to the commands that
+  publish, schedule publishing or release held messages (device start, `step`, burst, republish, scenario run, cut and restore of the link, Clear all faults, Reset) while a run goes, whatever the page
+  disabled; pause, stop, settings, reads and Stop stay open. "Fleet paused" is a precondition the server checks (`409` with the three checks), not something the run does for the operator: Studio
+  neither pauses nor resumes anything. A start needs `confirm: true`, passes the checks again, is refused while another run goes, and is capped at 250,000 messages (the cap of `run-baseline.sh`).
+- **What a run does to the live database, and how Studio avoids the worst of it.** The command line numbers its messages from 1,000,001 (`gap-report.ts`: "a fresh database whose devices were seeded with
+  `last_seq = 1000000`") and stamps them an hour in the past, `10 ms` apart. Against the demo's database that has two effects, both derived from `sequence-ledger.ts` and the primary key and not observed:
+  a jump from the engine's small `last_seq` to 1,000,001 opens a hole of about a million per device, counted lost after the grace period (about six million in `telemetry_sequence_gaps_total`, a
+  counter of the Faults page, the shipped alert rules and the dashboard); and two runs collide on `(device_id, metric, ts)` when their bases differ by a multiple of `10 ms × devices` and overlap
+  (about one in `10 × devices`), after which the run waits its whole timeout and ends incomplete. Studio's run therefore reads `device.last_seq` once (read only: Studio still writes nothing to
+  ingest's database) and continues each device from `last_seq + 1`, and offsets the timestamps by the run's number. The command line keeps its defaults, which the gap check depends on. The rows of a run
+  stay (nothing deletes them) and are said to stay.
+- **Ingest's lag cannot be measured on a run.** `telemetry_ingest_lag_seconds` is `now − reading.ts` (`batch-writer.service.ts`), and a benchmark's readings are an hour old by construction (they cannot be
+  stamped near now without colliding or being rejected as `future` at 10,000 messages a second over six devices). Frame 09's "Ingest lag 0.31 s" therefore cannot come from that metric. The run's series is
+  `queueDelayS`: the readings in flight over the rate they are stored at (Little's law), labelled an estimate. The lag histogram is still forwarded for the session charts outside a run, where `ts` is the device's;
+  the run adds thousands-of-seconds observations to it, which a window quantile forgets within a read and a cumulative mean does not.
+- **Stored is counted two ways, on purpose.** While publishing, it is the change of `telemetry_readings_total{result="stored"}` read at `INGEST_URL` (one replica's counter, no query to the database: the CLI's
+  count has no index on `received_at` and scans every partition, which during the publish phase would compete with the flush the run measures); after publishing it is the CLI's own count, so the result is
+  the CLI's. Published is in messages and stored in readings (about two readings per message); the page never mixes them. Flush time and buffered readings come from `/metrics`, the flush time as the 95th
+  percentile of the window between two reads (`windowQuantile`; ingest's histograms are cumulative since boot), so `FORWARDED_METRICS` grew from 8 to 13 names (the flush buckets, sum and count, the buffered
+  readings and the lag buckets). A source that is stale or missing is `null` in the series, never zero.
+- **Results and what is reported.** The server keeps the last ten runs in memory with their settings, result, series and outcome (`completed`, `incomplete`, `stopped`, `failed`); only `completed` is comparable.
+  `StateView.benchmark` carries the summary without series (every command answers `view()`; ten runs of a thousand points would be about 400 KB in each); the series come from `GET /api/benchmark` and from the
+  `benchmark` event (`{ run, point }`). The timeline gets two observations (`benchmark`: `started`, `finished`). The ramp-up mark is computed when a run is over (the published rate first reaching 90 % of its median).
+  `docs/benchmarks.md` is not touched by a run and says so.
+- **"Not available".** The benchmark is not available only when the server was built without it. An unreachable database is a failed pre-flight check with its reason (the Compose demo has no database at all),
+  and boot prints the target and, without waiting, whether it answered. The database is shown as `host:port/name`, never with credentials (the pattern of `describeBroker`).
+- **SIM-13 is checked again, as that amendment said it would be.** The benchmark publishes with its own connection in a process of its own and never reaches `published`, so the sampling of the stream is unchanged.
+- **Security posture.** Still no authentication. What an unauthenticated caller on loopback can now do beyond the burst is start one benchmark run at a time, after `confirm: true`, of up to 250,000 messages,
+  which saturates the broker and a core and writes about two readings per message to the database in `DATABASE_URL`. Same trust level as the burst, costlier; the guards are the ones that are not hardening: the
+  confirmation, one run at a time, a ceiling and a timeout. Nothing was hardened.
+- **Not done here.** The page itself (`SIM-15-ui`); `--qos` and `--no-wait` (they would make results not comparable with `docs/benchmarks.md`); an index on `reading (received_at)`; a server-side history of the session
+  charts outside a run; a CSV of a series; a run through the engine.

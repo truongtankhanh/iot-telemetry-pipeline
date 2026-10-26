@@ -48,7 +48,8 @@ export type ObservationKind =
   | 'alert-cleared'
   | 'delivery'
   | 'incident'
-  | 'dependency';
+  | 'dependency'
+  | 'benchmark';
 
 /** What happened, before the store gives it an id and a time. */
 export interface ObservationDraft {

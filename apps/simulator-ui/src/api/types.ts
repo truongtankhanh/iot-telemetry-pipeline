@@ -239,6 +239,11 @@ export interface StateView {
   config: { ingestUrl: string; consoleUrl: string | null; intervalMs: number; simulated: boolean };
   observationCursor: number;
   faultEffect: FaultEffectView | null;
+  /**
+   * The benchmark without its series (`GET /api/benchmark` has them). Optional here only so that the code written before the
+   * Analytics page still compiles; the simulator always sends it.
+   */
+  benchmark?: BenchmarkSummary;
 }
 
 export interface PublishedMessage {
@@ -297,7 +302,111 @@ export type StreamEventName =
   | 'metrics'
   | 'broker'
   | 'tick-error'
-  | 'observation';
+  | 'observation'
+  | 'benchmark';
+
+// ---- The benchmark (SIM-15) ----
+// A manual mirror of the types of `apps/simulator/src/benchmark-run.ts` and of `BenchResult` in `bench-run.ts`.
+// `fixtures/state-view.json` has the summary in a `GET /api/state` body; the key check of
+// `apps/simulator/src/control-routes.test.ts` is the check, from the simulator's side.
+
+/** What a run measured: the fields of the `--json` line of `pnpm --filter @itp/simulator bench`, with the same formulas. */
+export interface BenchResult {
+  messages: number;
+  readingsExpected: number;
+  readingsStored: number;
+  publishSeconds: number;
+  endToEndSeconds: number;
+  messagesPerSecond: number;
+  readingsPerSecond: number;
+  vcpu: number;
+  node: string;
+}
+
+export type BenchmarkPhase = 'starting' | 'publishing' | 'waiting' | 'ended';
+export type BenchmarkOutcome = 'completed' | 'incomplete' | 'stopped' | 'failed';
+
+/** One sample of a run, about once a second. `null` is unknown, never zero. */
+export interface BenchmarkPoint {
+  /** Seconds since the run started, to a tenth. */
+  t: number;
+  /** Messages the broker acknowledged. */
+  published: number;
+  /** Readings stored since the run started. */
+  stored: number | null;
+  /** `telemetry_buffered_readings`. */
+  buffered: number | null;
+  /** The 95th percentile of the flush time over the last read, in seconds. */
+  flushP95S: number | null;
+  /**
+   * Estimated queue delay in seconds: readings in flight over the rate they are stored at. Ingest's own lag cannot be read on
+   * a benchmark run: its readings are stamped an hour in the past.
+   */
+  queueDelayS: number | null;
+}
+
+export interface BenchmarkRunSummary {
+  /** The run's number in this session, from 1. */
+  id: number;
+  startedAt: string;
+  endedAt: string | null;
+  phase: BenchmarkPhase;
+  outcome: BenchmarkOutcome | null;
+  /** Why a run did not complete, in words. */
+  reason: string | null;
+  /** True only for a run that completed; `null` while it runs. */
+  comparable: boolean | null;
+  settings: { messages: number; devices: number; timeoutS: number };
+  expectedReadings: number;
+  /** Messages acknowledged. */
+  published: number;
+  /** Readings stored so far, or `null` when it cannot be known. */
+  stored: number | null;
+  elapsedMs: number;
+  result: BenchResult | null;
+  marks: { publishEndedS: number | null; rampUpEndS: number | null };
+}
+
+export interface BenchmarkRunDetail extends BenchmarkRunSummary {
+  series: BenchmarkPoint[];
+}
+
+export interface BenchmarkSummary {
+  available: boolean;
+  /** Why it is not available. */
+  reason: string | null;
+  /** `host:port/name` of the database a run counts in; never credentials. */
+  database: string | null;
+  maxMessages: number;
+  running: boolean;
+  current: BenchmarkRunSummary | null;
+  /** Finished runs, newest first (the last ten). */
+  runs: BenchmarkRunSummary[];
+}
+
+/** The answer of `GET /api/benchmark`: the summary with the series. */
+export interface BenchmarkDetail extends Omit<BenchmarkSummary, 'current' | 'runs'> {
+  current: BenchmarkRunDetail | null;
+  runs: BenchmarkRunDetail[];
+}
+
+export interface BenchmarkCheck {
+  id: 'ingest' | 'database' | 'fleet';
+  label: string;
+  ok: boolean;
+  reason: string | null;
+}
+
+/** The `benchmark` event of the stream: the run, and the new series point when it carries one. */
+export interface BenchmarkEvent {
+  run: BenchmarkRunSummary;
+  point: BenchmarkPoint | null;
+}
+
+/** The answer of `POST /api/benchmark`: the run as it begins, and the state view. */
+export interface BenchmarkStartAnswer extends StateView {
+  run: BenchmarkRunSummary;
+}
 
 // ---- The scenario library (SIM-08) ----
 // A manual mirror of `ScenarioItem` and the types around it in `apps/simulator/src/control-routes.ts`,
@@ -473,6 +582,7 @@ export const OBSERVATION_KINDS = [
   'delivery',
   'incident',
   'dependency',
+  'benchmark',
 ] as const;
 
 export type ObservationKind = (typeof OBSERVATION_KINDS)[number];

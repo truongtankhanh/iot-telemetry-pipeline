@@ -80,6 +80,7 @@ describe('the types and the fixture', () => {
   it('declare the same keys, section by section', () => {
     expect(keys(view)).toEqual([
       'alerts',
+      'benchmark',
       'broker',
       'config',
       'devices',
@@ -857,8 +858,8 @@ describe('getObservations', () => {
 
   it('returns the events and the cursor as the simulator sent them', async () => {
     const fetchFn = replyEvents(observationsFixture, { headers: { 'X-Next-Cursor': '1' } });
-    const result = await getObservations({ limit: 9 }, { fetch: asFetch(fetchFn) });
-    expect(result.events.map((event) => event.id)).toEqual([9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    const result = await getObservations({ limit: 10 }, { fetch: asFetch(fetchFn) });
+    expect(result.events.map((event) => event.id)).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
     expect(result.next).toBe(1);
   });
 

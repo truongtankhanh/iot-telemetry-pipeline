@@ -93,6 +93,10 @@ the state, as `GET /api/state` returns it.
 | `DELETE /api/faults`                             | **Clear all faults**: restore the link, switch every fault off, send what delay and reorder held; the scope stays; `500` (rest cleared) if the link will not come back                                                                                                                                                                                               |
 | `POST /api/faults/effect/reset`                  | Start the effect session again from the counters now ("Reset counters")                                                                                                                                                                                                                                                                                              |
 | `POST /api/messages/:id/republish`               | Send a message of the publish log again, byte for byte (same topic, payload, `seq` and `ts`; below): `id` is the one on the message; answers `{ message, …state }` with the new log entry; `400` for an `id` that is not a whole number of 1 or more; `404` when it is no longer in the last 200; `409` with the link down; `502` when the broker does not accept it |
+| `GET /api/benchmark`                             | The benchmark with its series: the run that is going and the last ten runs (below); `{ benchmark }`                                                                                                                                                                                                                                                                  |
+| `GET /api/benchmark/preflight`                   | The three checks before a run, `{ checks: [{ id, label, ok, reason }] }`: ingest ready, database reachable, fleet paused                                                                                                                                                                                                                                             |
+| `POST /api/benchmark`                            | Start a run (below). Body `{ "messages": 1 to 250000, "confirm": true }`; answers `{ run, …state }`; `400` for a body that is not that, naming the field; `409` while a run is going, or with `checks` when one fails; `503` when the benchmark is not available                                                                                                     |
+| `POST /api/benchmark/stop`                       | Stop the run; answers when it has ended; `409` when none is running                                                                                                                                                                                                                                                                                                  |
 | `POST /api/reset`                                | Clear anomalies and held values, restart the anomaly clock                                                                                                                                                                                                                                                                                                           |
 | `POST /api/step`                                 | One publish interval on the simulated clock; `409` on the wall clock, the default (start with `--simulated-clock` to step)                                                                                                                                                                                                                                           |
 
@@ -121,8 +125,8 @@ empty; after a disconnect a client reconnects and gets a new snapshot. Then: `st
 change), `published` (a message the broker accepted: `id`, `at`, the time of the PUBACK and `ackMs`, how long it took; `fault` says when it is a second copy, a burst message, a malformed payload or a republish),
 `sampling` (the stream is skipping messages, below),
 `dropped` (a message that was built and never sent: a drop fault or a link that was down; it is not in the publish log), `tick-error`, `ingest` (the state of ingest
-changed), `alerts` (the alerts as Studio saw them), `metrics` (a read of `/metrics`) and
-`observation` (an entry of the observation store).
+changed), `alerts` (the alerts as Studio saw them), `metrics` (a read of `/metrics`),
+`observation` (an entry of the observation store) and `benchmark` (a run started, changed phase or ended, or one more point of its series; below).
 
 **Studio's files.** The same server serves the built UI of Simulator Studio (`apps/simulator-ui`; the package arrives with the next
 parts of SIM-04): `GET` and `HEAD` for anything outside `/api/`. A path with a file extension is a file (`404` when it is not one, never the app's page);
@@ -305,7 +309,7 @@ chunk, so a 100-device tick is not sampled) are kept in the log and sent as `pub
 event `{ total, skipped, forwarded, windowMs, budgetPerS, active }` once per window while it skips, and one more with `active: false` when it
 stops, and the first message has `publishTotal` and `sampling: { active, skipped, budgetPerS, windowMs }`. A page's message rate is
 `forwarded + skipped` over `windowMs`, not the number of `published` events it received. The log holds what was forwarded, so a skipped message
-cannot be republished (`404`). `bench.ts` does not go through the engine or this server, so the benchmark never reaches the stream today.
+cannot be republished (`404`). The benchmark runs in a process of its own and publishes with its own connection, so it does not go through the engine or this sampling.
 
 ## A registry of 100 devices
 
@@ -326,6 +330,37 @@ pnpm --filter @itp/simulator bench -- --messages 100000
 Publishes the messages as fast as the broker accepts them, then waits until every reading is in
 PostgreSQL, and prints throughput. It needs the ingest service running and the database reachable
 (`DATABASE_URL`, or `--database`). Results and method: [benchmarks](../../docs/benchmarks.md).
+**From Studio.** The Analytics page runs the same loop. [bench-run.ts](src/bench-run.ts) is the code of both, so a result has the fields, the formulas and the
+rounding of the `--json` line; two runs are never identical (the three runs in [benchmarks](../../docs/benchmarks.md) differ by 8 %), so "the same" means the same code and
+the same order of magnitude. It does not record results in `docs/benchmarks.md`.
+
+- **A process of its own.** The run is a child of the control server (`bench-worker.ts`, started with `fork`), because it saturates the broker connection and a core and must not
+  share an event loop with the stream, the poller and Stop. Its settings, the database URL included, reach it over IPC and never on a command line. It never outlives the server:
+  the channel closing ends it at the next window of messages. Stop asks it to end the run, then sends `SIGTERM` after 5 s and `SIGKILL` 3 s after that; a process that says nothing for
+  120 s is killed; closing the server does the same. The tab is not the owner: closing it changes nothing, and a page that opens again finds the run in the first message of the
+  stream (`benchmark` in the state) and the Stop button works.
+- **Before a run**, three checks, made again when the run starts: ingest answers `/api/ready` as ready; the database answers `SELECT 1` on a connection of the benchmark's own
+  (`DATABASE_URL`); the fleet is paused (no device `running`, no scenario playing). A failed check is `409` with the list and the reason of each. Studio does not pause the fleet for you and
+  does not resume it afterwards.
+- **While it runs** the server answers `409` to the commands that publish, schedule publishing or release held messages: starting a device, `step`, a burst, a republish, running a
+  scenario, cutting and restoring the link, Clear all faults and Reset. Pause, stop, settings, reads and Stop stay open. One run at a time, up to 250,000 messages, a wait of up to 120 s for
+  storage.
+- **What a run does to the database.** Its rows stay: `messages × metrics` readings and their rollups, stamped about an hour in the past (so they are accepted and never collide), which
+  the demo's own charts do not show but a device's reading history does. Each device continues from `device.last_seq + 1` (read once, read only), so the run opens no hole in the
+  sequence ledger and `telemetry_sequence_gaps_total` does not move; the command line starts at 1,000,001 as `gap-report.ts` assumes, which on a database whose devices already have a `last_seq` would
+  count about a million lost messages per device. The timestamps are offset by the run's number so that two runs of a session never collide on `(device_id, metric, ts)`; the command line's plain
+  "an hour ago" collides about one time in `10 × devices` for runs less than 17 minutes apart, and the run then waits the whole timeout. The values (20 to 29) raise no alert with
+  `rules.json` as it is (worked out, not observed).
+- **What it reports.** `published` in messages and `stored` in readings, never mixed. While publishing, `stored` is the change of `telemetry_readings_total{result="stored"}` at `INGEST_URL` since
+  the start (one replica's counter; no query to the database while the run publishes, which would compete with the flush it measures); after publishing it is the command line's own count. About
+  once a second a point of the series: `t`, `published`, `stored`, `buffered` (`telemetry_buffered_readings`), `flushP95S` (the 95th percentile of the flush time over the window between two reads, from the buckets; ingest's histograms
+  are cumulative since boot) and `queueDelayS`. **Ingest's lag is not on a run**: its readings are stamped an hour in the past, so `telemetry_ingest_lag_seconds` would say thousands of seconds; the run reports
+  the estimated queue delay instead (readings in flight over the rate they are stored at). `null` means unknown, never zero.
+- **Results** stay in memory for the session: the last ten runs, with the settings, the result, the series and the outcome: `completed`, `incomplete` (the wait ended first), `stopped`, `failed`
+  (with the reason). Only `completed` is comparable. The ramp-up mark is where the published rate first reaches 90 % of the run's median rate, worked out when the run is over.
+- **The database.** `DATABASE_URL` is read by `start` too. The state shows it as `host:port/name`, never with the user or the password; boot prints it and says, without waiting, whether it answered.
+  The Compose demo has no database, so there the check fails and says so.
+
 `src/gap-report.ts` accounts for every message of a run; it is driven by `pnpm bench:gaps`, which
 starts two ingest replicas of its own.
 
@@ -338,7 +373,7 @@ the file.
 | Variable                     | Default                                                  | Used by          |
 | ---------------------------- | -------------------------------------------------------- | ---------------- |
 | `MQTT_URL`                   | `mqtt://localhost:1883`                                  | `start`, `bench` |
-| `DATABASE_URL`               | `postgres://postgres:postgres@localhost:5433/telemetry`  | `bench`          |
+| `DATABASE_URL`               | `postgres://postgres:postgres@localhost:5433/telemetry`  | `start`, `bench` |
 | `CONTROL_HOST`               | `127.0.0.1`                                              | `start`          |
 | `CONTROL_PORT`               | `3200`                                                   | `start`          |
 | `INGEST_URL`                 | `http://localhost:3100`                                  | `start`          |
@@ -378,7 +413,12 @@ Run from the repository root.
 ```
 src/
   main.ts            command line: arguments, broker connection, shutdown; runs the engine
-  bench.ts           throughput benchmark
+  bench.ts           throughput benchmark: the command line
+  bench-run.ts       the benchmark loop, shared by `bench.ts` and Studio; the database URL helpers
+  bench-series.ts    the quantile of a window, the queue delay and the ramp-up mark of a run (pure)
+  bench-protocol.ts  the messages between the control server and the benchmark process (pure)
+  bench-worker.ts    the benchmark process Studio starts: settings over IPC, progress, result
+  benchmark-run.ts   the benchmark the control server owns: checks, one run at a time, Stop, the series, the last ten runs
   gap-report.ts      accounts for every message of a benchmark run
   engine.ts          the publish loop: devices, anomalies, held values, faults, Step and Reset, events
   faults.ts          the faults: their settings and checks, the ten malformed-message generators (pure)

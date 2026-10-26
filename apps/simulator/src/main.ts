@@ -1,5 +1,6 @@
 import { connectAsync } from 'mqtt';
 import { parseArgs } from 'node:util';
+import { checkDatabase, describeDatabase, resolveDatabaseUrl } from './bench-run.ts';
 import { BrokerLink } from './broker-link.ts';
 import { ManualClock, systemClock } from './clock.ts';
 import {
@@ -101,6 +102,7 @@ function resolveControl() {
   }
 }
 const control = values['no-control'] ? undefined : resolveControl();
+const databaseUrl = resolveDatabaseUrl({ env: process.env });
 
 // Refused here too, before the process connects or publishes: the control server is the only way to step.
 function resolveClockMode(): boolean {
@@ -216,6 +218,8 @@ if (control) {
     library,
     poller: new IngestPoller({ baseUrl: control.ingestUrl, clock: systemClock }),
     broker: brokerLink,
+    // The benchmark publishes to the same broker and counts in the database `bench` counts in; both reach its process over IPC.
+    benchmark: { brokerUrl: values.broker, databaseUrl },
     studioDir: control.studioDir,
     ...(rules ? { rules } : {}),
     config: control,
@@ -233,6 +237,15 @@ if (control) {
       rules?.available
         ? `Rules: ${rules.items.length} from ${rulesPath}`
         : `Rules: not available (${rules?.reason}); Studio hides what depends on them`,
+    );
+    console.log(`Benchmark: database ${describeDatabase(databaseUrl)} (checked when a run starts)`);
+    // Without waiting for it: a database that is not there must not hold up the start, and the pre-flight says so again.
+    void checkDatabase(databaseUrl).then((check) =>
+      console.log(
+        check.ok
+          ? '  database reachable'
+          : `  database not reachable (${check.reason}): the benchmark's pre-flight fails until it is`,
+      ),
     );
     if (!isLoopbackHost(control.host)) {
       console.log(

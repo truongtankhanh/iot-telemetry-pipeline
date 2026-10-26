@@ -7,7 +7,9 @@ export interface Sample {
 
 /**
  * The ingest metrics Studio forwards, copied from `apps/ingest/src/metrics/metrics.ts` (the contract
- * package does not export Prometheus names). Renaming one there means changing it here too.
+ * package does not export Prometheus names). Renaming one there means changing it here too. The flush
+ * time, the buffered readings and the lag buckets are for the Analytics page: the benchmark's series and
+ * the session charts (`bench-series.ts` turns the buckets into a quantile of a window).
  */
 export const FORWARDED_METRICS: readonly string[] = [
   'telemetry_messages_total',
@@ -16,6 +18,11 @@ export const FORWARDED_METRICS: readonly string[] = [
   'telemetry_sequence_gaps_total',
   'telemetry_ingest_lag_seconds_sum',
   'telemetry_ingest_lag_seconds_count',
+  'telemetry_ingest_lag_seconds_bucket',
+  'telemetry_flush_duration_seconds_bucket',
+  'telemetry_flush_duration_seconds_sum',
+  'telemetry_flush_duration_seconds_count',
+  'telemetry_buffered_readings',
   'alerts_transitions_total',
   'alert_deliveries_total',
 ];
