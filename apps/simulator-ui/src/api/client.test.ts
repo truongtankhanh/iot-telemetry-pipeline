@@ -4,6 +4,7 @@ import expectationsFixture from './fixtures/expectations.json';
 import observationsFixture from './fixtures/observations.json';
 import scenariosFixture from './fixtures/scenarios.json';
 import { stateViewFixture as fixture } from './fixtures/stateView';
+import { twinLayoutFixture } from './fixtures/twinLayout';
 import {
   addAnomaly,
   ApiError,
@@ -16,6 +17,7 @@ import {
   getObservations,
   getScenarios,
   getState,
+  getTwinLayout,
   holdValue,
   importScenario,
   pauseDevice,
@@ -593,6 +595,100 @@ describe('scenarios', () => {
       expect((refused as ApiError).message).toBe('The Host header must name this machine');
 
       const silent = await getScenarios({
+        fetch: asFetch(
+          vi.fn(async () => {
+            throw new TypeError('Failed to fetch');
+          }),
+        ),
+      }).catch((e: unknown) => e);
+      expect((silent as ApiError).status).toBe(0);
+    });
+  });
+
+  describe('getTwinLayout', () => {
+    it('reads the view from /api/twin-layout', async () => {
+      const fetchFn = reply(twinLayoutFixture);
+      const answer = await getTwinLayout({ fetch: asFetch(fetchFn) });
+      expect(answer).toEqual(twinLayoutFixture);
+      expect(fetchFn).toHaveBeenCalledWith(
+        '/api/twin-layout',
+        expect.objectContaining({ headers: { Accept: 'application/json' } }),
+      );
+    });
+
+    it('has the shape the scene reads: buildings with a height, devices with a placement, a boundary', () => {
+      const { layout, placement } = twinLayoutFixture;
+      expect(layout?.boundary).toEqual({
+        west: -282,
+        east: 228,
+        south: -277,
+        north: 247,
+        radius: 18,
+      });
+      expect(
+        layout?.zones.filter((zone) => zone.kind === 'building').map((zone) => zone.heightM),
+      ).toEqual([18, 14]);
+      expect(layout?.devices.map((device) => device.placement)).toEqual([
+        'illustrative',
+        'illustrative',
+      ]);
+      expect(layout?.catalogue.every((asset) => asset.simulated === false)).toBe(true);
+      expect([...placement.placed, ...placement.unplaced.map((u) => u.id)]).toHaveLength(3);
+    });
+
+    it('is not an error when the layout is not available: that is a 200 with the reason', async () => {
+      const unavailable = {
+        available: false,
+        reason: 'cannot read /x/twin-layout.json (ENOENT)',
+        layout: null,
+        placement: {
+          placed: [],
+          unplaced: [{ id: 'dc-env-01', reason: 'the twin layout is not available' }],
+          orphans: [],
+        },
+      };
+      expect(await getTwinLayout({ fetch: asFetch(reply(unavailable)) })).toEqual(unavailable);
+    });
+
+    it('fails loudly on a body that is not the view', async () => {
+      const unavailable = structuredClone(twinLayoutFixture);
+      const bodies = [
+        [],
+        { available: 'yes' },
+        { ...twinLayoutFixture, placement: { placed: [] } },
+        {
+          ...twinLayoutFixture,
+          placement: { ...twinLayoutFixture.placement, unplaced: [{ id: 1 }] },
+        },
+        // available without a layout, and a layout that is not available
+        { ...twinLayoutFixture, layout: null },
+        { ...unavailable, available: false },
+        { ...twinLayoutFixture, layout: { ...twinLayoutFixture.layout, zones: 'none' } },
+      ];
+      for (const body of bodies) {
+        const failure = await getTwinLayout({ fetch: asFetch(reply(body)) }).catch(
+          (e: unknown) => e,
+        );
+        expect(failure).toBeInstanceOf(ApiError);
+        expect((failure as ApiError).message).toMatch(/does not understand/);
+      }
+    });
+
+    it('says a simulator without the route is too old, instead of showing its 404', async () => {
+      const failure = await getTwinLayout({ fetch: asFetch(refusal(404, 'No such route')) }).catch(
+        (e: unknown) => e,
+      );
+      expect((failure as ApiError).status).toBe(404);
+      expect((failure as ApiError).message).toMatch(/too old for the twin/);
+    });
+
+    it('turns a refusal into an ApiError and a silent simulator into status 0', async () => {
+      const refused = await getTwinLayout({
+        fetch: asFetch(refusal(403, 'The Host header must name this machine')),
+      }).catch((e: unknown) => e);
+      expect((refused as ApiError).status).toBe(403);
+
+      const silent = await getTwinLayout({
         fetch: asFetch(
           vi.fn(async () => {
             throw new TypeError('Failed to fetch');

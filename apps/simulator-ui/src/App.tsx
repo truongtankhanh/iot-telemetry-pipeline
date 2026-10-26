@@ -82,6 +82,10 @@ const Events = lazy(() =>
 // The Guided demo is its own chunk: it brings the script, the driver, the presenter view and the start screen, which no other page needs.
 const Demo = lazy(() => import('./pages/demo/Demo').then((module) => ({ default: module.Demo })));
 
+// The Twin is its own chunk, and the 3D scene inside it is another: the page checks that the device can draw it and that the
+// simulator has a layout before it asks for three.js, which no other page needs.
+const Twin = lazy(() => import('./pages/twin/Twin').then((module) => ({ default: module.Twin })));
+
 const TITLE = 'Simulator Studio';
 
 // One array for the life of the window: the shortcuts and the palette's items are derived from it.
@@ -133,6 +137,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Topology />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/twin"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Twin />
           </Suspense>
         }
       />

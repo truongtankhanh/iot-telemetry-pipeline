@@ -19,6 +19,7 @@ import type {
   ScenarioItem,
   ScenarioLibraryView,
   StateView,
+  TwinLayoutView,
 } from './types';
 
 /** A request the simulator refused or could not answer. `status` is 0 when it did not answer at all. */
@@ -303,6 +304,63 @@ export async function getScenarios(options: RequestOptions = {}): Promise<Scenar
     );
   }
   return body as unknown as ScenarioLibraryView;
+}
+
+// ---- The twin (SIM-17) ----
+
+const isStringList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+function isTwinLayoutView(body: unknown): body is TwinLayoutView {
+  if (!isObject(body) || typeof body.available !== 'boolean') return false;
+  if (body.reason !== null && typeof body.reason !== 'string') return false;
+  const { placement, layout } = body;
+  if (
+    !isObject(placement) ||
+    !isStringList(placement.placed) ||
+    !isStringList(placement.orphans) ||
+    !Array.isArray(placement.unplaced) ||
+    !placement.unplaced.every(
+      (item) => isObject(item) && typeof item.id === 'string' && typeof item.reason === 'string',
+    )
+  ) {
+    return false;
+  }
+  // A layout that is not available has none; one that is available carries what the scene draws from.
+  if (layout === null) return !body.available;
+  return (
+    body.available &&
+    isObject(layout) &&
+    isObject(layout.source) &&
+    isObject(layout.boundary) &&
+    Array.isArray(layout.zones) &&
+    Array.isArray(layout.devices) &&
+    Array.isArray(layout.catalogue)
+  );
+}
+
+/**
+ * `GET /api/twin-layout`: the campus the twin draws and which devices it places. The simulator answers `200` also when it
+ * cannot use its layout file (`available: false` and the reason), so only a simulator that does not know the route (`404`),
+ * a body that is not the view, or no answer at all fails here.
+ */
+export async function getTwinLayout(options: RequestOptions = {}): Promise<TwinLayoutView> {
+  const response = await send(
+    '/api/twin-layout',
+    { headers: { Accept: 'application/json' } },
+    options,
+  );
+  if (response.status === 404) {
+    throw new ApiError(404, 'This simulator is too old for the twin: it has no /api/twin-layout');
+  }
+  const body = await readJson(response);
+  if (!isTwinLayoutView(body)) {
+    throw new ApiError(
+      response.status,
+      'The simulator answered with a twin layout Studio does not understand',
+    );
+  }
+  return body;
 }
 
 const scenarioPath = (name: string) => `/api/scenarios/${encodeURIComponent(name)}`;

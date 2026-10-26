@@ -28,6 +28,7 @@ import type { ScenarioLibrary } from './scenario-library.ts';
 import { ScenarioRuns } from './scenario-runs.ts';
 import type { DeviceSpec } from './signals.ts';
 import { resolveStatic, studioIsBuilt } from './static-files.ts';
+import { type TwinLayoutView, twinLayoutUnavailable } from './twin-layout.ts';
 
 /** Largest request body accepted; the biggest legitimate one is an anomaly, a few hundred bytes. */
 export const MAX_BODY_BYTES = 16 * 1024;
@@ -52,6 +53,8 @@ export interface ControlServerOptions {
   studioDir?: string;
   /** The threshold rules (or why there are none). Without them the state says they are not available. */
   rules?: RulesView;
+  /** The twin layout and which of the devices it places (or why there is none). Without it the route says it is not available. */
+  twinLayout?: TwinLayoutView;
   store?: ObservationStore;
   /** Wall clock for the time of an observation. Not the engine's clock, which may be simulated. */
   now?: () => number;
@@ -157,6 +160,8 @@ export class ControlServer {
       config: { ingestUrl: options.config.ingestUrl, consoleUrl: options.config.consoleUrl },
       broker: options.broker,
       rules: options.rules ?? rulesUnavailable('no rules file was given'),
+      twinLayout:
+        options.twinLayout ?? twinLayoutUnavailable('no twin layout was given', options.devices),
       effect: new FaultEffect({ now: this.now }),
       messages: {
         find: (id) => this.publishLog.toArray().findLast((message) => message.id === id),

@@ -632,3 +632,84 @@ export type AnomalyRequest = Omit<Anomaly, 'startAt'> & { startAt?: number; star
 export interface AnomalyAnswer extends StateView {
   id: string;
 }
+
+// ---- The twin (SIM-17) ----
+// A manual mirror of `TwinLayoutView` and its parts in `apps/simulator/src/twin-layout.ts`. `fixtures/twin-layout.json` is a
+// trimmed `GET /api/twin-layout` body; the simulator's own tests check the real file and the route.
+
+/** Where the copy of the command center's campus came from; the simulator does not check it against that repository. */
+export interface TwinSource {
+  repository: string;
+  commit: string;
+  files: string[];
+  /** The day the copy was compared with the source, `YYYY-MM-DD`. */
+  checkedOn: string;
+}
+
+/** The site boundary: a rounded rectangle, edges in metres east and north of `siteCenter`. */
+export interface TwinBoundary {
+  west: number;
+  east: number;
+  south: number;
+  north: number;
+  radius: number;
+}
+
+/** A zone as the command center's seed describes it; `use` and `heightM` are a building's only. */
+export interface TwinZone {
+  code: string;
+  name: string;
+  kind: string;
+  use?: string;
+  heightM?: number;
+  /** [east, north] metres from the site centre. */
+  at: [number, number];
+  /** [width, depth] metres. */
+  size: [number, number];
+}
+
+/** A device of the simulator's registry and where it stands; `illustrative` is a guess made by hand inside its zone. */
+export interface TwinDevice {
+  id: string;
+  zone: string;
+  at: [number, number];
+  elevationM: number;
+  placement: 'illustrative' | 'surveyed';
+}
+
+/** An asset of the command center's catalogue, which the simulator does not play. */
+export interface TwinAsset {
+  code: string;
+  name: string;
+  class: string;
+  zone: string;
+  at: [number, number];
+  elevationM: number;
+  simulated: false;
+}
+
+export interface TwinLayout {
+  source: TwinSource;
+  /** [longitude, latitude] of the origin of every position. */
+  siteCenter: [number, number];
+  boundary: TwinBoundary;
+  zones: TwinZone[];
+  devices: TwinDevice[];
+  catalogue: TwinAsset[];
+}
+
+/** Which devices of the registry the layout places; `placed` and `unplaced` together are the registry. */
+export interface TwinPlacement {
+  placed: string[];
+  unplaced: { id: string; reason: string }[];
+  /** Devices the layout places that the registry does not have. */
+  orphans: string[];
+}
+
+/** The answer of `GET /api/twin-layout`: a `200` also when the layout cannot be used (`available: false`, with the reason). */
+export interface TwinLayoutView {
+  available: boolean;
+  reason: string | null;
+  layout: TwinLayout | null;
+  placement: TwinPlacement;
+}

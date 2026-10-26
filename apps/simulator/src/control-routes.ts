@@ -55,6 +55,7 @@ import {
   type MetricProfile,
   profilesOf,
 } from './signals.ts';
+import type { TwinLayoutView } from './twin-layout.ts';
 
 /** A request, after the HTTP layer has checked the headers and parsed the body. */
 export interface RouteRequest {
@@ -113,6 +114,8 @@ export interface RoutesContext {
   broker: { state(): BrokerState };
   /** The threshold rules read at boot (or why there are none); they do not change while the process runs. */
   rules: RulesView;
+  /** The twin layout read at boot (or why there is none) and which devices it places; it does not change while the process runs. */
+  twinLayout: TwinLayoutView;
   /** When the faults began and what ingest's counters said then, for the effect panel. */
   effect: FaultEffect;
   /** The publish log: the last `capacity` messages the broker acknowledged and the stream forwarded, newest last. */
@@ -425,6 +428,10 @@ export function createRoutes(context: RoutesContext) {
     });
 
   on('GET', '/api/state', () => ok(view()));
+
+  // Static data for the twin page, not part of the state: ten kilobytes that only that page asks for. An unusable layout is
+  // still a 200 (`available: false` and the reason), the way the rules are in the state, because Topology is the fallback.
+  on('GET', '/api/twin-layout', () => ok(context.twinLayout));
 
   on('GET', '/api/observations', (_params, request) => {
     const before = integerParam(request.query, 'before', 1, Number.MAX_SAFE_INTEGER);

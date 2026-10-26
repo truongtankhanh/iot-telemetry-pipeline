@@ -34,6 +34,7 @@ pnpm --filter @itp/simulator start --scenario server-room-overheat
 | `--ingest-url <url>`     | Ingest the control server reads (default `INGEST_URL`, else `http://localhost:3100`)                                                                                     |
 | `--studio-dir <path>`    | Directory with the built Studio UI to serve at `/` (default `STUDIO_DIR`, else `apps/simulator-ui/dist`)                                                                 |
 | `--rules <path>`         | `rules.json` that Studio draws the raise and clear lines from (default `RULES_FILE`, else the ingest service's)                                                          |
+| `--twin-layout <path>`   | `twin-layout.json` for the digital twin: the campus and where each device stands (default `TWIN_LAYOUT_FILE`, else `apps/simulator/config/twin-layout.json`)             |
 | `--scenarios-dir <path>` | Folder of custom scenario files, read once at start and written by saves (default `SCENARIOS_DIR`, else `apps/simulator/scenarios`)                                      |
 | `--no-control`           | Run without the control server, as a plain publisher                                                                                                                     |
 | `--simulated-clock`      | Run on the simulated clock: one tick at start, then only when Studio steps it (same as `SIMULATED_CLOCK=true`); see [Control server](#control-server)                    |
@@ -71,6 +72,7 @@ the state, as `GET /api/state` returns it.
 | Method and path                                  | What it does                                                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/state`                                 | Engine snapshot, devices as loaded, scenario names, ingest, alerts, metrics, rules, profiles, config                                                                                                                                                                                                                                                                 |
+| `GET /api/twin-layout`                           | The twin layout and which devices it places, `{ available, reason, layout, placement }` (below); `200` also when the layout is not available                                                                                                                                                                                                                         |
 | `GET /api/stream`                                | The event stream (below); at most 20 clients, then `503`                                                                                                                                                                                                                                                                                                             |
 | `GET /api/observations?before=&limit=`           | The observation store, newest first, `limit` 1 to 500 (default 100); `X-Next-Cursor` holds the next `before`                                                                                                                                                                                                                                                         |
 | `GET /api/alerts?status=&limit=&before=`         | A page of ingest's alerts, newest first, with what Studio saw and the scenario that caused each (below); `X-Next-Cursor` as ingest sends it                                                                                                                                                                                                                          |
@@ -381,6 +383,7 @@ the file.
 | `CONTROL_ALLOW_NON_LOOPBACK` | unset; only the exact value `true` allows                | `start`          |
 | `STUDIO_DIR`                 | `apps/simulator-ui/dist`                                 | `start`          |
 | `RULES_FILE`                 | `apps/ingest/config/rules.json`                          | `start`          |
+| `TWIN_LAYOUT_FILE`           | `apps/simulator/config/twin-layout.json`                 | `start`          |
 | `SCENARIOS_DIR`              | `apps/simulator/scenarios` (absent: no custom scenarios) | `start`          |
 | `SIMULATED_CLOCK`            | unset; only the exact value `true` turns it on           | `start`          |
 
@@ -396,6 +399,21 @@ the same rules as ingest ([rules-source.ts](src/rules-source.ts)) and reports it
 `false`, `reason` says why, and Studio hides what depends on the rules. The `profiles` part of the state gives,
 for each device and metric, the baseline, the noise (±) and the daily swing the generator uses
 ([signals.ts](src/signals.ts)); they are read-only. The demo image copies `rules.json` next to `devices.json`.
+
+**Twin layout.** `TWIN_LAYOUT_FILE` (or `--twin-layout`) is [config/twin-layout.json](config/twin-layout.json), which Studio's digital
+twin ([design](../../docs/design/simulator/digital-twin.md), [ADR-0012](../../docs/adr/0012-simulator-studio-digital-twin.md)) draws
+the campus and the devices from. Positions are metres east and north of `siteCenter`, the command center's convention. `zones` (20),
+`boundary` and `catalogue` (31 assets, all `simulated: false`) are a **copy of the command center's seed**, whose commit and files
+the file names under `source`; this repository does not check them, so they can drift. `devices` are Studio's own: each has a
+`placement`, `illustrative` (placed by hand inside the zone's footprint, which is the zone inset by 8 m) or `surveyed`. The simulator
+reads it once at start, only with the control server on, checks it ([twin-layout.ts](src/twin-layout.ts)) and serves it at
+`GET /api/twin-layout`: `{ available, reason, layout, placement }`. A file that is missing or invalid does not stop the simulator:
+`available` is `false` (still a `200`), `reason` says why, and Studio shows Topology. `placement` accounts for every device of the
+registry the simulator runs with: `placed`, `unplaced` (each `{ id, reason }`: its zone is not in the layout, the layout has no
+position for it, or the layout puts it in another zone) and `orphans` (devices the layout places that the registry does not
+have). With the default registry nothing is unplaced; with the [100-device registry](#a-registry-of-100-devices) 94 devices are,
+by design: the layout places Studio's six. The start-up lines say how many are placed. The demo image copies `twin-layout.json`
+next to `devices.json`.
 
 If you moved a Compose port in the root `.env`, use the same port here.
 
@@ -426,6 +444,7 @@ src/
   mqtt-link.ts       cuts and restores the simulator's own MQTT connection for the link-loss fault
   clock.ts           the engine's time: the system clock, and a manual clock for tests and Step
   device-source.ts   where devices come from (today the ingest registry, devices.json)
+  twin-layout.ts     the twin layout: its checks, the footprint rule, which devices it places and which it does not (pure, plus a loader that never throws)
   scenarios.ts       the built-in scenarios, as documents
   scenario-document.ts   the scenario document: its limits, its validation, the --anomaly flag for it
   scenario-library.ts    the built-ins, the folder of custom files and the imports, by name; save and remove

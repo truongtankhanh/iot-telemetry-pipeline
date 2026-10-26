@@ -54,7 +54,7 @@ const page = (
 });
 
 /**
- * The pages of the brief. Built so far: the Overview shell and Foundations (SIM-04), the Fleet (SIM-05), the Topology (SIM-06), the Alerts (SIM-07), the Lab's Scenarios (SIM-08), the Lab's workspace (SIM-10), the Lab's timeline editor (SIM-11), the Lab's faults (SIM-12), the Event stream (SIM-13) and the Guided demo (SIM-14); every other route
+ * The pages of the brief. Built so far: the Overview shell and Foundations (SIM-04), the Fleet (SIM-05), the Topology (SIM-06), the Alerts (SIM-07), the Lab's Scenarios (SIM-08), the Lab's workspace (SIM-10), the Lab's timeline editor (SIM-11), the Lab's faults (SIM-12), the Event stream (SIM-13), the Guided demo (SIM-14) and the Twin (SIM-17, a spike that draws the boundary and the buildings; SIM-18 finishes it); every other route
  * opens the shared placeholder that names the ticket which builds it, so nothing in the navigation or
  * the palette is a dead link.
  */
@@ -97,6 +97,7 @@ const ROUTES: AppRoute[] = [
     'SIM-18',
     ['14', '15', '16'],
     'w',
+    { built: true },
   ),
   page(
     '/events',

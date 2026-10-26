@@ -1,6 +1,6 @@
 # Digital twin control room — research and proposal
 
-Status: **approach approved** (SIM-01, revision 3, 2026-10-19); the SIM-17 spike decides go or no-go. Frames: 14 campus, 15 building, 16 loading and
+Status: **approach approved** (SIM-01, revision 3, 2026-10-19); the SIM-17 spike ended on 2026-10-26 in a **conditional go** (chunk 244,876 bytes of 350,000; frame time still to be measured on the reference laptop: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-the-sim-17-spike-conditional-go)). Frames: 14 campus, 15 building, 16 loading and
 fallback, in [mockups/](mockups/). Decision: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md). This page
 extends the [brief](brief.md), whose revision 2 deferred the 3D view.
 
@@ -166,12 +166,20 @@ supplies them ([V2-T01](../../tasks/v2/V2-T01-asset-catalogue-sync.md)):
 
 ```json
 {
+  "source": {
+    "repository": "ops-command-center",
+    "commit": "4b4fe02cd3a85698d462521fe1404a31ec5b3680",
+    "files": ["apps/api/src/database/seed/campus.ts", "apps/api/src/database/seed/assets.ts"],
+    "checkedOn": "2026-10-26"
+  },
   "siteCenter": [108.4415, 11.953],
+  "boundary": { "west": -282, "east": 228, "south": -277, "north": 247, "radius": 18 },
   "zones": [
     {
       "code": "BLD-DC",
       "name": "Data Center",
       "kind": "building",
+      "use": "data_center",
       "at": [175, 40],
       "size": [60, 46],
       "heightM": 14
@@ -199,9 +207,15 @@ supplies them ([V2-T01](../../tasks/v2/V2-T01-asset-catalogue-sync.md)):
 }
 ```
 
-- `zones` copies the command center's seed values for its 20 zones, and `catalogue` its 31 assets (`simulated: false` until V2-T05), in its convention (metres east and
-  north of the centre). It can drift; the file states its source, and a test checks that every device's `zone` exists
-  in it and in `devices.json`.
+- `zones` copies the command center's seed values for its 20 zones (a building also has its `use` and `heightM`), `boundary`
+  its site boundary, and `catalogue` its 31 assets (`simulated: false` until V2-T05), in its convention (metres east and
+  north of the centre). It can drift; the file states its source (`source`: repository, commit, files and the day it was
+  compared), and a test checks that every device's `zone` exists in it and in `devices.json`.
+- The simulator reads the file once at start and the UI gets it from `GET /api/twin-layout`, which answers the layout and a
+  `placement` of the registry the simulator runs with: the devices it places, the ones it does not (each with the reason) and
+  any it places that the registry does not have. A device with no position is reported, never dropped; with the 100-device
+  registry 94 are unplaced by design. A file that cannot be used is a `200` with `available: false` and the reason, and the
+  twin falls back to Topology. See the [simulator README](../../../apps/simulator/README.md#configuration).
 - `devices[].placement` is `illustrative` (placed by hand inside the zone) or `surveyed`. The inspector says which. The
   frames' Row A and Row B are `illustrative`: nothing in the data says where a server row stands.
 - The heat floor is interpolated between sensors and labelled so. It is a drawing aid, not a measurement.

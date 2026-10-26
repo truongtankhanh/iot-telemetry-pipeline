@@ -1,0 +1,508 @@
+{
+  "$comment": "Twin layout for Simulator Studio's digital twin (docs/design/simulator/digital-twin.md, ADR-0012). Metres east and north of siteCenter; three.js x is east, y is up, z is minus north. 'zones', 'boundary' and 'catalogue' are copied from ops-command-center's seed (see 'source'); this repository does not check them, so they can drift. 'devices' are Studio's own: placement 'illustrative' means placed by hand inside the zone's footprint (the zone inset by 8 m), not surveyed; dc-env-01 and dc-env-02 stand in 'row A' and 'row B' of frame 15, and row B is invented. The catalogue assets are not simulated until V2-T05.",
+  "source": {
+    "repository": "ops-command-center",
+    "commit": "4b4fe02cd3a85698d462521fe1404a31ec5b3680",
+    "files": ["apps/api/src/database/seed/campus.ts", "apps/api/src/database/seed/assets.ts"],
+    "checkedOn": "2026-10-26"
+  },
+  "siteCenter": [108.4415, 11.953],
+  "boundary": {
+    "west": -282,
+    "east": 228,
+    "south": -277,
+    "north": 247,
+    "radius": 18
+  },
+  "zones": [
+    {
+      "code": "GATE-MAIN",
+      "name": "Main Gate",
+      "kind": "gate",
+      "at": [0, -250],
+      "size": [44, 22]
+    },
+    {
+      "code": "BLD-HUB",
+      "name": "Innovation Hub",
+      "kind": "building",
+      "use": "academic",
+      "heightM": 24,
+      "at": [-120, 60],
+      "size": [90, 60]
+    },
+    {
+      "code": "BLD-LIB",
+      "name": "Library",
+      "kind": "building",
+      "use": "library",
+      "heightM": 18,
+      "at": [40, 120],
+      "size": [70, 50]
+    },
+    {
+      "code": "BLD-DC",
+      "name": "Data Center",
+      "kind": "building",
+      "use": "data_center",
+      "heightM": 14,
+      "at": [175, 40],
+      "size": [60, 46]
+    },
+    {
+      "code": "BLD-LHA",
+      "name": "Lecture Hall A",
+      "kind": "building",
+      "use": "academic",
+      "heightM": 16,
+      "at": [-60, -110],
+      "size": [80, 40]
+    },
+    {
+      "code": "BLD-STU",
+      "name": "Student Center",
+      "kind": "building",
+      "use": "dining",
+      "heightM": 12,
+      "at": [110, -95],
+      "size": [72, 50]
+    },
+    {
+      "code": "PRK-WEST",
+      "name": "West Parking",
+      "kind": "parking",
+      "at": [-215, -175],
+      "size": [90, 70]
+    },
+    {
+      "code": "OUT-LAWN",
+      "name": "Central Lawn",
+      "kind": "outdoor",
+      "at": [20, 0],
+      "size": [110, 70]
+    },
+    {
+      "code": "OUT-FIELD",
+      "name": "Sports Field",
+      "kind": "outdoor",
+      "at": [-150, 190],
+      "size": [120, 70]
+    },
+    {
+      "code": "BLD-LAB",
+      "name": "Science Lab",
+      "kind": "building",
+      "use": "laboratory",
+      "heightM": 16,
+      "at": [170, 212],
+      "size": [90, 64]
+    },
+    {
+      "code": "BLD-DORA",
+      "name": "Dormitory A",
+      "kind": "building",
+      "use": "residential",
+      "heightM": 20,
+      "at": [80, -181.5],
+      "size": [90, 47]
+    },
+    {
+      "code": "BLD-DORB",
+      "name": "Dormitory B",
+      "kind": "building",
+      "use": "residential",
+      "heightM": 20,
+      "at": [178.5, -181.5],
+      "size": [87, 47]
+    },
+    {
+      "code": "BLD-CLINIC",
+      "name": "Health Clinic",
+      "kind": "building",
+      "use": "healthcare",
+      "heightM": 10,
+      "at": [183.5, -240],
+      "size": [77, 56]
+    },
+    {
+      "code": "BLD-SPORTS",
+      "name": "Sports Hall",
+      "kind": "building",
+      "use": "sports_hall",
+      "heightM": 14,
+      "at": [-40, 207],
+      "size": [80, 74]
+    },
+    {
+      "code": "BLD-ADMIN",
+      "name": "Admin Building",
+      "kind": "building",
+      "use": "administration",
+      "heightM": 14,
+      "at": [-226, -14],
+      "size": [92, 68]
+    },
+    {
+      "code": "BLD-SEC",
+      "name": "Security office",
+      "kind": "building",
+      "use": "security_post",
+      "heightM": 6,
+      "at": [42, -251.5],
+      "size": [32, 27]
+    },
+    {
+      "code": "UTL-PLANT",
+      "name": "Utility Plant",
+      "kind": "utility",
+      "at": [65, 207],
+      "size": [110, 74]
+    },
+    {
+      "code": "WTR-LAKE",
+      "name": "Lake",
+      "kind": "water",
+      "at": [-95, -196.5],
+      "size": [110, 63]
+    },
+    {
+      "code": "PRK-EAST",
+      "name": "East Parking",
+      "kind": "parking",
+      "at": [185, -116],
+      "size": [60, 48]
+    },
+    {
+      "code": "GATE-EAST",
+      "name": "East Gate",
+      "kind": "gate",
+      "at": [216.5, -55],
+      "size": [23, 34]
+    }
+  ],
+  "devices": [
+    {
+      "id": "dc-env-01",
+      "zone": "BLD-DC",
+      "at": [170, 33],
+      "elevationM": 0,
+      "placement": "illustrative"
+    },
+    {
+      "id": "dc-env-02",
+      "zone": "BLD-DC",
+      "at": [170, 47],
+      "elevationM": 0,
+      "placement": "illustrative"
+    },
+    {
+      "id": "lib-air-01",
+      "zone": "BLD-LIB",
+      "at": [38, 118],
+      "elevationM": 0,
+      "placement": "illustrative"
+    },
+    {
+      "id": "lha-air-01",
+      "zone": "BLD-LHA",
+      "at": [-64, -108],
+      "elevationM": 0,
+      "placement": "illustrative"
+    },
+    {
+      "id": "stu-air-01",
+      "zone": "BLD-STU",
+      "at": [104, -92],
+      "elevationM": 0,
+      "placement": "illustrative"
+    },
+    {
+      "id": "hub-power-01",
+      "zone": "BLD-HUB",
+      "at": [-98, 52],
+      "elevationM": 0,
+      "placement": "illustrative"
+    }
+  ],
+  "catalogue": [
+    {
+      "code": "CT-01",
+      "name": "Cooling tower 1",
+      "class": "cooling_tower",
+      "zone": "BLD-DC",
+      "at": [161, 48],
+      "elevationM": 14,
+      "simulated": false
+    },
+    {
+      "code": "CT-02",
+      "name": "Cooling tower 2",
+      "class": "cooling_tower",
+      "zone": "BLD-DC",
+      "at": [174, 48],
+      "elevationM": 14,
+      "simulated": false
+    },
+    {
+      "code": "GEN-01",
+      "name": "Standby generator",
+      "class": "standby_generator",
+      "zone": "BLD-DC",
+      "at": [208, 46.5],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "UPS-01",
+      "name": "UPS room",
+      "class": "ups",
+      "zone": "BLD-DC",
+      "at": [164.5, 29.7],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "BAT-01",
+      "name": "UPS batteries",
+      "class": "ups_battery",
+      "zone": "BLD-DC",
+      "at": [179.5, 29.7],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "CRAC-01",
+      "name": "Precision cooling 1",
+      "class": "precision_cooling",
+      "zone": "BLD-DC",
+      "at": [190, 50.2],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "CRAC-02",
+      "name": "Precision cooling 2",
+      "class": "precision_cooling",
+      "zone": "BLD-DC",
+      "at": [190, 42.25],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "TR-01",
+      "name": "Main transformer",
+      "class": "transformer",
+      "zone": "UTL-PLANT",
+      "at": [94, 216],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "SWG-01",
+      "name": "Main switchgear",
+      "class": "switchgear",
+      "zone": "UTL-PLANT",
+      "at": [46, 215],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "CH-01",
+      "name": "Chiller 1",
+      "class": "chiller",
+      "zone": "UTL-PLANT",
+      "at": [30, 200],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "AHU-C1",
+      "name": "Air handler",
+      "class": "air_handler",
+      "zone": "BLD-CLINIC",
+      "at": [183, -240],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "AHU-L1",
+      "name": "Air handler, level 1",
+      "class": "air_handler",
+      "zone": "BLD-LIB",
+      "at": [40, 120],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "AHU-H1",
+      "name": "Air handler, roof",
+      "class": "air_handler",
+      "zone": "BLD-HUB",
+      "at": [-130, 60],
+      "elevationM": 24,
+      "simulated": false
+    },
+    {
+      "code": "PMP-S1",
+      "name": "Booster pump",
+      "class": "booster_pump",
+      "zone": "BLD-STU",
+      "at": [110, -95],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "LFT-A2",
+      "name": "Lift 2",
+      "class": "lift",
+      "zone": "BLD-DORA",
+      "at": [60, -172],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "LFT-B1",
+      "name": "Lift 1",
+      "class": "lift",
+      "zone": "BLD-DORB",
+      "at": [152, -170],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "LFT-H1",
+      "name": "Passenger lift",
+      "class": "lift",
+      "zone": "BLD-HUB",
+      "at": [-100, 45],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "BAR-01",
+      "name": "Barrier arm, inbound",
+      "class": "barrier_arm",
+      "zone": "GATE-MAIN",
+      "at": [8, -252],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "BAR-02",
+      "name": "Barrier arm, service",
+      "class": "barrier_arm",
+      "zone": "GATE-EAST",
+      "at": [216, -55],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "FH-L1",
+      "name": "Fume hoods, level 2",
+      "class": "fume_hood",
+      "zone": "BLD-LAB",
+      "at": [150, 205],
+      "elevationM": 4,
+      "simulated": false
+    },
+    {
+      "code": "GAS-L1",
+      "name": "Gas detector",
+      "class": "gas_detector",
+      "zone": "BLD-LAB",
+      "at": [192, 200],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "LKS-B3",
+      "name": "Leak sensor, level 3",
+      "class": "leak_sensor",
+      "zone": "BLD-DORB",
+      "at": [204, -193],
+      "elevationM": 8,
+      "simulated": false
+    },
+    {
+      "code": "ICS-DC",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-DC",
+      "at": [175, 40],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "ICS-LHA",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-LHA",
+      "at": [-60, -110],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "ICS-STU",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-STU",
+      "at": [110, -95],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "ICS-LAB",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-LAB",
+      "at": [170, 212],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "ICS-DORA",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-DORA",
+      "at": [80, -181.5],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "ICS-DORB",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-DORB",
+      "at": [178.5, -181.5],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "ICS-SPORTS",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-SPORTS",
+      "at": [-40, 207],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "ICS-ADMIN",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-ADMIN",
+      "at": [-226, -14],
+      "elevationM": 0,
+      "simulated": false
+    },
+    {
+      "code": "ICS-SEC",
+      "name": "Indoor climate sensor",
+      "class": "indoor_climate",
+      "zone": "BLD-SEC",
+      "at": [42, -251.5],
+      "elevationM": 0,
+      "simulated": false
+    }
+  ]
+}

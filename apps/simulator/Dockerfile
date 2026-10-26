@@ -23,7 +23,7 @@ COPY apps ./apps
 # /foundations page; the packaged demo has neither its route nor its code.
 RUN pnpm turbo run build --filter "@itp/simulator..." --filter "@itp/simulator-ui..."
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm --filter @itp/simulator deploy --prod --legacy --store-dir /pnpm/store /out \
- && mkdir -p /out/registry && cp apps/ingest/config/devices.json apps/ingest/config/rules.json /out/registry/ \
+ && mkdir -p /out/registry && cp apps/ingest/config/devices.json apps/ingest/config/rules.json apps/simulator/config/twin-layout.json /out/registry/ \
  && cp -r apps/simulator-ui/dist /out/ui
 
 FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
@@ -32,4 +32,4 @@ ENV STUDIO_DIR=/app/ui
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 USER node
-ENTRYPOINT ["node", "src/main.ts", "--registry", "/app/registry/devices.json", "--rules", "/app/registry/rules.json"]
+ENTRYPOINT ["node", "src/main.ts", "--registry", "/app/registry/devices.json", "--rules", "/app/registry/rules.json", "--twin-layout", "/app/registry/twin-layout.json"]
