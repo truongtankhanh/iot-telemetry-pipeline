@@ -81,3 +81,127 @@ export function homeView(
   ];
   return { target, position, distance };
 }
+
+// ---- Presets and nudges (SIM-18) ----
+
+/** Where the camera is and what it looks at, in scene metres. */
+export interface CameraView {
+  position: [number, number, number];
+  target: [number, number, number];
+}
+
+/**
+ * The presets that fly. _Building_ arrives with the building focus (SIM-20). _Top_ is the nearest to overhead the tilt
+ * limit allows: 20° from vertical, the same yaw and distance as the home view, so the limit the design set stays one.
+ */
+export type CameraPreset = 'campus' | 'top';
+
+/** The camera `distance` from `target`, `tiltDeg` from vertical and `yawDeg` round from south towards east. */
+function orbitPosition(
+  target: readonly [number, number, number],
+  distance: number,
+  tiltDeg: number,
+  yawDeg: number,
+): [number, number, number] {
+  const tilt = toRadians(tiltDeg);
+  const yaw = toRadians(yawDeg);
+  return [
+    target[0] + distance * Math.sin(tilt) * Math.sin(yaw),
+    target[1] + distance * Math.cos(tilt),
+    target[2] + distance * Math.sin(tilt) * Math.cos(yaw),
+  ];
+}
+
+/** The overhead preset: the home view's target, yaw and distance at the steepest tilt the limits allow. */
+export function topView(boundary: TwinBoundary, aspect: number): CameraView {
+  const home = homeView(boundary, aspect);
+  return {
+    target: home.target,
+    position: orbitPosition(home.target, home.distance, TILT_MIN_DEG, HOME_YAW_DEG),
+  };
+}
+
+export function presetView(
+  preset: CameraPreset,
+  boundary: TwinBoundary,
+  aspect: number,
+): CameraView {
+  if (preset === 'top') return topView(boundary, aspect);
+  const home = homeView(boundary, aspect);
+  return { target: home.target, position: home.position };
+}
+
+/**
+ * What the camera buttons and the keys do. Rotating turns the campus as the button's arrow says (_left_ turns it
+ * counter-clockwise seen from above, so the camera moves clockwise), panning slides the target over the ground in the
+ * direction of the arrow.
+ */
+export type CameraNudge =
+  | 'rotate-left'
+  | 'rotate-right'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'pan-left'
+  | 'pan-right'
+  | 'pan-up'
+  | 'pan-down';
+
+/** One step of a rotation, one step of a zoom (the distance is multiplied by it or divided by it), one step of a pan. */
+export const ROTATE_STEP_DEG = 15;
+export const ZOOM_STEP = 0.8;
+/** A pan moves the target by this share of the distance to it. */
+export const PAN_STEP = 0.1;
+
+/**
+ * The view after one nudge, kept inside the limits: the tilt between 20° and 78°, the distance between 60 and 900 m,
+ * the target inside the boundary plus 40 m (the position follows the target, so the angle and the distance are kept).
+ */
+export function nudgeView(
+  view: CameraView,
+  boundary: TwinBoundary,
+  nudge: CameraNudge,
+): CameraView {
+  const [dx, dy, dz] = [
+    view.position[0] - view.target[0],
+    view.position[1] - view.target[1],
+    view.position[2] - view.target[2],
+  ];
+  let distance = Math.hypot(dx, dy, dz);
+  // 0 looks straight down; `atan2` gives the yaw from south (+z) towards east (+x), as `orbitPosition` takes it.
+  let tilt =
+    distance === 0 ? toRadians(HOME_TILT_DEG) : Math.acos(Math.min(1, Math.max(-1, dy / distance)));
+  let yaw = Math.atan2(dx, dz);
+  let target: [number, number, number] = [...view.target];
+
+  switch (nudge) {
+    case 'rotate-left':
+      yaw -= toRadians(ROTATE_STEP_DEG);
+      break;
+    case 'rotate-right':
+      yaw += toRadians(ROTATE_STEP_DEG);
+      break;
+    case 'zoom-in':
+      distance *= ZOOM_STEP;
+      break;
+    case 'zoom-out':
+      distance /= ZOOM_STEP;
+      break;
+    default: {
+      const step = distance * PAN_STEP;
+      // On the ground: to the right of the view, and away from the camera.
+      const right: [number, number] = [Math.cos(yaw), -Math.sin(yaw)];
+      const away: [number, number] = [-Math.sin(yaw), -Math.cos(yaw)];
+      const sign = nudge === 'pan-left' || nudge === 'pan-down' ? -1 : 1;
+      const along = nudge === 'pan-left' || nudge === 'pan-right' ? right : away;
+      target = [target[0] + sign * step * along[0], target[1], target[2] + sign * step * along[1]];
+    }
+  }
+
+  tilt = Math.min(toRadians(TILT_MAX_DEG), Math.max(toRadians(TILT_MIN_DEG), tilt));
+  distance = Math.min(MAX_DISTANCE_M, Math.max(MIN_DISTANCE_M, distance));
+  target = clampTarget(target, boundary);
+  return {
+    target,
+    position: orbitPosition(target, distance, (tilt * 180) / Math.PI, (yaw * 180) / Math.PI),
+  };
+}

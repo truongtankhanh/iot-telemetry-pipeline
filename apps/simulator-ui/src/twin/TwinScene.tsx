@@ -1,12 +1,22 @@
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useEffect, useRef } from 'react';
-import type { TwinLayout } from '../api/types';
+import { type Ref, useEffect, useRef } from 'react';
+import type { TwinAsset, TwinLayout } from '../api/types';
+import type { TopologyState } from '../lib/topologyState';
 import { LENS } from '../lib/twinCamera';
+import type { TwinPin } from '../lib/twinPins';
+import type { SceneProblem } from '../lib/twinStatus';
+import type { TwinSelection } from '../lib/twinQuery';
 import { watchContextLoss } from '../lib/webgl';
 import { Buildings } from './Buildings';
-import { CameraRig } from './CameraRig';
+import { CameraRig, type CameraRigHandle } from './CameraRig';
+import { CatalogueMarkers } from './CatalogueMarkers';
 import { Ground } from './Ground';
+import { LabelProjector, type ViewListener } from './LabelProjector';
+import { Pins } from './Pins';
 import { twinColors } from './twinColors';
+
+export type { CameraRigHandle as TwinSceneHandle } from './CameraRig';
+export type { ViewListener } from './LabelProjector';
 
 /**
  * The lights make the walls: every face is the top colour, and a Lambert surface lit by a hemisphere light (the same
@@ -45,25 +55,65 @@ function FirstFrameMark() {
 
 export interface TwinSceneProps {
   layout: TwinLayout;
-  /** Called once when the WebGL context was lost and has not come back in 5 seconds: the page then shows Topology. */
-  onContextLost: () => void;
+  pins: readonly TwinPin[];
+  /** The look of each building by its code: the worst of its devices, or `null` for none. */
+  buildingStates: Readonly<Record<string, TopologyState | null>>;
+  /** The nine catalogue assets drawn at campus level. */
+  catalogue: readonly TwinAsset[];
+  /** Which layers are on. */
+  layers: { devices: boolean; catalogue: boolean };
+  selection: TwinSelection | null;
+  /** What the pointer is over, for the cursor and the larger hovered pin. */
+  hovered: TwinSelection | null;
+  /** The pointer is over a building or a pin (reported on every move; the caller ignores what it knows). */
+  onHover: (target: TwinSelection) => void;
+  /** The pointer left a building or a pin; the caller clears the hover only if it is still that target. */
+  onLeave: (target: TwinSelection) => void;
+  /** A click on a building or a pin (a drag of the camera is not one). */
+  onSelect: (target: TwinSelection) => void;
+  /** The camera moved or the canvas was resized: for the DOM overlays that follow the pins. */
+  onView: ViewListener;
+  /**
+   * The scene cannot be shown: the WebGL context was lost and has not come back in 5 seconds (called once), or its code did
+   * not load (said by the stand-in the page puts in its place). The page then shows Topology.
+   */
+  onUnavailable: (problem: SceneProblem) => void;
   className?: string;
+  /** Fly to a preset, take one step: what the camera buttons and the keys ask for. */
+  ref?: Ref<CameraRigHandle>;
 }
 
 /**
- * The 3D campus of the spike (SIM-17): the ground, the site boundary and the extruded buildings, lit and seen through
- * orbit controls, on a canvas that draws on demand. This module and its siblings in `src/twin/` are the only code that
- * imports three.js or React Three Fiber, and the page imports it only through a dynamic `import()`, so it is its own
- * chunk and a device without WebGL 2 never downloads it.
+ * The 3D campus (SIM-18): the ground, the site boundary, the extruded buildings with the look of their worst device, a pin
+ * for each placed device, the catalogue markers, orbit controls the page can also drive, and the projection the DOM labels
+ * need, on a canvas that draws on demand. This module and its siblings in `src/twin/` are the only code that imports
+ * three.js or React Three Fiber, and the page imports it only through a dynamic `import()`, so it is its own chunk and a
+ * device without WebGL 2 never downloads it.
  *
- * The scene is a picture with a text alternative: the wrapper is an image, and the page next to it states the same
- * facts as text (and, from SIM-18, lists the devices). jsdom cannot draw it, so it is checked by hand.
+ * The scene is a picture with a text alternative: the wrapper is an image, and the page states the same facts as text
+ * (the headline, and a visually hidden list of every device). Labels, the tooltip and the controls are DOM and sit
+ * beside this wrapper, not inside it. jsdom cannot draw it, so it is checked by hand.
  */
-export function TwinScene({ layout, onContextLost, className }: TwinSceneProps) {
+export function TwinScene({
+  layout,
+  pins,
+  buildingStates,
+  catalogue,
+  layers,
+  selection,
+  hovered,
+  onHover,
+  onLeave,
+  onSelect,
+  onView,
+  onUnavailable,
+  className,
+  ref,
+}: TwinSceneProps) {
   const stop = useRef<(() => void) | null>(null);
-  const latest = useRef(onContextLost);
+  const latest = useRef(onUnavailable);
   useEffect(() => {
-    latest.current = onContextLost;
+    latest.current = onUnavailable;
   });
   useEffect(() => () => stop.current?.(), []);
 
@@ -72,7 +122,9 @@ export function TwinScene({ layout, onContextLost, className }: TwinSceneProps) 
     <div
       className={className}
       role="img"
-      aria-label={`The campus in 3D: the site boundary and ${buildings} buildings. Drag to orbit, scroll to zoom, right-drag to pan. The same facts are listed below as text.`}
+      // The pointer is over something to choose.
+      style={hovered === null ? undefined : { cursor: 'pointer' }}
+      aria-label={`The campus in 3D: the site boundary, ${buildings} buildings and ${pins.length} devices. Drag to orbit, scroll to zoom, right-drag to pan. The same facts are listed below as text.`}
     >
       <Canvas
         frameloop="demand"
@@ -82,7 +134,7 @@ export function TwinScene({ layout, onContextLost, className }: TwinSceneProps) 
         camera={{ fov: LENS.fov, near: LENS.near, far: LENS.far }}
         onCreated={({ gl }) => {
           stop.current?.();
-          stop.current = watchContextLoss(gl.domElement, () => latest.current());
+          stop.current = watchContextLoss(gl.domElement, () => latest.current('context-lost'));
         }}
       >
         <color attach="background" args={[twinColors.background]} />
@@ -93,8 +145,28 @@ export function TwinScene({ layout, onContextLost, className }: TwinSceneProps) 
           intensity={KEY_LIGHT * Math.PI}
         />
         <Ground boundary={layout.boundary} />
-        <Buildings zones={layout.zones} />
-        <CameraRig boundary={layout.boundary} />
+        <Buildings
+          zones={layout.zones}
+          states={buildingStates}
+          selectedCode={selection?.type === 'zone' ? selection.id : null}
+          onHover={onHover}
+          onLeave={onLeave}
+          onSelect={onSelect}
+        />
+        <CatalogueMarkers assets={catalogue} visible={layers.catalogue} />
+        {/* The rig before the pins and the projector: frame callbacks run in the order they were registered, and the
+            rig is what moves the camera that they read. */}
+        <CameraRig boundary={layout.boundary} ref={ref} />
+        <Pins
+          pins={pins}
+          selectedId={selection?.type === 'device' ? selection.id : null}
+          hoveredId={hovered?.type === 'device' ? hovered.id : null}
+          visible={layers.devices}
+          onHover={onHover}
+          onLeave={onLeave}
+          onSelect={onSelect}
+        />
+        <LabelProjector onView={onView} />
         <FirstFrameMark />
       </Canvas>
     </div>

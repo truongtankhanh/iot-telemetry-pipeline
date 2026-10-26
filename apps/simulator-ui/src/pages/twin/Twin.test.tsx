@@ -1,30 +1,56 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stateViewFixture } from '../../api/fixtures/stateView';
 import { twinLayoutFixture } from '../../api/fixtures/twinLayout';
-import type { TwinLayoutView } from '../../api/types';
+import type { StateView, TwinLayoutView } from '../../api/types';
+import { AnimationBudget } from '../../lib/animationBudget';
+import type * as Webgl from '../../lib/webgl';
+import { HistoryStore } from '../../state/history';
+import { PulseBus } from '../../state/pulses';
+import { StudioProvider } from '../../state/StudioProvider';
+import { createStudioStore } from '../../state/store';
 import { axeViolations } from '../../test-axe';
 import type { TwinSceneProps } from '../../twin/TwinScene';
+import { AnimationBudgetProvider } from '../../ui/AnimationBudget';
+import { seedHistory } from '../fleet/fleetTestSupport';
 import { Twin } from './Twin';
 
 // The scene needs WebGL, which jsdom does not have, and is the one module that imports three.js: it is replaced by a
 // stand-in that counts how many times its module was loaded. A module is loaded once and then cached, so the cases that
-// must NOT request the scene come first in this file, and the one that does comes after them.
+// must NOT request the scene come first in this file, and the ones that do come after them.
 const { probe, sceneLoaded } = vi.hoisted(() => ({ probe: vi.fn(), sceneLoaded: vi.fn() }));
-vi.mock('../../lib/webgl', () => ({ webgl2Available: probe }));
+vi.mock('../../lib/webgl', async (importOriginal) => ({
+  ...(await importOriginal<typeof Webgl>()),
+  webgl2Available: probe,
+}));
 vi.mock('../../twin/TwinScene', () => {
   sceneLoaded();
   return {
-    TwinScene: ({ layout, onContextLost }: TwinSceneProps) => (
-      <div data-testid="scene" data-zones={layout.zones.length}>
-        <button type="button" onClick={onContextLost}>
+    TwinScene: ({ layout, pins, onUnavailable }: TwinSceneProps) => (
+      <div data-testid="scene" data-zones={layout.zones.length} data-pins={pins.length}>
+        <button type="button" onClick={() => onUnavailable('context-lost')}>
           Lose the context
         </button>
       </div>
     ),
   };
 });
+// The Topology draws a graph with React Flow, which has its own tests; here only that it is in place, and without a heading.
+vi.mock('../topology/Topology', () => ({
+  Topology: ({ showHeader }: { showHeader?: boolean }) => (
+    <div data-testid="topology" data-header={String(showHeader)} />
+  ),
+}));
+// The simulation controls and the event timeline are the Overview's, with their own tests and their own requests.
+vi.mock('../overview/SimulationControls', () => ({
+  SimulationControls: () => <div data-testid="simulation-controls" />,
+}));
+vi.mock('../overview/EventTimeline', () => ({
+  EventTimeline: () => <div data-testid="event-timeline" />,
+}));
+vi.mock('../overview/useSimulationControls', () => ({ useSimulationControls: () => ({}) }));
 
 const UNAVAILABLE: TwinLayoutView = {
   available: false,
@@ -53,12 +79,23 @@ function stubFetch(...answers: (() => Response | Promise<Response>)[]) {
   return fetchFn;
 }
 
-const renderTwin = () =>
-  render(
-    <MemoryRouter initialEntries={['/twin']}>
-      <Twin />
-    </MemoryRouter>,
+/** The page inside what it reads: a store holding the fixture's state (or none), its history and an animation budget. */
+const renderTwin = (view: StateView | null = structuredClone(stateViewFixture)) => {
+  const store = createStudioStore();
+  store.getState().setLink('live', Date.now());
+  if (view) store.getState().setView(view, Date.now());
+  const history = new HistoryStore();
+  if (view) seedHistory(history, view);
+  return render(
+    <StudioProvider store={store} history={history} pulses={new PulseBus()}>
+      <AnimationBudgetProvider budget={new AnimationBudget()}>
+        <MemoryRouter initialEntries={['/twin']}>
+          <Twin />
+        </MemoryRouter>
+      </AnimationBudgetProvider>
+    </StudioProvider>,
   );
+};
 
 beforeEach(() => probe.mockReturnValue(true));
 afterEach(() => {
@@ -67,12 +104,12 @@ afterEach(() => {
 });
 
 describe('the Twin page, where the scene is not requested', () => {
-  it('says the 3D view is not available without WebGL 2, links to the Topology, and asks for nothing', async () => {
+  it('says the 3D view is not available without WebGL 2, shows the Topology in place, and asks for nothing', () => {
     probe.mockReturnValue(false);
     const fetchFn = stubFetch();
     renderTwin();
     expect(screen.getByRole('heading', { level: 1, name: 'Digital twin' })).toBeInTheDocument();
-    expect(screen.getByText('Spike')).toBeInTheDocument();
+    expect(screen.queryByText('Spike')).toBeNull();
     expect(screen.getByText(/3D view isn't available on this device/)).toBeInTheDocument();
     expect(
       screen.getByText(/WebGL 2 is off, so Studio shows the topology instead/),
@@ -85,6 +122,15 @@ describe('the Twin page, where the scene is not requested', () => {
     expect(sceneLoaded).not.toHaveBeenCalled();
   });
 
+  it('shows the Topology itself, under the twin’s own heading, and never an empty canvas', async () => {
+    probe.mockReturnValue(false);
+    stubFetch();
+    renderTwin();
+    const topology = await screen.findByTestId('topology');
+    expect(topology).toHaveAttribute('data-header', 'false');
+    expect(document.querySelector('canvas')).toBeNull();
+  });
+
   it('says it is reading the layout while the simulator has not answered', () => {
     stubFetch(() => new Promise<Response>(() => {}));
     renderTwin();
@@ -92,11 +138,12 @@ describe('the Twin page, where the scene is not requested', () => {
     expect(sceneLoaded).not.toHaveBeenCalled();
   });
 
-  it('gives the reason and the link to the Topology when the layout is not available', async () => {
+  it('gives the reason and the Topology when the layout is not available', async () => {
     stubFetch(() => answer(UNAVAILABLE));
     renderTwin();
     expect(await screen.findByText(/The twin layout is not available/)).toBeInTheDocument();
     expect(screen.getByText(/cannot read \/x\/twin-layout.json \(ENOENT\)/)).toBeInTheDocument();
+    expect(await screen.findByTestId('topology')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open topology' })).toHaveAttribute(
       'href',
       '/topology',
@@ -117,14 +164,24 @@ describe('the Twin page, where the scene is not requested', () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
     expect(sceneLoaded).not.toHaveBeenCalled();
   });
+
+  it('waits for the first message from the simulator before it draws', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin(null);
+    expect(
+      await screen.findByText('Waiting for the first message from the simulator…'),
+    ).toBeInTheDocument();
+    expect(sceneLoaded).not.toHaveBeenCalled();
+  });
 });
 
 describe('the Twin page, where the scene is requested', () => {
-  it('loads the scene with the layout, and states what it draws, where it came from and who is not placed', async () => {
+  it('loads the scene with the layout and the placed pins, and states what it draws, where it came from and who is not placed', async () => {
     stubFetch(() => answer(twinLayoutFixture));
     renderTwin();
     const scene = await screen.findByTestId('scene');
     expect(scene).toHaveAttribute('data-zones', '3');
+    expect(scene).toHaveAttribute('data-pins', '2');
     expect(sceneLoaded).toHaveBeenCalledTimes(1);
 
     expect(
@@ -140,6 +197,52 @@ describe('the Twin page, where the scene is requested', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('hub-power-01: no position in the layout')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Open topology' })).toBeNull();
+    expect(screen.getByTestId('simulation-controls')).toBeInTheDocument();
+    expect(screen.getByTestId('event-timeline')).toBeInTheDocument();
+  });
+
+  it('lists every device as text with its state, whether or not the scene draws it', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    const table = screen.getByRole('table', { name: /Devices in the twin, as text/ });
+    for (const device of stateViewFixture.devices) {
+      expect(within(table).getByRole('row', { name: new RegExp(device.id) })).toBeInTheDocument();
+    }
+    expect(within(table).getByRole('row', { name: /dc-env-01/ })).toHaveTextContent(/Anomaly/);
+    const unplaced = within(table).getByRole('row', { name: /hub-power-01/ });
+    expect(unplaced).toHaveTextContent(/Paused/);
+    expect(unplaced).toHaveTextContent('Not drawn: no position in the layout');
+  });
+
+  it('selects a device from the list, and climbs one level at a time on Escape', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    const building = twinLayoutFixture.layout?.zones.find((zone) => zone.code === 'BLD-LIB');
+    const device = stateViewFixture.devices.find((candidate) => candidate.id === 'lib-air-01');
+    expect(building).toBeDefined();
+    expect(device).toBeDefined();
+    const name = device?.name ?? 'lib-air-01';
+
+    expect(screen.getByText(/Choose a building or a device/)).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: /Devices in the twin, as text/ });
+    await userEvent.click(within(table).getByRole('row', { name: /lib-air-01/ }));
+    expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open in Fleet' })).toHaveAttribute(
+      'href',
+      '/fleet?device=lib-air-01',
+    );
+
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('heading', { level: 3, name: building?.name })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name })).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByText(/Choose a building or a device/)).toBeInTheDocument();
+    // Nothing left to climb: the page is still the twin.
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('heading', { level: 1, name: 'Digital twin' })).toBeInTheDocument();
   });
 
   it('has no accessibility violations once the scene is up', async () => {
@@ -149,12 +252,13 @@ describe('the Twin page, where the scene is requested', () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
-  it('swaps the scene for the Topology link when it says its graphics context was lost for good', async () => {
+  it('swaps the scene for the Topology when it says its graphics context was lost for good', async () => {
     stubFetch(() => answer(twinLayoutFixture));
     renderTwin();
     await userEvent.click(await screen.findByRole('button', { name: 'Lose the context' }));
     await waitFor(() => expect(screen.queryByTestId('scene')).toBeNull());
     expect(screen.getByText(/The 3D view lost its graphics context/)).toBeInTheDocument();
+    expect(await screen.findByTestId('topology')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open topology' })).toHaveAttribute(
       'href',
       '/topology',

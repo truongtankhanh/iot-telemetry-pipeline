@@ -1,0 +1,383 @@
+/*
+ * What is drawn over and under the digital twin's scene: the flat plan and its loading card, the labels and the tooltip,
+ * the controls, and the key's dashed swatch. Tokens only; nothing under 13 px (the frames' 12 px is raised to it:
+ * `scripts/textSize.ts` fails below). Every animation hangs off `data-animated`, which the one block at the end of
+ * `tokens.css` stops under `prefers-reduced-motion`.
+ */
+
+/* ---- the flat plan (frame 16) ---- */
+
+/* A size container: the plan inside is the largest box of its own aspect ratio that fits. */
+.planFrame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.plan {
+  position: relative;
+  width: min(100cqw, calc(100cqh * var(--plan-ratio)));
+  aspect-ratio: var(--plan-ratio);
+}
+
+.planSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.planBoundary {
+  fill: var(--surface-1);
+  stroke: var(--border-strong);
+  stroke-width: 1.2;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.planZone,
+.planBuilding {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.planZone {
+  fill: var(--surface-1);
+}
+
+.planZone[data-kind='outdoor'] {
+  fill: color-mix(in srgb, var(--success) 10%, var(--surface-0));
+}
+
+.planZone[data-kind='water'] {
+  fill: color-mix(in srgb, var(--info) 10%, var(--surface-0));
+}
+
+.planZone[data-kind='gate'] {
+  fill: color-mix(in srgb, var(--flow) 8%, var(--surface-1));
+}
+
+.planZone[data-kind='utility'] {
+  stroke-dasharray: 4 3;
+}
+
+.planBuilding {
+  fill: var(--surface-2);
+}
+
+/* A device on the plan: a mark in the shape of its kind, ringed in its state, dashed when it is not reporting. */
+.planPin {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  color: var(--success);
+  fill: var(--surface-1);
+  stroke: currentcolor;
+  stroke-width: 0.28;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.planPin[data-state='anomaly'] {
+  color: var(--warning);
+  fill: color-mix(in srgb, var(--warning) 20%, var(--surface-1));
+}
+
+.planPin[data-state='stale'],
+.planPin[data-state='down'] {
+  color: var(--text-tertiary);
+  fill: var(--surface-0);
+  stroke-dasharray: 0.5 0.35;
+}
+
+.planPin[data-state='selected'] {
+  color: var(--accent);
+  width: 22px;
+  height: 22px;
+}
+
+/* ---- the loading card (frame 16) ---- */
+
+.loadingCard {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  width: min(300px, calc(100% - 32px));
+  box-sizing: border-box;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-2);
+}
+
+.loadingTitle {
+  margin: 0 0 6px;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+.step[data-state='loading'] {
+  color: var(--text-primary);
+}
+
+.stepDone {
+  color: var(--success);
+}
+
+.stepWord {
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  color: var(--text-tertiary);
+}
+
+.spinner,
+.hollow {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.spinner {
+  border: 3px solid var(--surface-3);
+  border-top-color: var(--accent);
+}
+
+.spinner[data-animated='true'] {
+  animation: twinSpin 0.9s linear infinite;
+}
+
+.hollow {
+  border: 2px solid var(--border-strong);
+}
+
+/* "Working", not a percentage: standing still (and partly full) under reduced motion. */
+.bar {
+  position: relative;
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: 3px;
+}
+
+.bar::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.bar[data-animated='true']::after {
+  animation: twinSlide 1.4s ease-in-out infinite;
+}
+
+.loadingNote {
+  margin: 8px 0 0;
+  font-size: var(--fs-min);
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+@keyframes twinSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes twinSlide {
+  from {
+    left: -40%;
+  }
+
+  to {
+    left: 100%;
+  }
+}
+
+/* ---- labels and tooltip (frame 14) ---- */
+
+/* The layer the labels are placed in: the whole stage, letting the pointer through to the scene. */
+.labels {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Placed by `transform` from the top left; hidden until the first projection has put it somewhere. */
+.label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--surface-2) 94%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-1);
+  font-size: var(--fs-min);
+  line-height: 1.25;
+  white-space: nowrap;
+  visibility: hidden;
+  will-change: transform;
+}
+
+.label[data-placed='true'] {
+  visibility: visible;
+}
+
+.label b {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.label span {
+  color: var(--text-secondary);
+}
+
+.label[data-state='anomaly'] {
+  border-color: var(--warning);
+}
+
+.label[data-state='stale'] {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+}
+
+.label[data-state='stale'] b {
+  color: var(--text-secondary);
+}
+
+.label[data-selected='true'] {
+  border-color: var(--accent);
+  border-width: 1.5px;
+}
+
+.tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 280px;
+  padding: 8px 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-2);
+  font-size: var(--fs-min);
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.tooltip b {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tooltip span {
+  color: var(--text-secondary);
+}
+
+/* ---- the controls over the stage (frame 14) ---- */
+
+.overlayTop {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.layers {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  box-sizing: border-box;
+  width: 190px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-2);
+}
+
+.layersTitle {
+  margin: 0 0 2px;
+  font-size: var(--fs-min);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.tools {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.toolGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-2);
+}
+
+/* ---- the key ---- */
+
+/* A catalogue asset: a dashed, dim box, as the scene draws it. */
+.legendDashed {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 1.5px dashed var(--text-tertiary);
+  border-radius: 2px;
+}

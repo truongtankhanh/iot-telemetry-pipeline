@@ -199,3 +199,13 @@ export function boundaryRing(boundary: TwinBoundary, segmentsPerCorner = 6): [nu
   }
   return points;
 }
+
+/**
+ * The building a triangle belongs to, from the triangle's index in the merged mesh (what a pointer hit reports as
+ * `faceIndex`): the range whose indices contain the triangle's first index. `null` for an index outside every range.
+ */
+export function buildingAtFace(ranges: readonly ShellRange[], faceIndex: number): string | null {
+  const first = faceIndex * 3;
+  const range = ranges.find(({ start, count }) => first >= start && first < start + count);
+  return range === undefined ? null : range.code;
+}

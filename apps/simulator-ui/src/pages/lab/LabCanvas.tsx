@@ -10,6 +10,7 @@ import { Chip } from '../../ui/Chip';
 import { Pill } from '../../ui/Pill';
 import { Button } from '../../ui/Button';
 import { Segmented } from '../../ui/Segmented';
+import { ViewSwitch } from '../../ui/ViewSwitch';
 import topology from '../topology/topology.module.css';
 import { TopologyGraph } from '../topology/TopologyGraph';
 import { useDownstreamPulses } from '../topology/useDownstreamPulses';
@@ -126,6 +127,7 @@ export function LabCanvas({
             { value: 'all', label: 'All devices', disabled: graph.tier === 'counts' },
           ]}
         />
+        <ViewSwitch current="topology" selection={selection} />
         {scale ? (
           <>
             <button

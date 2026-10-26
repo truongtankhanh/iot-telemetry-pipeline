@@ -2,7 +2,8 @@
 #
 # A local stand-in for .github/workflows/ci.yml, so a PR does not wait for GitHub's runners.
 #
-#   verify     (job 1)  install, format:check, docs:links, lint, typecheck, test, test:coverage, test:e2e, build, OpenAPI check
+#   verify     (job 1)  install, format:check, docs:links, lint, typecheck, test, test:coverage, test:e2e, build, OpenAPI check,
+#                       digital twin chunk budget
 #   manifests  (job 2)  kustomize build of deploy/k8s/overlays/local, validated with kubeconform
 #   images     (job 3)  docker compose --profile demo build
 #
@@ -225,6 +226,9 @@ verify_job() {
   [ "$RUN_BUILD" -eq 1 ] && run_step "build" pnpm exec turbo run build --concurrency="$JOBS" $FORCE
   # docs/openapi.json must match the controllers; the check reads the build made just above.
   [ "$RUN_BUILD" -eq 1 ] && run_step "OpenAPI document is current" pnpm --filter @itp/ingest openapi:check
+  # The twin's 3D scene chunk: within 350,000 bytes gzipped and requested only on /twin (ADR-0012). One more Studio build,
+  # with a manifest, into dist-budget (git-ignored), so the dist/ above is left as it is.
+  [ "$RUN_BUILD" -eq 1 ] && run_step "digital twin chunk is within budget" pnpm --filter @itp/simulator-ui budget
 }
 
 # --- job 2: manifests ---------------------------------------------------------------------------

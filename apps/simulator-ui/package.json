@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "budget": "vite build --manifest --outDir dist-budget && node scripts/chunk-budget.ts dist-budget",
     "preview": "vite preview",
     "lint": "eslint src scripts && node scripts/contrast.ts --check",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
