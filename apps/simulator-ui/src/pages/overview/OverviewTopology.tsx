@@ -9,6 +9,7 @@ import { Icon } from '../../ui/Icon';
 import { uiIcons } from '../../ui/icons';
 import { Pill } from '../../ui/Pill';
 import { Segmented } from '../../ui/Segmented';
+import { ViewSwitch } from '../../ui/ViewSwitch';
 import { formatClockTime } from '../../lib/time';
 import { TopologyGraph } from '../topology/TopologyGraph';
 import topology from '../topology/topology.module.css';
@@ -89,6 +90,7 @@ export function OverviewTopology({ now, query, onQuery }: OverviewTopologyProps)
           ) : (
             <Pill label="Connecting" tone="unknown" />
           )}
+          <ViewSwitch current="topology" selection={selection} />
           <Link
             className={styles.link}
             to={`/topology${open === '' ? '' : `?${open}`}`}

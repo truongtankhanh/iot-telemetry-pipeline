@@ -6,6 +6,7 @@ import { useNow } from '../../state/useNow';
 import { useStudio } from '../../state/studioContext';
 import { Card } from '../../ui/Card';
 import { PageHeader } from '../../ui/PageHeader';
+import { ViewSwitch } from '../../ui/ViewSwitch';
 import { DependencyBanners } from './DependencyBanners';
 import { DetailRow } from './DetailRow';
 import styles from './topology.module.css';
@@ -30,13 +31,18 @@ function unknownSelection(selection: Selection | null, deviceIds: Set<string>, z
   return null;
 }
 
+export interface TopologyProps {
+  /** False when the page sits under another page's heading (the Twin shows it when it cannot draw the scene). */
+  showHeader?: boolean;
+}
+
 /**
  * The topology (frames 04 and 10): the banners for what is wrong, the toolbar, the graph, its key and the row under it. The address is the state (search, grouping,
  * _Problems only_, the selected node); the zones the viewer opened are this page's own. It reads the store and the
  * history and keeps no copy of either. Before the first message there is a loading line, with no registered device
  * a card says so, and with the link to the simulator lost the graph keeps the last data, dimmed.
  */
-export function Topology() {
+export function Topology({ showHeader = true }: TopologyProps = {}) {
   const view = useStudio((state) => state.view);
   const link = useStudio((state) => state.link);
   const lostSince = useStudio((state) => state.lostSince);
@@ -47,6 +53,12 @@ export function Topology() {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const model = useTopologyModel({ view, link, lastAlertSink, publishRate, now, query, expanded });
   useDownstreamPulses();
+
+  const header = showHeader ? (
+    <PageHeader title="Topology" description={DESCRIPTION}>
+      <ViewSwitch current="topology" />
+    </PageHeader>
+  ) : null;
 
   const onSelect = useCallback((selection: Selection | null) => update({ selection }), [update]);
   const onToggleZone = useCallback((code: string) => {
@@ -60,7 +72,7 @@ export function Topology() {
   if (view === null || model === null) {
     return (
       <>
-        <PageHeader title="Topology" description={DESCRIPTION} />
+        {header}
         <Card title="System topology">
           <p role="status">
             {link === 'lost'
@@ -75,7 +87,7 @@ export function Topology() {
   if (view.devices.length === 0) {
     return (
       <>
-        <PageHeader title="Topology" description={DESCRIPTION} />
+        {header}
         <Card title="No devices">
           <p>The simulator plays no device, so there is nothing to follow to an incident.</p>
         </Card>
@@ -101,7 +113,7 @@ export function Topology() {
 
   return (
     <div className={styles.page} data-stale={link === 'lost' ? 'true' : undefined}>
-      <PageHeader title="Topology" description={DESCRIPTION} />
+      {header}
       <DependencyBanners notes={notes} runningDevices={running} />
       {notice === null ? null : (
         <p role="status" className={styles.notice}>

@@ -1,6 +1,7 @@
 # Digital twin control room — research and proposal
 
-Status: **approach approved** (SIM-01, revision 3, 2026-10-19); the SIM-17 spike ended on 2026-10-26 in a **conditional go** (chunk 244,876 bytes of 350,000; frame time still to be measured on the reference laptop: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-the-sim-17-spike-conditional-go)). Frames: 14 campus, 15 building, 16 loading and
+Status: **approach approved** (SIM-01, revision 3, 2026-10-19); the SIM-17 spike ended on 2026-10-26 in a **conditional go** (chunk 244,876 bytes of 350,000; frame time still to be measured on the reference laptop: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-the-sim-17-spike-conditional-go)). SIM-18 built the campus scene the same day ([ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-sim-18-the-campus-scene): built and unit-tested; the scene chunk is 246,489 bytes of 350,000; the frame time is 60 fps with no late frame on an M3 Pro but not yet measured on the reference laptop).
+Frames: 14 campus, 15 building, 16 loading and
 fallback, in [mockups/](mockups/). Decision: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md). This page
 extends the [brief](brief.md), whose revision 2 deferred the 3D view.
 
@@ -149,10 +150,12 @@ The twin makes a fault visible where it lands. Each row is drawn from engine sta
 ### Interaction
 
 - **Camera:** damped orbit, zoom to the cursor, pan; tilt between 20° and 78° from vertical; the target stays inside
-  the boundary plus 40 m. Presets _Campus_, _Building_, _Top_ fly in 600 ms, instantly under reduced motion. The view
+  the boundary plus 40 m. Presets _Campus_, _Building_, _Top_ fly in 600 ms, instantly under reduced motion (SIM-18 builds _Campus_ and
+  _Top_, which is 20° from vertical, the steepest the tilt limit allows; _Building_ arrives with SIM-20). The view
   never moves by itself, except where a guided-demo step says to.
 - **Hover** shows a tooltip after 150 ms. **Click** a building to focus it, a pin to inspect the device. **Escape**
-  climbs one level (device, building, campus) and never leaves the twin; **Home** returns to the campus.
+  climbs one level (device, building, campus) and never leaves the twin; **Home** returns to the campus. The selection is
+  in the address with the Topology's keys, `device` and `zone`, so the _Topology | Twin_ switch carries it.
 - **Inject here** posts the same command as the Lab; there is one way to inject, not two.
 - **Neon arcs in WebGL** are line meshes with an additive halo and a moving pulse, not a full-screen bloom pass: a bloom
   pass costs more than six arcs justify and would glow the buildings too. SIM-17 measures the cost.

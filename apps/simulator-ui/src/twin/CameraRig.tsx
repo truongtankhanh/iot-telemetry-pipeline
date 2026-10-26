@@ -1,14 +1,20 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useRef } from 'react';
+import { type Ref, useEffect, useImperativeHandle, useRef } from 'react';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { TwinBoundary } from '../api/types';
 import {
+  type CameraNudge,
+  type CameraPreset,
+  type CameraView,
   clampTarget,
   MAX_DISTANCE_M,
   MIN_DISTANCE_M,
   homeView,
+  nudgeView,
   polarLimitsRad,
+  presetView,
 } from '../lib/twinCamera';
+import { flightAt } from '../lib/twinFlight';
 
 /** The share of the remaining movement that stays each frame while the view coasts to a stop. */
 const DAMPING_FACTOR = 0.12;
@@ -17,20 +23,40 @@ const prefersReducedMotion = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** What the page can ask of the camera: fly to a preset, or take one step (the buttons and the keys). */
+export interface CameraRigHandle {
+  fly: (preset: CameraPreset) => void;
+  nudge: (nudge: CameraNudge) => void;
+}
+
+interface Flight {
+  from: CameraView;
+  to: CameraView;
+  startedAt: number;
+}
+
+export interface CameraRigProps {
+  boundary: TwinBoundary;
+  ref?: Ref<CameraRigHandle>;
+}
+
 /**
  * The camera's controls: three's `OrbitControls` with the design's limits — a damped orbit, zoom to the cursor, pan on the
  * ground, a tilt of 20° to 78° from vertical, a distance of 60 to 900 m, and a target that cannot leave the site boundary
  * plus 40 m (clamped after every update, moving the camera with it so the view keeps its angle). The view starts at the home
- * view and never moves by itself. The canvas draws on demand, so a change in the view asks for the next frame, and a view
- * that is still coasting keeps asking until it stops. Damping is off under `prefers-reduced-motion`. The controls are
- * created when the rig mounts and disposed when it unmounts.
+ * view and never moves by itself: it moves when the viewer drags, or when the page asks through the handle — a flight to a
+ * preset (600 ms, eased, instant under `prefers-reduced-motion`) or one step of a button or a key. A flight ends the moment
+ * the viewer takes hold of the view. The canvas draws on demand, so a change in the view asks for the next frame, and a
+ * view that is still coasting or flying keeps asking until it stops. Damping is off under `prefers-reduced-motion`. The
+ * controls are created when the rig mounts and disposed when it unmounts.
  */
-export function CameraRig({ boundary }: { boundary: TwinBoundary }) {
+export function CameraRig({ boundary, ref }: CameraRigProps) {
   const camera = useThree((state) => state.camera);
   const domElement = useThree((state) => state.gl.domElement);
   const invalidate = useThree((state) => state.invalidate);
   const read = useThree((state) => state.get);
   const controls = useRef<OrbitControls | null>(null);
+  const flight = useRef<Flight | null>(null);
 
   useEffect(() => {
     const { size } = read();
@@ -51,21 +77,72 @@ export function CameraRig({ boundary }: { boundary: TwinBoundary }) {
     orbit.maxPolarAngle = polar.max;
     // `invalidate` takes a number of frames, not the event the controls pass, so it is wrapped.
     const onChange = () => invalidate();
+    // The viewer taking hold of the view (a drag, a wheel turn) ends a flight; the view is theirs from there.
+    const onStart = () => {
+      flight.current = null;
+    };
     orbit.addEventListener('change', onChange);
+    orbit.addEventListener('start', onStart);
     orbit.update();
     controls.current = orbit;
     invalidate();
 
     return () => {
       orbit.removeEventListener('change', onChange);
+      orbit.removeEventListener('start', onStart);
       orbit.dispose();
       controls.current = null;
+      flight.current = null;
     };
   }, [boundary, camera, domElement, invalidate, read]);
+
+  useImperativeHandle(ref, () => {
+    const viewNow = (orbit: OrbitControls): CameraView => ({
+      position: [camera.position.x, camera.position.y, camera.position.z],
+      target: [orbit.target.x, orbit.target.y, orbit.target.z],
+    });
+    const apply = (orbit: OrbitControls, view: CameraView) => {
+      camera.position.set(...view.position);
+      orbit.target.set(...view.target);
+      orbit.update();
+      invalidate();
+    };
+    return {
+      fly(preset) {
+        const orbit = controls.current;
+        if (orbit === null) return;
+        const { width, height } = read().size;
+        const to = presetView(preset, boundary, width / Math.max(1, height));
+        // Read when asked, not when the rig was made: the setting can change while the page is open.
+        if (prefersReducedMotion()) {
+          flight.current = null;
+          apply(orbit, to);
+          return;
+        }
+        flight.current = { from: viewNow(orbit), to, startedAt: performance.now() };
+        invalidate();
+      },
+      nudge(nudge) {
+        const orbit = controls.current;
+        if (orbit === null) return;
+        flight.current = null;
+        apply(orbit, nudgeView(viewNow(orbit), boundary, nudge));
+      },
+    };
+  }, [boundary, camera, invalidate, read]);
 
   useFrame(() => {
     const orbit = controls.current;
     if (orbit === null) return;
+
+    const active = flight.current;
+    if (active !== null) {
+      const frame = flightAt(active.from, active.to, performance.now() - active.startedAt);
+      camera.position.set(...frame.position);
+      orbit.target.set(...frame.target);
+      if (frame.done) flight.current = null;
+    }
+
     // While the view coasts, `update` moves it and fires `change`, which asks for the next frame.
     orbit.update();
     const { x, y, z } = orbit.target;
@@ -80,6 +157,8 @@ export function CameraRig({ boundary }: { boundary: TwinBoundary }) {
       );
       orbit.update();
     }
+    // A flight in the air needs the next frame too: nothing else will ask for it.
+    if (flight.current !== null) invalidate();
   });
 
   return null;

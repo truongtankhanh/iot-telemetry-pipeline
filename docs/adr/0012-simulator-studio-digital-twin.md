@@ -3,6 +3,7 @@
 - **Status:** Accepted 2026-10-19 as the approach; **go or no-go is decided by the SIM-17 spike** (see [digital-twin.md](../design/simulator/digital-twin.md)). Confirmed with it: hand-placed `illustrative` positions, and the Pipeline hub drawn as a floating logical object.
 - **Date:** 2026-10-19
 - **Amended 2026-10-26:** the SIM-17 spike ended in a **conditional go** (see [the amendment](#amendment-2026-10-26-the-sim-17-spike-conditional-go)).
+- **Amended 2026-10-26 (SIM-18):** the campus scene is built on that go, which stays **conditional** (see [the second amendment](#amendment-2026-10-26-sim-18-the-campus-scene)).
 
 ## Context
 
@@ -147,3 +148,107 @@ half was committed at 09:26 (`1d40ec3`). Active hours were not recorded.
   and a build-time budget check.
 - The main bundle was 310,498 bytes raw in a listing taken before this work and is 328,355 now; this spike adds a lazy import and a route to it, which cannot explain 18 KB, and the earlier listing predates the Analytics
   commit (`2367710`), but that was **not verified** by building the commit before the spike.
+
+## Amendment, 2026-10-26: SIM-18, the campus scene
+
+The spike's go was conditional on the frame time being measured on the reference laptop and on the chunk staying under 350,000 bytes with SIM-18's additions. **The chunk is now measured** (below) and is well inside its budget;
+**the frame time on the reference laptop is not**. SIM-18 was written, its unit tests pass, and it was observed in a headless Chrome on the machine of the spike (below), not on the reference laptop. The condition on the frame time stands, and so does the fallback to option D if it fails. This
+section says what was built, what differs from the design page, what was measured and what is owed; it gives no figure that was not measured.
+
+### What SIM-18 built
+
+- **Pins and states.** A pin for every device the layout places, in the shape of its kind (rounded square, circle, hexagon), ringed in its state (dashed when it is paused, stopped or silent), on a stem down to its building's roof.
+  The state is Fleet's and the Topology's own (`deviceStatus`, then `deviceTopologyState`), so the three pages cannot disagree; a building takes the worst of its pins. While the link to the simulator is lost every pin is dashed
+  and its label says how old its last value is.
+- **Labels and tooltip** are DOM above the canvas, at most 12 at a time (the selected pin, the hovered one and those that need a look first), placed from the camera's matrix without a React render per frame; the tooltip
+  appears after the pointer rests 150 ms.
+- **Camera.** The presets _Campus_ and _Top_ fly in 600 ms (instantly under `prefers-reduced-motion`; a flight ends the moment the viewer takes hold), with buttons that rotate, zoom and reset and, with focus on the stage,
+  arrow keys to pan and `+` / `-` to zoom. _Top_ is **20° from vertical**, the steepest the tilt limit allows, not straight down; _Building_ comes with SIM-20.
+- **Selection** is in the address with the keys the Topology reads (`device`, `zone`), so the _Topology | Twin_ switch (on the Topology, the Overview, the Lab canvas and the Twin) carries the selected device or building
+  and a shared link keeps it. **Escape** climbs one level (device, building, nothing) and never leaves the page; **Home** returns to the campus.
+- **Catalogue layer.** The nine assets the command center draws at campus level, as dim dashed boxes, labelled "not simulated". The list of nine codes is a constant in Studio (`lib/twinCatalogue.ts`), because the layout file
+  has no field for it and "outdoor and roof" cannot be read from its data; a test that reads the real layout file is what notices a drift.
+- **Loading and fallback.** While the scene's code loads, the flat plan (an SVG from the same layout, seen from the home camera's direction) shows the devices live, with a checklist and no percentage. When the twin cannot be
+  drawn (no WebGL 2, a layout that could not be read or used, a lost context, code that did not load) the page says why and shows **the Topology itself, in place**, never an empty canvas.
+- **Text twin.** A table of every device Fleet lists, with its name, id, state, latest values, last heard and whether the scene draws it, visually hidden until focus is inside it (a row can be chosen with Enter).
+- The Overview's simulation controls and event timeline sit under the scene, so the twin can be driven alone.
+
+### Where it differs from the design page, and why
+
+- A line is one pixel wide in WebGL, so a building's state is carried by the tint of its top face (the walls take their shade from the lights) more than by its outline, and a stale building's rim is not dashed. A pin's ring is
+  a band of triangles for the same reason.
+- Pins are drawn without a depth test: at campus distance a 16-pixel mark is wider than the 6 m it floats above its roof, and a building would cut it. A pin behind a nearer building is therefore still seen and can be picked.
+- The tints of an anomaly and of a dark building are frame 14's (`#5b4e34`, `#2b3338`); the command center's neutral material has none, and nothing here says whether its own twin will.
+- The loading card has no progress bar that moves, and the fallback banner cannot be dismissed, so that the reason stays next to the topology it explains.
+
+### The budget is now checked
+
+`pnpm --filter @itp/simulator-ui budget` builds Studio with a manifest into `dist-budget/` (git-ignored, so the `dist/` the simulator serves never holds `.vite/`) and checks the scene chunk: zlib level 9, the chunk's `.js` and
+`.css` and the chunks only it imports, 1 KB = 1,000 bytes, at most 350,000; the scene is not in the entry's static imports, `index.html` does not name it, and no other file contains `WebGLRenderer`. It exits 1 on any of them.
+It is a step of the `verify` job of `ci.yml` and of `scripts/ci-local.sh`, which change together.
+
+### Measured: the chunk with SIM-18's additions
+
+On 2026-10-26, by Sếp, on a MacBook Pro (model and chip not stated), Node 24, Vite 8.3.4, with `pnpm --filter @itp/simulator-ui build` and then `pnpm --filter @itp/simulator-ui budget`, on the working tree of the branch
+`feat/sim-18-twin-campus` (the changes were not committed; there is no commit hash). Chunk sizes do not depend on the machine.
+
+- The scene chunk `assets/TwinScene-Cy7HEnhO.js`: 941,047 bytes raw, **246,489 bytes gzipped (level 9)**. It has no `.css` and no chunk that only it imports, so that is the total counted. The margin is **103,511 bytes** under 350,000
+  (128,511 under the command center's 375,000). The spike's chunk was 244,876 bytes: SIM-18's pins, markers, flights and handles added **1,613 bytes (0.7 %)**.
+- The laziness check of the script passed: the scene is not in the entry's static imports, `index.html` does not name it, and no other file has the renderer. Vite still prints its 500 kB warning for this chunk.
+- The page chunk `assets/Twin-B7BV9U5h.js` is 32.62 kB raw and 11.79 kB gzipped (Vite's figure), with `assets/Twin-BW7tuW5O.css` 8.12 kB and 2.17 kB; with the scene the twin is about 260 kB gzipped. The entry bundle `assets/index-DPjD2MGL.js`
+  is 328.52 kB raw and 104.14 kB gzipped (328,355 and 104.05 kB at the spike): the switch, the routes and the one lazy import changed it by about 170 bytes.
+- `vite build --manifest --outDir dist-budget` worked as written, and `dist/` has no `.vite/`.
+
+### Measured: the frame time and what a browser showed
+
+On 2026-10-26 at about 15:07 +07, by Claude at Sếp's request, against the Studio served by Sếp's running simulator (six devices, no scenario playing, so every pin was healthy): a headless Chrome 155.0.8059.86 driven through the DevTools
+protocol by a one-off script outside the repository (it loads pages and clicks in the interface and sends no command to the simulator), at 1920 × 1080 and device pixel ratio 1, cache off. The machine is the one of the spike's measurement, **not the
+reference laptop**: a MacBook Pro `Mac15,7`, Apple M3 Pro, 18 GB, on AC power, with the simulator, ingest and Vite servers running (load average 3.2 before the run and 4.8 after), so the figures are not those of an idle machine. The build was the
+working tree of `feat/sim-18-twin-campus` (not committed; no commit hash).
+
+| Phase                                     | Frames | fps | Frame interval p50 / p95 / p99 / max (ms) | Frames over 25 ms | Page `requestAnimationFrame` callbacks, p95 / max (ms)  |
+| ----------------------------------------- | ------ | --- | ----------------------------------------- | ----------------- | ------------------------------------------------------- |
+| idle, 5 s                                 | 300    | 60  | 16.7 / 16.8 / 16.8 / 16.8                 | 0                 | 0.5 / 0.5 (10 callbacks: the demand loop draws nothing) |
+| orbit, 10 s (drag, about 60 events/s)     | 603    | 60  | 16.7 / 16.7 / 16.8 / 16.8                 | 0                 | 0.4 / 0.6                                               |
+| zoom, 10 s (wheel, at the cursor)         | 603    | 60  | 16.7 / 16.7 / 16.8 / 16.8                 | 0                 | 0.4 / 0.8                                               |
+| eight flights, _Campus_ and _Top_ (7.2 s) | 433    | 60  | 16.7 / 16.8 / 16.8 / 16.8                 | 0                 | 0.4 / 1.8                                               |
+
+The interval is locked to the 60 Hz of the compositor: no frame was late in any phase, labels and pins included. What this does **not** show is what it did not show for the spike: a vsync-locked interval says the GPU kept up, not by how much; the 14 ms
+of the criterion is a budget that an interval cannot be read against; the input is synthetic; and the hardware is far faster than the reference laptop's. It is a measurement on the wrong machine, not a pass of the criterion on the right one.
+
+What the same run saw:
+
+- **Lazy.** With the cache off, `/`, `/fleet`, `/topology` and `/lab` requested no `TwinScene` chunk (29, 32, 35 and 39 scripts); `/twin` requested it once.
+- **Console.** Only the `THREE.Clock` deprecation warning of the spike; no error, no exception, no Content-Security-Policy violation. The first frame of the scene was marked at 467 ms from navigation (275 ms at the spike, which had no pins, labels or live
+  state; the machine's load differs and was not isolated).
+- **Pins and text.** Six pins and six labels were placed; the headline read "20 zones, 12 buildings, 31 catalogue assets (not simulated) · 6 of 6 devices placed (6 illustrative)"; the text table had six rows, each with the Fleet name and the id; the
+  `View` switch had _Twin_ selected; the stage had `tabindex` 0; the scene's text alternative named 12 buildings and 6 devices.
+- **Pointer and keys.** With the pointer on a pin the tooltip was absent at about 60 ms and present at about 410 ms (kind, building, state, readings, position) and the cursor was a pointer; a click set `?device=dc-env-01` and the selection card;
+  `Esc` went to `?zone=BLD-DC`, a second `Esc` to no selection, and a third left the page on `/twin`; the switch to Topology kept `?device=dc-env-01`, and back kept it on `/twin`; `Home` cleared it.
+- **Fallbacks.** After `loseContext()` and 7.5 s, the canvas was gone, the reason was shown and the Topology was in place with a single heading. With 3D APIs off (`--disable-3d-apis`), no scene and no layout was requested, the banner and the Topology were
+  shown and there was no canvas.
+- **Screenshots** of the campus, a hover, a selected pin, a selected building, the _Top_ preset in flight and settled, a rotation, the catalogue layer off, the lost context and the missing WebGL 2 were taken; the first, the selected pin, the selected
+  building, _Top_ and the missing WebGL 2 were looked at. They show the scene drawn, pins in the shapes of their kinds, healthy rims, the catalogue markers as small dim boxes, and _Top_ as a near-overhead view.
+- **A defect they showed, fixed the same day.** At the home view the six labels, each about 165 × 44 px, stand within about 330 px of each other and overlapped: the label of one Data Center device sat under the other's, and the Library's was
+  partly under the Innovation Hub's; the cap of 12 labels does not prevent that. A label that would cover one already shown is now hidden (`visibleLabels` in `lib/twinProject.ts`, which takes them in the order selected, hovered, needing a look, the rest, and keeps a
+  gap of 4 px). In a second run, on a rebuilt Studio, three of the six were named at the home view and five when zoomed in, none covering another (two screenshots, looked at); the second Data Center device stays unnamed in both, its pin being next to the
+  first's, and is in the tooltip and the text list. The campus also fills only part of the stage at home (the 900 m distance limit, as at the spike).
+- **A scenario, from the page's own Run button** (15:20 to 15:22, on Sếp's request; `server-room-overheat`, sampled every 5 s through the labels' `data-state`, the text table and the simulation card, with screenshots): the Data Center device read healthy at
+  20 s, **anomaly from 25 s to 80 s** ("Anomaly: temperature_c 29.2 °C, above 27") and healthy again at 85 s; in the screenshot at 30 s its building has an amber outline and a brown top, its pin an amber ring and its label an amber border, and at 100 s all
+  are green again; the other five devices stayed healthy. The alert opened 27 s after the start and cleared at 83 s. Side effect: **alert #28** (high, `dc-env-01`, delivery skipped, no sink) is now in the database of Sếp's ingest.
+- **Paused, from the page's own Pause button** (about 10 s, then Resume): all six pins and labels went to the paused look — dashed rings and label borders, dark buildings with a grey outline, "Data Center · paused" — the text table said "Paused" with "8 s
+  ago", and after Resume everything read healthy again and the simulator listed all six devices as running.
+- **Not observed:** the silent look (it needs a fault), reduced motion, a keyboard-only pass, a screen reader, the tilt and target limits as numbers, the alert beacon (SIM-19), and anything on the reference laptop.
+
+### Still owed
+
+- The frame time on the reference laptop (p95 over 20 s of orbit and zoom at 1920 × 1080, devices at rest), in a new dated section. Over 14 ms means option D; the chunk is within its budget.
+- The rest of the manual list: the silent look, the reduced-motion case of the flights, the flat plan while the code loads (throttled network), a keyboard-only pass, and the
+  hidden list read with a screen reader.
+- Of what the spike said SIM-18 owed: the visually hidden list, the keyboard camera, Escape and Home, the flat plan with live pins and the build-time budget check are built; the frame time is measured only off the reference laptop.
+
+### Consequences
+
+- The scene chunk holds pins, markers and the camera's flights on top of the spike's code; the page chunk holds the plan, the labels, the tooltip, the controls and the text table.
+- CI builds Studio one more time (with a manifest, into a folder of its own).
+- The link-state pill is written a fourth time (the Topology, the Overview, the Lab and now the Twin); an extraction would touch three other pages and was left.

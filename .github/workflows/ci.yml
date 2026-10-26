@@ -90,6 +90,10 @@ jobs:
       # or DTO did not regenerate it (`pnpm docs:openapi`). It needs the build just above.
       - name: OpenAPI document is current
         run: pnpm --filter @itp/ingest openapi:check
+      # The digital twin's 3D scene is a chunk of its own: at most 350,000 bytes gzipped, and requested only on /twin
+      # (ADR-0012). This builds Studio once more, with a manifest, into a folder that is not the one the simulator serves.
+      - name: Digital twin chunk is within budget
+        run: pnpm --filter @itp/simulator-ui budget
 
   manifests:
     name: Kubernetes manifests

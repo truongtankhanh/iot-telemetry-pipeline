@@ -87,9 +87,11 @@ describe('the campus of the frames: six devices in five zones', () => {
     expect(panels[0]).toHaveClass('react-flow__minimap');
   });
 
-  it('has no Twin switch and no layer switch (they come with later tickets)', () => {
+  it('has the Topology | Twin switch, and no layer switch (those come with later tickets)', () => {
     page();
-    expect(screen.queryByRole('radio', { name: 'Twin' })).toBeNull();
+    const view = screen.getByRole('radiogroup', { name: 'View' });
+    expect(within(view).getByRole('radio', { name: 'Topology' })).toBeChecked();
+    expect(within(view).getByRole('radio', { name: 'Twin' })).not.toBeChecked();
     expect(screen.queryByRole('radio', { name: 'Data flow' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Retry now/ })).toBeNull();
   });
