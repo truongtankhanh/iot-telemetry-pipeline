@@ -46,6 +46,7 @@ import { ScenarioRuns } from './scenario-runs.ts';
 import { FolderScenarioStore, type ScenarioStore, serializeScenario } from './scenario-store.ts';
 import type { DeviceSpec } from './signals.ts';
 import { DEVICES, FakeBenchChild, setupEngine, T0 } from './test-support.ts';
+import { type TwinLayoutView, twinLayoutUnavailable } from './twin-layout.ts';
 
 const OVERHEAT: ScenarioDocument = {
   name: 'overheat',
@@ -96,6 +97,42 @@ const RULES: RulesView = {
   ],
 };
 
+/** A twin layout as the server read it: one building, one device placed in it and one the layout has no position for. */
+const TWIN: TwinLayoutView = {
+  available: true,
+  reason: null,
+  layout: {
+    source: {
+      repository: 'ops-command-center',
+      commit: 'abc1234',
+      files: ['apps/api/src/database/seed/campus.ts'],
+      checkedOn: '2026-10-26',
+    },
+    siteCenter: [108.4415, 11.953],
+    boundary: { west: -282, east: 228, south: -277, north: 247, radius: 18 },
+    zones: [
+      {
+        code: 'BLD-DC',
+        name: 'Data Center',
+        kind: 'building',
+        use: 'data_center',
+        heightM: 14,
+        at: [175, 40],
+        size: [60, 46],
+      },
+    ],
+    devices: [
+      { id: 'dc-env-01', zone: 'BLD-DC', at: [170, 33], elevationM: 0, placement: 'illustrative' },
+    ],
+    catalogue: [],
+  },
+  placement: {
+    placed: ['dc-env-01'],
+    unplaced: [{ id: 'lib-air-01', reason: 'no position in the layout' }],
+    orphans: [],
+  },
+};
+
 const INGEST = {
   state: () => ({
     status: 'ready' as const,
@@ -118,6 +155,8 @@ async function setup(
     started?: boolean;
     wallClock?: boolean;
     rules?: RulesView;
+    /** The twin layout the server read; without it, `TWIN`. */
+    twinLayout?: TwinLayoutView;
     broken?: boolean;
     /** Where the library saves scenarios; without it the library cannot save. */
     scenarioStore?: ScenarioStore;
@@ -131,6 +170,7 @@ async function setup(
     started = true,
     wallClock = false,
     rules = RULES,
+    twinLayout = TWIN,
     broken = false,
     scenarioStore,
     link,
@@ -191,6 +231,7 @@ async function setup(
     config: { ingestUrl: 'http://localhost:3100', consoleUrl: null },
     broker,
     rules,
+    twinLayout,
     effect,
     messages: { find: (id) => logged.find((m) => m.id === id), capacity: 200 },
     benchmark,
@@ -312,6 +353,45 @@ describe('GET /api/state: rules and profiles', () => {
     const before = view(await call('GET', '/api/state')).profiles;
     const after = view(await call('POST', '/api/devices/dc-env-01/pause')).profiles;
     assert.deepEqual(after, before);
+  });
+});
+
+describe('GET /api/twin-layout', () => {
+  it('answers the layout and the placement as the server read them', async () => {
+    const { call } = await setup();
+    const response = await call('GET', '/api/twin-layout');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, TWIN);
+  });
+
+  it('answers 200 with the reason when the layout is not available, and every device unplaced', async () => {
+    const { call } = await setup({
+      twinLayout: twinLayoutUnavailable('cannot read /x/twin-layout.json (ENOENT)', DEVICES),
+    });
+    const response = await call('GET', '/api/twin-layout');
+    assert.equal(response.status, 200);
+    const body = response.body as TwinLayoutView;
+    assert.equal(body.available, false);
+    assert.equal(body.reason, 'cannot read /x/twin-layout.json (ENOENT)');
+    assert.equal(body.layout, null);
+    assert.deepEqual(
+      body.placement.unplaced.map((u) => u.id),
+      DEVICES.map((d) => d.id),
+    );
+  });
+
+  it('is a read: other methods get 405 with Allow', async () => {
+    const { call } = await setup();
+    const response = await call('POST', '/api/twin-layout');
+    assertEnvelope(response, 405);
+    assert.equal(response.headers?.Allow, 'GET');
+  });
+
+  it('is not part of the state: GET /api/state has no twin layout', async () => {
+    const { call } = await setup();
+    const state = (await call('GET', '/api/state')).body as Record<string, unknown>;
+    assert.equal('twinLayout' in state, false);
+    assert.equal('twin' in state, false);
   });
 });
 

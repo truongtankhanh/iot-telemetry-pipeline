@@ -20,6 +20,7 @@ import { loadScenarioFolder, ScenarioLibrary } from './scenario-library.ts';
 import { FolderScenarioStore } from './scenario-store.ts';
 import { BUILT_IN_SCENARIOS } from './scenarios.ts';
 import { type Anomaly, parseAnomaly } from './signals.ts';
+import { loadTwinLayout } from './twin-layout.ts';
 
 const HELP = `Usage: node src/main.ts [options]
 
@@ -28,7 +29,10 @@ const HELP = `Usage: node src/main.ts [options]
   --rules <path>        rules.json that Studio draws the raise and clear lines from (default
                         RULES_FILE, else ../ingest/config/rules.json); a file that cannot be
                         read is reported, not fatal
-  --interval <ms>       publish interval per device (default 2000)
+  --twin-layout <path>  twin-layout.json for the digital twin: the campus and where each device
+                        stands (default TWIN_LAYOUT_FILE, else ../config/twin-layout.json); a file
+                        that cannot be read is reported, not fatal
+  --interval <ms>      publish interval per device (default 2000)
   --anomaly <spec>      device:metric:value:startAt:duration[:shape], repeatable; the shape is
                         step (default), ramp or spike
                         e.g. dc-env-01:temperature_c:29.5:20:60 or ...:29.5:20:60:ramp
@@ -60,6 +64,7 @@ const { values } = parseArgs({
       default: new URL('../../ingest/config/devices.json', import.meta.url).pathname,
     },
     rules: { type: 'string' },
+    'twin-layout': { type: 'string' },
     interval: { type: 'string', default: '2000' },
     anomaly: { type: 'string', multiple: true, default: [] },
     scenario: { type: 'string' },
@@ -156,6 +161,14 @@ const rulesPath =
     new URL('../../ingest/config/rules.json', import.meta.url).pathname);
 const rules = control ? loadRules(rulesPath) : undefined;
 
+// The twin layout is for Studio only, like the rules: a missing or unusable file never stops the simulator, it is said
+// once here and by the route, and Studio shows Topology instead. The registry is placed against it once.
+const twinLayoutPath =
+  values['twin-layout'] ??
+  (process.env.TWIN_LAYOUT_FILE?.trim() ||
+    new URL('../config/twin-layout.json', import.meta.url).pathname);
+const twinLayout = control ? loadTwinLayout(twinLayoutPath, devices) : undefined;
+
 const client = await connectAsync(values.broker, {
   protocolVersion: 5,
   clientId: `simulator-${process.pid}`,
@@ -222,6 +235,7 @@ if (control) {
     benchmark: { brokerUrl: values.broker, databaseUrl },
     studioDir: control.studioDir,
     ...(rules ? { rules } : {}),
+    ...(twinLayout ? { twinLayout } : {}),
     config: control,
   });
   try {
@@ -238,6 +252,27 @@ if (control) {
         ? `Rules: ${rules.items.length} from ${rulesPath}`
         : `Rules: not available (${rules?.reason}); Studio hides what depends on them`,
     );
+    if (twinLayout?.layout) {
+      const { layout, placement } = twinLayout;
+      console.log(
+        `Twin layout: ${layout.zones.length} zones, ${layout.catalogue.length} catalogue assets, ` +
+          `${placement.placed.length} of ${devices.length} devices placed (${twinLayoutPath})`,
+      );
+      // A registry of a hundred devices leaves most of them unplaced: the first few say why, the rest are counted.
+      for (const { id, reason } of placement.unplaced.slice(0, 5)) {
+        console.log(`  not placed: ${id} (${reason})`);
+      }
+      if (placement.unplaced.length > 5) {
+        console.log(`  … and ${placement.unplaced.length - 5} more not placed`);
+      }
+      if (placement.orphans.length > 0) {
+        console.log(`  in the layout but not in the registry: ${placement.orphans.join(', ')}`);
+      }
+    } else {
+      console.log(
+        `Twin layout: not available (${twinLayout?.reason}); Studio shows Topology instead of the twin`,
+      );
+    }
     console.log(`Benchmark: database ${describeDatabase(databaseUrl)} (checked when a run starts)`);
     // Without waiting for it: a database that is not there must not hold up the start, and the pre-flight says so again.
     void checkDatabase(databaseUrl).then((check) =>

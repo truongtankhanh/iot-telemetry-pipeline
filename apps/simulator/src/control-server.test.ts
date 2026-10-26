@@ -12,6 +12,7 @@ import { IngestPoller } from './ingest-poller.ts';
 import { ObservationStore } from './observation-store.ts';
 import { ScenarioLibrary } from './scenario-library.ts';
 import { DEVICES, FakeBenchChild, FakeIngest, setupEngine, T0 } from './test-support.ts';
+import { twinLayoutUnavailable } from './twin-layout.ts';
 
 /** The tests here talk to a real server on a loopback port the system picks (port 0). */
 
@@ -1253,5 +1254,30 @@ describe('ControlServer and the benchmark', () => {
     children[0]?.done('stopped');
     children[0]?.exit('exited with code 0');
     await closing;
+  });
+});
+
+describe('ControlServer and the twin layout', () => {
+  it('says it is not available when the server was built without one, with every device unplaced', async () => {
+    const { port } = await startServer();
+    const reply = await get(port, '/api/twin-layout');
+    assert.equal(reply.status, 200);
+    assert.match(reply.headers['content-type'] ?? '', /application\/json/);
+    const body = reply.json();
+    assert.equal(body.available, false);
+    assert.equal(body.reason, 'no twin layout was given');
+    assert.equal(body.layout, null);
+    assert.deepEqual(
+      ((body.placement as Json).unplaced as { id: string }[]).map((u) => u.id),
+      DEVICES.map((d) => d.id),
+    );
+    // Not in the state: the twin page asks for it, the other pages do not carry it.
+    assert.equal('twinLayout' in (await get(port, '/api/state')).json(), false);
+  });
+
+  it('answers the layout it was given', async () => {
+    const twinLayout = twinLayoutUnavailable('cannot read /x (ENOENT)', DEVICES);
+    const { port } = await startServer({ twinLayout });
+    assert.deepEqual((await get(port, '/api/twin-layout')).json(), twinLayout);
   });
 });
