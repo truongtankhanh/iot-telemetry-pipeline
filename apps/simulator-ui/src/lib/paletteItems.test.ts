@@ -28,7 +28,7 @@ describe('buildPaletteItems', () => {
     expect(pages.find((p) => p.target === '/fleet')?.detail).toMatch(
       /^Every device, its live values/,
     );
-    expect(pages.find((p) => p.target === '/twin')?.detail).toBe('Not built yet · SIM-18');
+    expect(pages.find((p) => p.target === '/analytics')?.detail).toBe('Not built yet · SIM-15');
     expect(pages.find((p) => p.target === '/lab/faults')?.label).toBe('Lab · Faults');
   });
 

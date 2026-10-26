@@ -1,0 +1,73 @@
+{
+  "available": true,
+  "reason": null,
+  "layout": {
+    "source": {
+      "repository": "ops-command-center",
+      "commit": "4b4fe02cd3a85698d462521fe1404a31ec5b3680",
+      "files": ["apps/api/src/database/seed/campus.ts", "apps/api/src/database/seed/assets.ts"],
+      "checkedOn": "2026-10-26"
+    },
+    "siteCenter": [108.4415, 11.953],
+    "boundary": { "west": -282, "east": 228, "south": -277, "north": 247, "radius": 18 },
+    "zones": [
+      {
+        "code": "BLD-LIB",
+        "name": "Library",
+        "kind": "building",
+        "use": "library",
+        "heightM": 18,
+        "at": [40, 120],
+        "size": [70, 50]
+      },
+      {
+        "code": "BLD-DC",
+        "name": "Data Center",
+        "kind": "building",
+        "use": "data_center",
+        "heightM": 14,
+        "at": [175, 40],
+        "size": [60, 46]
+      },
+      {
+        "code": "OUT-LAWN",
+        "name": "Central Lawn",
+        "kind": "outdoor",
+        "at": [20, 0],
+        "size": [110, 70]
+      }
+    ],
+    "devices": [
+      {
+        "id": "dc-env-01",
+        "zone": "BLD-DC",
+        "at": [170, 33],
+        "elevationM": 0,
+        "placement": "illustrative"
+      },
+      {
+        "id": "lib-air-01",
+        "zone": "BLD-LIB",
+        "at": [38, 118],
+        "elevationM": 0,
+        "placement": "illustrative"
+      }
+    ],
+    "catalogue": [
+      {
+        "code": "UPS-01",
+        "name": "UPS room",
+        "class": "ups",
+        "zone": "BLD-DC",
+        "at": [164.5, 29.7],
+        "elevationM": 0,
+        "simulated": false
+      }
+    ]
+  },
+  "placement": {
+    "placed": ["dc-env-01", "lib-air-01"],
+    "unplaced": [{ "id": "hub-power-01", "reason": "no position in the layout" }],
+    "orphans": []
+  }
+}

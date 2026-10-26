@@ -138,12 +138,12 @@ describe('navigation', () => {
     renderStudio();
     await userEvent.click(
       within(screen.getByRole('navigation', { name: 'Pages' })).getByRole('link', {
-        name: /Twin/,
+        name: /Analytics/,
       }),
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Twin' })).toBeInTheDocument();
-    expect(screen.getByText('Coming with SIM-18')).toBeInTheDocument();
-    expect(document.title).toBe('Twin · Simulator Studio');
+    expect(screen.getByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
+    expect(screen.getByText('Coming with SIM-15')).toBeInTheDocument();
+    expect(document.title).toBe('Analytics · Simulator Studio');
   });
 
   it('moves focus to the page when the route changes, and marks the current page', async () => {
@@ -153,9 +153,12 @@ describe('navigation', () => {
       'aria-current',
       'page',
     );
-    await userEvent.click(within(nav).getByRole('link', { name: /Twin/ }));
+    await userEvent.click(within(nav).getByRole('link', { name: /Analytics/ }));
     expect(document.getElementById('main')).toHaveFocus();
-    expect(within(nav).getByRole('link', { name: /Twin/ })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('link', { name: /Analytics/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
   it('shows the sub-pages of the Lab only on the Lab, each a link', () => {
@@ -178,8 +181,8 @@ describe('navigation', () => {
   });
 
   it('treats a path under a page that is not built as that page, one under a built page as the page, and an unknown path as not found', async () => {
-    const first = renderStudio({ path: '/twin/7' });
-    expect(screen.getByText('Coming with SIM-18')).toBeInTheDocument();
+    const first = renderStudio({ path: '/analytics/7' });
+    expect(screen.getByText('Coming with SIM-15')).toBeInTheDocument();
     first.unmount();
     const built = renderStudio({ path: '/fleet/dc-env-01' });
     expect(
@@ -274,7 +277,7 @@ describe('the keyboard', () => {
 
 describe('the palette’s actions', () => {
   it('open the Overview with the scenario picked, and run nothing', async () => {
-    renderStudio({ path: '/twin' });
+    renderStudio({ path: '/analytics' });
     await userEvent.keyboard('/');
     await userEvent.keyboard('>run crowded');
     await userEvent.keyboard('{Enter}');
@@ -287,7 +290,7 @@ describe('the palette’s actions', () => {
   });
 
   it('open the Overview with the control focused, after the page has moved focus to itself', async () => {
-    renderStudio({ path: '/twin' });
+    renderStudio({ path: '/analytics' });
     await userEvent.keyboard('/');
     await userEvent.keyboard('>reset');
     await userEvent.keyboard('{Enter}');
@@ -361,7 +364,7 @@ describe('accessibility', () => {
     expect(await axeViolations(overview.container)).toEqual([]);
     overview.unmount();
 
-    const placeholder = renderStudio({ path: '/twin' });
+    const placeholder = renderStudio({ path: '/analytics' });
     expect(await axeViolations(placeholder.container)).toEqual([]);
     placeholder.unmount();
 

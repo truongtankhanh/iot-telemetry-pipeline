@@ -1,0 +1,52 @@
+/* The digital twin page: the stage the 3D scene fills, and the text under it. Tokens only; nothing under 13 px. */
+.stage {
+  position: relative;
+  height: min(70vh, 640px);
+  min-height: 360px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  background: var(--surface-0);
+}
+
+/* The wrapper the scene renders: the canvas fills it, so it has to fill the stage. */
+.scene {
+  width: 100%;
+  height: 100%;
+}
+
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.status {
+  margin: 12px 0 0;
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.source {
+  margin: 4px 0 12px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.notes {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+/* The page's content is a flex column that stretches its children: a button on its own would fill the width. */
+.actions {
+  display: flex;
+}

@@ -26,11 +26,12 @@ describe('appRoutes', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('builds the Overview, the Fleet, the Topology, the Events, the Alerts, the Lab with its scenarios, timeline and faults, the Demo, and Foundations only; every other page names the ticket that builds it', () => {
+  it('builds the Overview, the Fleet, the Topology, the Twin (a spike), the Events, the Alerts, the Lab with its scenarios, timeline and faults, the Demo, and Foundations only; every other page names the ticket that builds it', () => {
     expect(routes.filter((r) => r.built).map((r) => r.path)).toEqual([
       '/',
       '/fleet',
       '/topology',
+      '/twin',
       '/events',
       '/alerts',
       '/lab',

@@ -1,6 +1,6 @@
 # Digital twin control room — research and proposal
 
-Status: **approach approved** (SIM-01, revision 3, 2026-10-19); the SIM-17 spike decides go or no-go. Frames: 14 campus, 15 building, 16 loading and
+Status: **approach approved** (SIM-01, revision 3, 2026-10-19); the SIM-17 spike ended on 2026-10-26 in a **conditional go** (chunk 244,876 bytes of 350,000; frame time still to be measured on the reference laptop: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-the-sim-17-spike-conditional-go)). Frames: 14 campus, 15 building, 16 loading and
 fallback, in [mockups/](mockups/). Decision: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md). This page
 extends the [brief](brief.md), whose revision 2 deferred the 3D view.
 
