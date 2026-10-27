@@ -5,16 +5,19 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import type { TwinLayout, TwinLayoutView } from '../../api/types';
+import { isLit } from '../../lib/twinFlow';
 import { climb, sameSelection, type TwinSelection } from '../../lib/twinQuery';
 import { type CameraNudge, type CameraPreset } from '../../lib/twinCamera';
 import { tooltipOf } from '../../lib/twinPins';
 import { placementSummary, type SceneProblem } from '../../lib/twinStatus';
+import { usePulseBus } from '../../state/pulseContext';
 import { useStudio } from '../../state/studioContext';
-import type { TwinSceneHandle, TwinSceneProps } from '../../twin/TwinScene';
+import type { PulseSource, TwinSceneHandle, TwinSceneProps } from '../../twin/TwinScene';
 import { Banner } from '../../ui/Banner';
 import { Card } from '../../ui/Card';
 import { EventTimeline } from '../overview/EventTimeline';
@@ -24,12 +27,14 @@ import { useSimulationControls } from '../overview/useSimulationControls';
 import styles from './twin.module.css';
 import { TwinControls, type TwinLayers } from './TwinControls';
 import { TwinDevices } from './TwinDevices';
+import { TwinHub } from './TwinHub';
 import { TwinLabels, type TwinLabelsHandle } from './TwinLabels';
 import { TwinLegend } from './TwinLegend';
 import { TwinLoading } from './TwinLoading';
 import { TwinPlan } from './TwinPlan';
 import { TwinSelectionCard } from './TwinSelectionCard';
 import { TwinTooltip } from './TwinTooltip';
+import { useGrantedSlots } from './useGrantedSlots';
 import { useTwinKeys } from './useTwinKeys';
 import { useTwinModel } from './useTwinModel';
 import { useTwinParams } from './useTwinParams';
@@ -76,10 +81,16 @@ export interface TwinCampusProps {
 export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
   const [selection, select] = useTwinParams();
   const model = useTwinModel(view, selection);
+  const bus = usePulseBus();
   const link = useStudio((state) => state.link);
   const lostSince = useStudio((state) => state.lostSince);
   const [hovered, setHovered] = useState<TwinSelection | null>(null);
-  const [layers, setLayers] = useState<TwinLayers>({ devices: true, catalogue: true });
+  const [layers, setLayers] = useState<TwinLayers>({
+    devices: true,
+    dataFlow: true,
+    alerts: true,
+    catalogue: true,
+  });
   const scene = useRef<TwinSceneHandle | null>(null);
   const labels = useRef<TwinLabelsHandle | null>(null);
   const stage = useRef<HTMLDivElement | null>(null);
@@ -103,6 +114,20 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
     (matrix: ArrayLike<number>, size: { width: number; height: number }) =>
       labels.current?.update(matrix, size),
     [],
+  );
+
+  // The animation budget is the screen's (12 pulsing nodes, 24 glowing lines, shared with the 2D edges). The twin asks on
+  // this side of the canvas and hands the scene plain ids: the lit arcs first, in the pins' order, may move dots; a pin
+  // with an open alert may pulse its beacon. What is past a cap keeps its look and stands still.
+  const litArcs = (model?.flow.arcs ?? []).filter((arc) => isLit(arc.look)).map((arc) => arc.id);
+  const grantedArcs = useGrantedSlots('line', layers.dataFlow ? litArcs : []);
+  const alertPins = (model?.pins ?? []).filter((pin) => pin.alert !== null).map((pin) => pin.id);
+  const movingBeacons = useGrantedSlots('node', layers.alerts ? alertPins : []);
+  // What the engine published, for the devices that have a pin: a dot is drawn for each, and for nothing else.
+  const pinIds = (model?.pins ?? []).map((pin) => pin.id).join('\u0000');
+  const pulses = useMemo<PulseSource>(
+    () => (listener) => bus.subscribe(pinIds === '' ? [] : pinIds.split('\u0000'), listener),
+    [bus, pinIds],
   );
 
   const layout = model?.layout ?? null;
@@ -153,6 +178,10 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
                 pins={model.pins}
                 buildingStates={model.buildings}
                 catalogue={model.catalogue.drawn}
+                flow={model.flow}
+                granted={grantedArcs}
+                moving={movingBeacons}
+                pulses={pulses}
                 layers={layers}
                 selection={selection}
                 hovered={hovered}
@@ -164,12 +193,14 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
                 className={styles.scene}
               />
             </Suspense>
-            {layers.devices ? (
+            {layers.devices || layers.dataFlow ? (
               <TwinLabels
                 ref={labels}
-                pins={model.pins}
+                pins={layers.devices ? model.pins : []}
                 selection={selection}
                 hoveredId={hoveredDevice}
+                hub={layers.dataFlow ? model.flow.hub : null}
+                alerts={layers.alerts}
               />
             ) : null}
             <TwinTooltip
@@ -215,6 +246,7 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
         now={model.now}
         onSelect={(id) => select({ type: 'device', id })}
       />
+      <TwinHub hub={model.flow.hub} faultLines={model.faultLines} />
 
       <div className={styles.simRow}>
         <SimulationControls

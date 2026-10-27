@@ -1,22 +1,28 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   CircleGeometry,
   Float32BufferAttribute,
   type Group,
+  type Mesh,
+  type MeshBasicMaterial,
+  RingGeometry,
   Shape,
   ShapeGeometry,
   type Vector2,
   Vector3,
 } from 'three';
 import type { DeviceShape } from '../lib/deviceIdentity';
+import { prefersReducedMotion } from '../lib/reducedMotion';
 import { LENS } from '../lib/twinCamera';
+import { beaconPhase } from '../lib/twinFlow';
 import { PIN_LIFT_M, type TwinPin } from '../lib/twinPins';
 import type { TwinSelection } from '../lib/twinQuery';
 import { CLICK_SLOP_PX } from './Buildings';
-import { pinFills, stateColors, stemColor } from './twinColors';
+import { pinFills, severityColors, stateColors, stemColor } from './twinColors';
 
 /** How wide a pin is on the screen, in pixels, wherever the camera is: a pin is a mark, not a model. */
 const PIN_PX = 16;
@@ -25,6 +31,17 @@ const RING_INNER = 0.76;
 /** The selected pin and the hovered one are drawn a little larger. */
 const SELECTED_SCALE = 1.3;
 const HOVERED_SCALE = 1.15;
+/**
+ * The beacon of an open alert is a ring that grows from `BEACON_FROM` to `BEACON_TO` times the pin's radius while it
+ * fades (frame 14: radius 11 to 26 around a pin of 8). Under reduced motion it is still, at `BEACON_STILL` and a fixed
+ * opacity; a beacon of alerts that were not read just now is dimmed.
+ */
+const BEACON_FROM = 1.4;
+const BEACON_TO = 3.2;
+const BEACON_STILL = 1.8;
+const BEACON_OPACITY = 0.9;
+const BEACON_STILL_OPACITY = 0.75;
+const BEACON_STALE_FACTOR = 0.4;
 
 const roundedRect = (half: number, radius: number): Shape => {
   const shape = new Shape();
@@ -120,7 +137,9 @@ function buildGeometries() {
   const hit = new CircleGeometry(0.8, 16);
   const stem = new BufferGeometry();
   stem.setAttribute('position', new Float32BufferAttribute([0, 0, 0, 0, -PIN_LIFT_M, 0], 3));
-  return { byShape, hit, stem };
+  // The pin's radius is 0.5 head units, so this ring is the pin's own size before the beacon scales it.
+  const beacon = new RingGeometry(0.46, 0.54, 40);
+  return { byShape, hit, stem, beacon };
 }
 
 export interface PinsProps {
@@ -130,6 +149,10 @@ export interface PinsProps {
   /** The device under the pointer, drawn a little larger. */
   hoveredId: string | null;
   visible: boolean;
+  /** The Alerts layer is on: a pin with an open alert carries a beacon in the alert's severity colour. */
+  alerts: boolean;
+  /** The devices whose beacon may move: those that hold a `node` slot of the animation budget (12). The rest are still. */
+  moving: ReadonlySet<string>;
   onHover: (target: TwinSelection) => void;
   onLeave: (target: TwinSelection) => void;
   onSelect: (target: TwinSelection) => void;
@@ -142,12 +165,19 @@ export interface PinsProps {
  * (no depth test), because at campus distance a 16-pixel mark is wider than the height it floats at and a building would
  * cut it. The state is also the ring's dashes and the label's words, never the colour alone. Picking is the pointer
  * events of the scene, on a hit disc larger than the pin. The shared geometries are built once and **disposed** on unmount.
+ *
+ * A pin whose device has an open alert also carries a **beacon** (SIM-19): a ring in the alert's severity colour that
+ * grows and fades once every `BEACON_PERIOD_MS`, behind the pin so the pin stays readable. It is a child of the pin's
+ * billboard head, so it keeps its size on the screen too. The scene asks for the next frame only while a beacon exists,
+ * the tab is shown and the viewer has not asked for less motion; then the ring is still and larger.
  */
 export function Pins({
   pins,
   selectedId,
   hoveredId,
   visible,
+  alerts,
+  moving,
   onHover,
   onLeave,
   onSelect,
@@ -155,6 +185,7 @@ export function Pins({
   const invalidate = useThree((state) => state.invalidate);
   const geometries = useMemo(() => buildGeometries(), []);
   const [heads] = useState(() => new Map<string, Group>());
+  const [beacons] = useState(() => new Map<string, { mesh: Mesh; stale: boolean; id: string }>());
   const scratch = useMemo(() => new Vector3(), []);
 
   useEffect(
@@ -166,10 +197,11 @@ export function Pins({
       }
       geometries.hit.dispose();
       geometries.stem.dispose();
+      geometries.beacon.dispose();
     },
     [geometries],
   );
-  useEffect(() => invalidate(), [pins, selectedId, hoveredId, visible, invalidate]);
+  useEffect(() => invalidate(), [pins, selectedId, hoveredId, visible, alerts, invalidate]);
 
   // Face the camera and keep the size on screen: a world size of `PIN_PX` pixels at the pin's distance.
   const tanHalfFov = Math.tan((LENS.fov * Math.PI) / 360);
@@ -181,6 +213,22 @@ export function Pins({
         head.getWorldPosition(scratch).distanceTo(camera.position) * metresPerPixel * PIN_PX,
       );
     }
+    if (beacons.size === 0) return;
+    const reduced = prefersReducedMotion();
+    const phase = beaconPhase(performance.now());
+    let anyMoves = false;
+    for (const { mesh, stale, id } of beacons.values()) {
+      // A beacon past the animation budget, or under reduced motion, is a still ring: it keeps saying "alert open".
+      const still = reduced || !moving.has(id);
+      anyMoves ||= !still;
+      const material = mesh.material as MeshBasicMaterial;
+      const grow = still ? BEACON_STILL : BEACON_FROM + (BEACON_TO - BEACON_FROM) * phase;
+      const opacity = still ? BEACON_STILL_OPACITY : BEACON_OPACITY * (1 - phase);
+      mesh.scale.setScalar(grow);
+      material.opacity = stale ? opacity * BEACON_STALE_FACTOR : opacity;
+    }
+    // The next frame is asked for only while a beacon moves; a hidden tab draws nothing to move.
+    if (anyMoves && !document.hidden) invalidate();
   });
 
   if (!visible) return null;
@@ -205,6 +253,29 @@ export function Pins({
                 };
               }}
             >
+              {alerts && pin.alert !== null ? (
+                <mesh
+                  geometry={geometries.beacon}
+                  position-z={-0.02}
+                  renderOrder={9}
+                  ref={(mesh) => {
+                    if (mesh === null || pin.alert === null) return;
+                    beacons.set(pin.id, { mesh, stale: pin.alert.stale, id: pin.id });
+                    return () => {
+                      beacons.delete(pin.id);
+                    };
+                  }}
+                >
+                  <meshBasicMaterial
+                    color={severityColors[pin.alert.severity]}
+                    transparent
+                    opacity={BEACON_OPACITY}
+                    blending={AdditiveBlending}
+                    depthTest={false}
+                    depthWrite={false}
+                  />
+                </mesh>
+              ) : null}
               <group scale={selected ? SELECTED_SCALE : pin.id === hoveredId ? HOVERED_SCALE : 1}>
                 <mesh geometry={shape.fill} renderOrder={11}>
                   <meshBasicMaterial

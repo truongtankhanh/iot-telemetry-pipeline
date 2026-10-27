@@ -196,7 +196,8 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     options.history?.record(message);
     options.messages?.record(message);
     // A message that names no device cannot draw a dot on a device's edge.
-    if (typeof message.deviceId === 'string') options.pulses?.emit(message.deviceId, at);
+    if (typeof message.deviceId === 'string')
+      options.pulses?.emit(message.deviceId, at, message.fault);
   });
   source.addEventListener('published', () => rate.record(now()));
   on<SamplingReport>('sampling', (report, at) => {

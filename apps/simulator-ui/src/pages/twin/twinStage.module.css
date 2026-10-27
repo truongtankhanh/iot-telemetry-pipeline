@@ -287,6 +287,71 @@
   border-width: 1.5px;
 }
 
+/* The hub's label: dashed and in the accent colour, because the pipeline is a logical thing and not a place. */
+.hubLabel {
+  border-style: dashed;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
+
+.hubLabel[data-hub-state='down'],
+.hubLabel[data-hub-state='no-link'] {
+  border-color: var(--danger);
+}
+
+.hubLabel[data-hub-state='warn'] {
+  border-color: var(--warning);
+}
+
+.hubLabel[data-hub-state='unknown'] {
+  border-color: var(--text-tertiary);
+}
+
+.labelChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+  max-width: 260px;
+}
+
+/* The alert chip on a label (frame 14): the severity's icon and words, edged in its hue; dim when the alerts were not read just now. */
+.alertChip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  margin-top: 3px;
+  padding: 1px 7px;
+  border: 1px solid var(--text-tertiary);
+  border-radius: var(--radius-1);
+  font-style: normal;
+  font-size: var(--fs-min);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.alertChip[data-severity='critical'] {
+  border-color: var(--sev-critical);
+}
+
+.alertChip[data-severity='high'] {
+  border-color: var(--sev-high);
+}
+
+.alertChip[data-severity='medium'] {
+  border-color: var(--sev-medium);
+}
+
+.alertChip[data-severity='low'] {
+  border-color: var(--sev-low);
+}
+
+.alertChip[data-stale='true'] {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
 .tooltip {
   position: absolute;
   top: 0;
@@ -373,6 +438,24 @@
 /* ---- the key ---- */
 
 /* A catalogue asset: a dashed, dim box, as the scene draws it. */
+.legendBeacon {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--sev-high);
+  border-radius: 50%;
+}
+
+.legendHub {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 16px;
+  height: 8px;
+  border: 1.5px dashed var(--accent);
+  border-radius: 50%;
+}
+
 .legendDashed {
   display: inline-block;
   box-sizing: border-box;

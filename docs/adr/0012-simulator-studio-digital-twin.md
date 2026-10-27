@@ -4,6 +4,7 @@
 - **Date:** 2026-10-19
 - **Amended 2026-10-26:** the SIM-17 spike ended in a **conditional go** (see [the amendment](#amendment-2026-10-26-the-sim-17-spike-conditional-go)).
 - **Amended 2026-10-26 (SIM-18):** the campus scene is built on that go, which stays **conditional** (see [the second amendment](#amendment-2026-10-26-sim-18-the-campus-scene)).
+- **Amended 2026-10-26 (SIM-19):** the data flow, the alert beacons and the fault visuals are built; the condition stays (see [the third amendment](#amendment-2026-10-26-sim-19-data-flow-beacons-and-fault-visuals)).
 
 ## Context
 
@@ -252,3 +253,71 @@ What the same run saw:
 - The scene chunk holds pins, markers and the camera's flights on top of the spike's code; the page chunk holds the plan, the labels, the tooltip, the controls and the text table.
 - CI builds Studio one more time (with a manifest, into a folder of its own).
 - The link-state pill is written a fourth time (the Topology, the Overview, the Lab and now the Twin); an extraction would touch three other pages and was left.
+
+## Amendment, 2026-10-26: SIM-19, data flow, beacons and fault visuals
+
+SIM-19 puts motion and consequence on the SIM-18 scene. The **conditions of the go stand unchanged**: the frame time on the command center's reference laptop is not measured, and SIM-19 is the first change that makes the scene
+animate, so the figure taken at SIM-18 (an idle scene) no longer describes it. **This section records what was built and decided; it gives no figure that was not measured, and nothing in it has yet been seen running.**
+The chunk size with SIM-19's additions is **measured** (below); the frame time with a scenario running and the hand checks are **not recorded** and are owed (see [Still owed](#still-owed-sim-19)).
+
+### What SIM-19 built
+
+- **The Pipeline hub and the arcs.** A dashed, floating ring over the middle of the site boundary, 80 m up, with a dashed stem to a small ring on the ground, in the accent colour: the hub stands for the broker and ingest, a
+  logical object with no place on the campus, and the layout has no position for it (the height and the centre are constants of `lib/twinFlow.ts`). One arc leaves each pin for the hub. A lit arc (a device running or in
+  anomaly) is a soft additive halo under a core, cyan for `flowing` and amber for `warn`; one that carries nothing is a dashed wire, grey for a device that does not report and red for a hub that is down or a cut link
+  (`bad`). The words are Topology's. An arc is a **ribbon** that faces the camera and keeps its width in pixels (`lib/twinRibbon.ts`): no bloom pass and no SVG filter, as the design page decided.
+- **Dots.** A dot travels an arc each time the simulator published for that device (the pulse bus), at most 4 alive on an arc and 24 on the screen, none under `prefers-reduced-motion`, while the tab is hidden, or on an
+  arc that is not lit. A message the simulator tagged `duplicate` is a `published` event of its own, so its copy starts 150 ms after the first and the two read as a pair. A delay makes a dot take 1,400 ms plus the
+  configured delay, up to 5 s. A burst has no special case: its messages meet the two caps and the rest are dropped.
+- **Beacons.** While an alert is open on a device, its pin carries a ring in the **alert's severity colour** (`--sev-*`, never `--warning`) that grows and fades every 1.6 s, and its label carries the chip (`High · #7`; the
+  number is the alert's id as the Alerts page writes it). A device with several open alerts shows the worst, newest among equals, and the text says "+n more". Alerts that were not read just now dim the beacon and say so.
+- **Fault visuals, each from the engine's own state** (`faults` of the state view; nothing has a clock of its own): drop makes gaps in the arc and shows `dropped N` at the hub (the engine's count); delay makes dots slower
+  and shows `lag 800 ± 100 ms · 3 held`; duplicate shows `readings N`, the figure that does not move; malformed puts a small cross at the hub and `rejected: json, shape`; a burst shows `burst`; link loss turns every arc red
+  and dashed, starts no dot and shows `no link`; silent is the device's own stale look with the age of its last value on the label. Switch a fault off and the next state view draws nothing for it. A fault whose scope is
+  _selected_ acts on those devices' arcs only; a cut link reaches all.
+- **Layers.** _Data flow_ and _Alerts_ join _Devices_ and _Catalogue_ (frame 14); Heat is SIM-20. The key gains the red cross, the beacon and the logical hub.
+- **Text twin.** A visually hidden block after the device list says what the hub is, how it stands, each chip and each fault that is on; the list and the card say the open alert in words.
+
+### Decisions taken (Sếp, "accept all", 2026-10-26)
+
+1. **An open alert is amber** (Q1): a healthy pin with an open alert has the anomaly _look_ (ring, rim, arc) because the alert outlives the breach, while the **word** stays Fleet's (`Running`). The twin therefore differs from
+   Topology's colour for that device in that window, on purpose.
+2. **The hub's place** (Q2) is a constant derived from the boundary, not a field of `twin-layout.json`: no data and no simulator change.
+3. **One alert per pin** (Q3), the worst; **the engine's own counts** for the hub's chips (Q4), not ingest's gaps, which trail the cause by its grace period; **the pulse bus carries the message's `fault`** (Q5) as an optional third
+   argument, which Topology's edges never see; **reorder has no picture** (Q6), a line of text.
+4. **Malformed comes from the state, not the message** (P1): the cross and the reasons are on while the fault is, and gone one update after it is off; a cross that flashed per message would be a loop of the UI's own.
+5. **Arcs keep their glow and move only dots** (a deviation from the plan, recorded in `docs/plan/SIM-19-implementation.md`): a marching pulse on every lit arc would keep the scene drawing 60 frames a second whenever a
+   device runs, ending the idle that SIM-18 measured. The animation budget (24 lines, 12 nodes, shared with the 2D edges) decides which arcs move dots and which beacons pulse; what is past a cap stands still. The scene asks for
+   a frame only while a dot or a moving beacon is alive.
+
+### Where it differs from the design page, and why
+
+- The arcs are cyan for a healthy device, as on frame 14 and on Topology; the design page's table says "indigo", but indigo is the accent colour ("you can act on this"), not energy.
+- No arc marches continuously (decision 5); the movement on an arc is its dots.
+- The malformed cross shows while the fault is on, not once per rejected message (decision 4).
+- With the six placed devices the screen cap of 24 dots cannot be reached (6 arcs × 4): it is built and unit-tested as the brief says, and **was not observed**.
+
+### Measured: the chunk with SIM-19's additions
+
+On 2026-10-27, by Sếp, with `pnpm --filter @itp/simulator-ui build` and then `pnpm --filter @itp/simulator-ui budget`, on the working tree of the branch `feat/sim-19-twin-data-flow` (the changes were not committed; there is no commit
+hash; the machine is not recorded, and chunk sizes do not depend on it). The scene chunk `assets/TwinScene-C4J9AxVx.js` is 949,612 bytes raw and **249,433 bytes gzipped (level 9)**, the only file counted, with a margin of
+**100,567 bytes** under 350,000. SIM-18's was 246,489: SIM-19's hub, arcs, dots and beacon added **2,944 bytes (1.2 %)**. The script's laziness check passed (requested only by the twin page). The page chunk and the entry bundle
+were not listed in the output given, so their sizes are not recorded.
+
+On the same day Studio's unit tests were run by Sếp: 147 files, 2,559 tests, all passing, including the cases of `Twin.test.tsx` written for this ticket. That says nothing about the parts that draw (`Arcs`, `Hub`, `Dots`, the
+beacon in `Pins`), which jsdom cannot run.
+
+### Still owed (SIM-19)
+
+- The frame time on the reference laptop, **with `server-room-overheat` playing** and dots moving (p95 over 20 s at 1920 × 1080; over 14 ms means option D), in a new dated section.
+- The hand checks of the ticket's list, none done: the overheat run (pin and rim amber, then the beacon with the alert, both gone with it), each fault on and off, a cut link, ingest stopped, a selected scope, reduced motion
+  (no dots, a still beacon), the layers off, a hidden tab, and the hidden text read with a screen reader.
+- The unit tests of the pure files (`twinAlerts`, `twinFaults`, `twinFlow`, `twinDots`, `twinRibbon`, `twinPins`, the pulse bus's third argument, `useGrantedSlots`, `useTwinModel`) are written by the `steel-unit-react-*`
+  suite after this change; the page's tests are in `Twin.test.tsx`. The parts that draw (`Arcs`, `Hub`, `Dots`, the beacon in `Pins`) cannot be tested in jsdom.
+
+### Consequences
+
+- The scene chunk holds arcs, a hub, a pool of dots and a beacon on top of SIM-18's (249,433 bytes gzipped in all); the page chunk holds the hub label, the alert chip and the text twin (its size is not recorded).
+- The pulse bus has a third, optional argument; a plain message still calls its listeners with two.
+- Two screens now spend the same animation budget (Topology's edges and the twin's arcs); only one is on screen at a time.
+- `lib/reducedMotion.ts` is a third copy of the one-line media query (`CameraRig` and `useEdgeDots` carry the others); an extraction was left.

@@ -1,4 +1,6 @@
+import type { Severity } from '../api/types';
 import type { TopologyState } from '../lib/topologyState';
+import type { ArcLook } from '../lib/twinFlow';
 
 /**
  * The scene's colours, as numbers a WebGL material takes (a shader cannot read a CSS variable, and the spike draws
@@ -63,3 +65,34 @@ export function buildingTop(state: TopologyState | null): number {
 export function rimColor(state: TopologyState | null): number {
   return state === null ? twinColors.edge : stateColors[state];
 }
+
+/**
+ * The beacon of an open alert, by the alert's severity: `--sev-critical`, `--sev-high`, `--sev-medium`, `--sev-low`. The
+ * only loud colours in Studio, and they mean severity and nothing else, so a beacon is never `--warning`.
+ */
+export const severityColors: Record<Severity, number> = {
+  critical: 0xff6280,
+  high: 0xff8f3a,
+  medium: 0xffe04d,
+  low: 0x44d2ff,
+};
+
+/**
+ * The arcs of the data flow, by look: `flowing` is `--flow` (electric cyan, energy moving), `warn` `--warning`, `bad`
+ * `--danger`, and `off` the dim neutral of `stateColors.stale`. Topology's edges use the same four hues for the same words.
+ */
+export const arcColors: Record<ArcLook, number> = {
+  flowing: 0x47d7ff,
+  warn: 0xffc23d,
+  off: 0x6b7c87,
+  bad: 0xff6280,
+};
+
+/** The lit core of a dot on a `flowing` and a `warn` arc: `--flow-core` and `--warn-core`. */
+export const dotColors = { flowing: 0xd8f6ff, warn: 0xfff3d6 } as const;
+
+/** The logical hub: `--accent`, the colour of what can be acted on, drawn dashed because the hub is not a place. */
+export const hubColor = 0x959bff;
+
+/** The cross on the hub: red while the pipeline is down (`--danger`), amber for a malformed fault (`--warning`). */
+export const crossColors = { down: 0xff6280, malformed: 0xffc23d } as const;

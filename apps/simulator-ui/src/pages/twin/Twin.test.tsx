@@ -28,8 +28,17 @@ vi.mock('../../lib/webgl', async (importOriginal) => ({
 vi.mock('../../twin/TwinScene', () => {
   sceneLoaded();
   return {
-    TwinScene: ({ layout, pins, onUnavailable }: TwinSceneProps) => (
-      <div data-testid="scene" data-zones={layout.zones.length} data-pins={pins.length}>
+    TwinScene: ({ layout, pins, flow, granted, moving, layers, onUnavailable }: TwinSceneProps) => (
+      <div
+        data-testid="scene"
+        data-zones={layout.zones.length}
+        data-pins={pins.length}
+        data-arcs={flow.arcs.length}
+        data-looks={flow.arcs.map((arc) => `${arc.id}:${arc.look}`).join(',')}
+        data-granted={[...granted].sort().join(',')}
+        data-moving={[...moving].sort().join(',')}
+        data-layers={JSON.stringify(layers)}
+      >
         <button type="button" onClick={() => onUnavailable('context-lost')}>
           Lose the context
         </button>
@@ -175,6 +184,13 @@ describe('the Twin page, where the scene is not requested', () => {
   });
 });
 
+/** The fixture's state with some faults on, the way the simulator reports them (`FaultsSnapshot`). */
+const withFaults = (change: Partial<StateView['engine']['faults']>): StateView => {
+  const view = structuredClone(stateViewFixture);
+  view.engine.faults = { ...view.engine.faults, ...change };
+  return view;
+};
+
 describe('the Twin page, where the scene is requested', () => {
   it('loads the scene with the layout and the placed pins, and states what it draws, where it came from and who is not placed', async () => {
     stubFetch(() => answer(twinLayoutFixture));
@@ -263,5 +279,114 @@ describe('the Twin page, where the scene is requested', () => {
       'href',
       '/topology',
     );
+  });
+});
+
+describe('the Twin page, data flow, beacons and faults (SIM-19)', () => {
+  const pipeline = () => screen.getByRole('region', { name: 'The Pipeline, as text' });
+
+  it('hands the scene an arc for every pin, and the lit ones a slot of the animation budget', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    const scene = await screen.findByTestId('scene');
+    expect(scene).toHaveAttribute('data-arcs', '2');
+    // An open alert is an anomaly to the eye (amber arc), and amber is lit.
+    expect(scene.getAttribute('data-looks')).toContain('dc-env-01:warn');
+    expect(scene.getAttribute('data-granted')).toContain('dc-env-01');
+    // The fixture has one open alert, on dc-env-01: that beacon may move.
+    expect(scene).toHaveAttribute('data-moving', 'dc-env-01');
+  });
+
+  it('says the open alert as text in the list and on the card, with a link to the alerts', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    const table = screen.getByRole('table', { name: /Devices in the twin, as text/ });
+    const row = within(table).getByRole('row', { name: /dc-env-01/ });
+    expect(row).toHaveTextContent('alert #7 high');
+    await userEvent.click(row);
+    expect(screen.getByText('alert #7 high')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open alerts' })).toHaveAttribute('href', '/alerts');
+  });
+
+  it('describes the hub as logical, with no fault on, as text', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    const hub = within(pipeline());
+    expect(hub.getByRole('heading', { level: 3, name: 'Pipeline (logical)' })).toBeInTheDocument();
+    expect(hub.getByText(/not a place on the campus/)).toBeInTheDocument();
+    expect(hub.getByText('No fault is on.')).toBeInTheDocument();
+  });
+
+  it('draws a fault from the engine state and says it as text, and the next state without it says nothing', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin(
+      withFaults({
+        drop: { percent: 10 },
+        delay: { delayMs: 800, jitterMs: 100 },
+        dropped: 4,
+        held: 3,
+      }),
+    );
+    await screen.findByTestId('scene');
+    const hub = within(pipeline());
+    expect(hub.getByText('dropped 4')).toBeInTheDocument();
+    expect(hub.getByText('lag 800 ± 100 ms · 3 held')).toBeInTheDocument();
+    expect(hub.getByText('Drop: 10 % of messages on the running devices')).toBeInTheDocument();
+    expect(
+      hub.getByText('Delay: 800 ms, jitter 100 ms on the running devices; 3 messages held'),
+    ).toBeInTheDocument();
+  });
+
+  it('turns every arc red when the link is cut, and says so, and is not the Studio link', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin(withFaults({ linkLoss: { since: '2026-10-20T09:14:31.000Z', forS: null } }));
+    const scene = await screen.findByTestId('scene');
+    for (const look of (scene.getAttribute('data-looks') ?? '').split(',')) {
+      expect(look.endsWith(':bad')).toBe(true);
+    }
+    expect(within(pipeline()).getByText(/Link: No link/)).toBeInTheDocument();
+    expect(within(pipeline()).getByText('no link')).toBeInTheDocument();
+  });
+
+  it('shows a disconnected broker as the hub being down', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    const view = structuredClone(stateViewFixture);
+    view.broker.connected = false;
+    renderTwin(view);
+    const scene = await screen.findByTestId('scene');
+    expect(scene.getAttribute('data-looks')).toContain('dc-env-01:bad');
+    expect(within(pipeline()).getByText(/Broker: Disconnected/)).toBeInTheDocument();
+  });
+
+  it('has a switch for each layer, and the text stays when the data flow is switched off', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    const scene = await screen.findByTestId('scene');
+    for (const name of ['Devices', 'Data flow', 'Alerts', /^Catalogue/]) {
+      expect(screen.getByRole('switch', { name })).toBeChecked();
+    }
+    await userEvent.click(screen.getByRole('switch', { name: 'Data flow' }));
+    expect(JSON.parse(scene.getAttribute('data-layers') ?? '{}')).toMatchObject({
+      dataFlow: false,
+      alerts: true,
+    });
+    // No arc may move a dot while the layer is off, and the hub is still described.
+    expect(scene).toHaveAttribute('data-granted', '');
+    expect(within(pipeline()).getByText('No fault is on.')).toBeInTheDocument();
+  });
+
+  it('keys the down state and the logical hub in the legend', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    expect(
+      within(screen.getByRole('list', { name: 'States' })).getByText('Down'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Pipeline hub, logical (not a place)')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Open alert: a beacon in the alert's severity colour/),
+    ).toBeInTheDocument();
   });
 });
