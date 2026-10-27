@@ -1,5 +1,6 @@
 import { type Ref, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { chipText } from '../../lib/twinAlerts';
+import { type CatalogueBox, labelAnchor } from '../../lib/twinCatalogue';
 import type { HubModel, Point3 } from '../../lib/twinFlow';
 import { chooseLabels, type TwinPin } from '../../lib/twinPins';
 import type { TwinSelection } from '../../lib/twinQuery';
@@ -11,6 +12,8 @@ import styles from './twinStage.module.css';
 
 /** The key of the hub's label among the pins' ids; a device id never contains `:` (the telemetry contract's `SEGMENT`). */
 const HUB_LABEL_ID = 'hub:pipeline';
+/** A catalogue asset's label is keyed `asset:` and its code, which cannot meet a device id for the same reason. */
+const assetLabelId = (box: Pick<CatalogueBox, 'code'>) => `asset:${box.code}`;
 
 interface LabelEntry {
   id: string;
@@ -32,6 +35,11 @@ export interface TwinLabelsProps {
   hub: HubModel | null;
   /** The Alerts layer is on: a pin with an open alert shows its chip. */
   alerts: boolean;
+  /**
+   * The catalogue boxes of the building in focus that get a label (the code only, in a dashed, dim label): none at campus
+   * level. They are placed after the pins and the hub, so a crowd of them cannot hide a device.
+   */
+  assets?: readonly CatalogueBox[];
   ref?: Ref<TwinLabelsHandle>;
 }
 
@@ -47,14 +55,23 @@ interface View {
  * then the hovered one, then those that need a look — and the rest are in the tooltip and the text list. The Pipeline hub
  * has a label of its own (what it stands for, its state when that is not fine, and a chip for each fault that shows there);
  * it is placed right after the selected pin, so a crowd of pin labels cannot hide it. A pin with an open alert carries the
- * alert's chip (icon, severity and number) on its label. A label that would
+ * alert's chip (icon, severity and number) on its label. With a building in focus its catalogue assets get a dim, dashed label
+ * with the code only, placed after everything else. A label that would
  * cover one already shown (`visibleLabels`) is hidden, so at campus distance a few are named and zooming in names more.
  *
  * A label follows its pin without a React render per frame: the scene calls `update` when the camera moves, and each label's
  * position is written to its element's `transform`. A label whose pin is behind the camera or outside the view is hidden.
  * The labels are `aria-hidden` — the visually hidden device list carries the same words — and let the pointer through.
  */
-export function TwinLabels({ pins, selection, hoveredId, hub, alerts, ref }: TwinLabelsProps) {
+export function TwinLabels({
+  pins,
+  selection,
+  hoveredId,
+  hub,
+  alerts,
+  assets = [],
+  ref,
+}: TwinLabelsProps) {
   const ids = chooseLabels(pins, { selection, hoveredId });
   const shown = ids.flatMap((id) => pins.find((pin) => pin.id === id) ?? []);
   // The placement order is the order of importance: the selected pin, the hub, then the rest (`visibleLabels` hides what
@@ -64,6 +81,7 @@ export function TwinLabels({ pins, selection, hoveredId, hub, alerts, ref }: Twi
     ...shown.filter(isSelected).map(entryOf),
     ...(hub === null ? [] : [{ id: HUB_LABEL_ID, anchor: hub.anchor }]),
     ...shown.filter((pin) => !isSelected(pin)).map(entryOf),
+    ...assets.map((box) => ({ id: assetLabelId(box), anchor: labelAnchor(box) })),
   ];
 
   const [elements] = useState(() => new Map<string, HTMLElement>());
@@ -152,6 +170,15 @@ export function TwinLabels({ pins, selection, hoveredId, hub, alerts, ref }: Twi
           )}
         </div>
       )}
+      {assets.map((box) => (
+        <div
+          key={assetLabelId(box)}
+          className={`${styles.label} ${styles.assetLabel}`}
+          ref={register(assetLabelId(box))}
+        >
+          <b>{box.code}</b>
+        </div>
+      ))}
       {shown.map((pin) => (
         <div
           key={pin.id}

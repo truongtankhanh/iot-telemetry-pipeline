@@ -23,6 +23,9 @@ import type { TwinSelection } from './twinQuery';
 /** How far above its building's roof a pin floats, in metres: a pin must be seen over the roof line, not in it. */
 export const PIN_LIFT_M = 6;
 
+/** How far above the floor a pin floats inside the building in focus, in metres: clear of the floor tint, under the roof line. */
+export const FLOOR_LIFT_M = 3;
+
 /** The most labels drawn at once (the animation budget's node cap, frame 00). The rest are in the tooltip and the list. */
 export const LABEL_CAP = 12;
 
@@ -58,10 +61,20 @@ export interface TwinPin {
   /** The worst alert open on the device (a beacon on the pin, a chip on the label), or `null`. */
   alert: AlertMark | null;
   placement: 'illustrative' | 'surveyed';
-  /** Where the pin floats, in scene metres. */
+  /**
+   * Where the pin floats, in scene metres: over the roof, or, for a device of the building in focus, just above its
+   * floor, where the device stands.
+   */
   anchor: [number, number, number];
-  /** Where its stem meets the roof, in scene metres. */
+  /** Where its stem meets the roof (or, in focus, the floor), in scene metres. */
   stemBase: [number, number, number];
+  /**
+   * Another building is in focus and this device has no open alert: the pin, its stem and its arc are drawn faded and it
+   * gets no label. A device with an open alert is never faded (a beacon does not fade).
+   */
+  faded: boolean;
+  /** The latest `temperature_c`, or `null` when the device has none (no such metric, or no value yet): what the heat floor reads. */
+  temperatureC: number | null;
   readings: TwinReading[];
   /** The second line of the label: the building and the latest value, or the state when there is no value to show. */
   detail: string;
@@ -76,7 +89,12 @@ export interface PinOptions {
   linkLost: boolean;
   /** The open alert of each device that has one (`alertMarks`). */
   alerts: ReadonlyMap<string, AlertMark>;
+  /** The building in focus (`focusedZone`), or `null`/absent for the campus. */
+  focusedZone?: string | null;
 }
+
+/** The metric the heat floor reads. */
+export const TEMPERATURE_METRIC = 'temperature_c';
 
 /** `29.3 °C`, `702 ppm`, or `—` for no value. */
 export function readingText(metric: string, value: number | null): string {
@@ -117,6 +135,7 @@ export function twinPins(
   const zones = new Map(layout.zones.map((zone) => [zone.code, zone]));
   const positions = new Map(layout.devices.map((device) => [device.id, device]));
   const pins: TwinPin[] = [];
+  const focus = options.focusedZone ?? null;
   for (const row of rows) {
     const position = positions.get(row.device.id);
     if (position === undefined) continue;
@@ -124,6 +143,8 @@ export function twinPins(
     const roof = zone?.kind === 'building' ? (zone.heightM ?? DEFAULT_BUILDING_HEIGHT_M) : 0;
     const [east, north] = position.at;
     const alert = options.alerts.get(row.device.id) ?? null;
+    // In focus the device stands where the layout puts it, on the floor of its building; otherwise it is a pin over the roof.
+    const inFocus = focus !== null && position.zone === focus;
     const fleetState: TopologyState = options.linkLost
       ? 'stale'
       : deviceTopologyState(row.status.kind);
@@ -150,8 +171,13 @@ export function twinPins(
       lastSeen: row.lastSeen,
       alert,
       placement: position.placement,
-      anchor: sceneOf(east, north, roof + PIN_LIFT_M),
-      stemBase: sceneOf(east, north, roof),
+      anchor: inFocus
+        ? sceneOf(east, north, position.elevationM + FLOOR_LIFT_M)
+        : sceneOf(east, north, roof + PIN_LIFT_M),
+      stemBase: inFocus ? sceneOf(east, north, position.elevationM) : sceneOf(east, north, roof),
+      faded: focus !== null && !inFocus && alert === null,
+      temperatureC:
+        row.readings.find((reading) => reading.metric === TEMPERATURE_METRIC)?.value ?? null,
       readings: row.readings.map(({ metric, value }) => ({
         metric,
         label: metricLabel(metric),
@@ -190,7 +216,8 @@ export interface LabelChoice {
 
 /**
  * Which pins get a label: at most `cap`, the selected device (or every device of the selected building) first, then the
- * hovered one, then those that need a look, then the rest in the registry's order. Returns ids in that order.
+ * hovered one, then those that need a look, then the rest in the registry's order. Returns ids in that order. A faded
+ * pin (another building is in focus, and it has no open alert) gets none: the rest of the campus is faded, not labelled.
  */
 export function chooseLabels(
   pins: readonly TwinPin[],
@@ -207,7 +234,8 @@ export function chooseLabels(
     return pin.state === 'healthy' ? 3 : 2;
   };
   return pins
-    .map((pin, index) => ({ id: pin.id, rank: rank(pin), index }))
+    .map((pin, index) => ({ pin, id: pin.id, rank: rank(pin), index }))
+    .filter((entry) => !entry.pin.faded)
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .slice(0, Math.max(0, cap))
     .map((entry) => entry.id);

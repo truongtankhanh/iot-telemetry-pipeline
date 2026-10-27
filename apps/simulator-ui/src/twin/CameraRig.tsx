@@ -4,15 +4,14 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { TwinBoundary } from '../api/types';
 import {
   type CameraNudge,
-  type CameraPreset,
+  type CameraTarget,
   type CameraView,
   clampTarget,
   MAX_DISTANCE_M,
   MIN_DISTANCE_M,
-  homeView,
   nudgeView,
   polarLimitsRad,
-  presetView,
+  viewFor,
 } from '../lib/twinCamera';
 import { flightAt } from '../lib/twinFlight';
 
@@ -23,9 +22,9 @@ const prefersReducedMotion = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** What the page can ask of the camera: fly to a preset, or take one step (the buttons and the keys). */
+/** What the page can ask of the camera: fly to a preset or a building, or take one step (the buttons and the keys). */
 export interface CameraRigHandle {
-  fly: (preset: CameraPreset) => void;
+  fly: (target: CameraTarget) => void;
   nudge: (nudge: CameraNudge) => void;
 }
 
@@ -37,6 +36,11 @@ interface Flight {
 
 export interface CameraRigProps {
   boundary: TwinBoundary;
+  /**
+   * Where the camera is at the start, read once when the rig mounts (a later change is ignored: the view is the viewer's
+   * from then on). Absent, it is the home view. A link that opens on a building starts at that building, with no flight.
+   */
+  start?: CameraTarget;
   ref?: Ref<CameraRigHandle>;
 }
 
@@ -44,27 +48,34 @@ export interface CameraRigProps {
  * The camera's controls: three's `OrbitControls` with the design's limits — a damped orbit, zoom to the cursor, pan on the
  * ground, a tilt of 20° to 78° from vertical, a distance of 60 to 900 m, and a target that cannot leave the site boundary
  * plus 40 m (clamped after every update, moving the camera with it so the view keeps its angle). The view starts at the home
- * view and never moves by itself: it moves when the viewer drags, or when the page asks through the handle — a flight to a
- * preset (600 ms, eased, instant under `prefers-reduced-motion`) or one step of a button or a key. A flight ends the moment
+ * view (or at `start`) and never moves by itself: it moves when the viewer drags, or when the page asks through the handle —
+ * a flight to a preset or a building (600 ms, eased, instant under `prefers-reduced-motion`) or one step of a button or a
+ * key. A flight ends the moment
  * the viewer takes hold of the view. The canvas draws on demand, so a change in the view asks for the next frame, and a
  * view that is still coasting or flying keeps asking until it stops. Damping is off under `prefers-reduced-motion`. The
  * controls are created when the rig mounts and disposed when it unmounts.
  */
-export function CameraRig({ boundary, ref }: CameraRigProps) {
+export function CameraRig({ boundary, start, ref }: CameraRigProps) {
   const camera = useThree((state) => state.camera);
   const domElement = useThree((state) => state.gl.domElement);
   const invalidate = useThree((state) => state.invalidate);
   const read = useThree((state) => state.get);
   const controls = useRef<OrbitControls | null>(null);
   const flight = useRef<Flight | null>(null);
+  // Kept from the first render: the effect below must not send the camera back when `start` changes later.
+  const startRef = useRef(start);
 
   useEffect(() => {
     const { size } = read();
-    const home = homeView(boundary, size.width / Math.max(1, size.height));
-    camera.position.set(...home.position);
+    const initial = viewFor(
+      startRef.current ?? 'campus',
+      boundary,
+      size.width / Math.max(1, size.height),
+    );
+    camera.position.set(...initial.position);
 
     const orbit = new OrbitControls(camera, domElement);
-    orbit.target.set(...home.target);
+    orbit.target.set(...initial.target);
     orbit.enableDamping = !prefersReducedMotion();
     orbit.dampingFactor = DAMPING_FACTOR;
     orbit.zoomToCursor = true;
@@ -108,11 +119,11 @@ export function CameraRig({ boundary, ref }: CameraRigProps) {
       invalidate();
     };
     return {
-      fly(preset) {
+      fly(target) {
         const orbit = controls.current;
         if (orbit === null) return;
         const { width, height } = read().size;
-        const to = presetView(preset, boundary, width / Math.max(1, height));
+        const to = viewFor(target, boundary, width / Math.max(1, height));
         // Read when asked, not when the rig was made: the setting can change while the page is open.
         if (prefersReducedMotion()) {
           flight.current = null;

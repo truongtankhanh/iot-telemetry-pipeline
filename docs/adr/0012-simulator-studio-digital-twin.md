@@ -321,3 +321,72 @@ beacon in `Pins`), which jsdom cannot run.
 - The pulse bus has a third, optional argument; a plain message still calls its listeners with two.
 - Two screens now spend the same animation budget (Topology's edges and the twin's arcs); only one is on screen at a time.
 - `lib/reducedMotion.ts` is a third copy of the one-line media query (`CameraRig` and `useEdgeDots` carry the others); an extraction was left.
+
+## Amendment, 2026-10-27: SIM-20, building focus and the heat floor
+
+SIM-20 adds the third level of the twin, **the building** (frame 15): see-through walls, the rest of the campus faded, the devices on the floor, the device inspector with the rule thresholds, the building's catalogue assets at their class footprint,
+and a heat floor. The **conditions of the go stand unchanged**: the frame time on the command center's reference laptop is still not measured, and SIM-20 adds a third unmeasured layer (transparent walls and a coloured floor). **This section records what
+was written and decided.** On 2026-10-27 `lint`, `typecheck` and `docs:links` passed and the chunk was measured ([below](#measured-the-chunk-and-the-tests)); Studio's unit tests ran with one failure, which was then fixed, and a second run passed all 2,559; nothing in it has been seen running; see [Still owed](#still-owed-sim-20).
+
+### What SIM-20 built
+
+- **Focus is derived, not stored.** The focused building is the selected building, or the building of the selected device (`focusedZone` in `lib/twinQuery.ts`); the address keeps only `device` and `zone`, so the _Topology | Twin_ switch and a shared link
+  carry it. Choosing a building, or a device of another building, flies the camera to it (600 ms, instant under reduced motion); a device of the building already in focus does not move it. Escape goes device → building (the camera stays) → campus (the camera
+  flies back); Home as before. A page that opens with a building in the address starts at it, with no flight (`CameraRig`'s `start`, read once). The camera control has a third button named after the building, disabled while none is focused.
+- **The scene.** The focused building is taken out of the merged mesh and drawn on its own (`twin/Buildings.tsx`): no roof, a dashed roof outline, walls at one low opacity, and **no pointer**, so the pins and markers inside stay reachable (a pin on the floor is
+  behind the building's own faces for the raycaster). The merged mesh is drawn without it, at the command center's ghost opacity (0.18). Pins of the focused building stand just above its floor on a short stem; the pins and arcs of other buildings are faded unless
+  they carry a beacon (a beacon never fades) and get no label. Catalogue assets are drawn as dashed boxes at the footprint of their class, with their code as a dim label; the other buildings' campus-level assets are drawn dimmer.
+- **The card.** `TwinInspector`: the value of the main metric and where it stands against the rule (`ruleSentence`, `headroom`), the two-minute chart with the rule's lines, the other values, the topic and the position; `TwinBuildingAssets` ("Also in this building",
+  one row per class, with "roof" and "3 m east" derived from the data); `TwinLevel` (breadcrumb, the building's name and state, the key that goes up a level).
+- **The heat floor** (`lib/twinHeat.ts`, `twin/HeatFloor.tsx`, `TwinHeatLegend`). The floor of the focused building is interpolated (inverse-distance weighting, power 2, on squares of about 3 m) between the temperature devices that are reporting, rounded to a tenth of a
+  degree, and coloured on the command center's ramp. With one sensor it is one tint. With none that report it is **hatched**, never tinted, and says "No recent temperature"; with no device that measures temperature at all (the Innovation Hub's power meter) it says
+  "No temperature data". The legend states in every case that the floor is interpolated, not measured. Heat is the floor of the focused building only; at campus level the legend says to focus a building.
+- **Text.** The scene's `aria-label` names the level; `TwinFocusText` (hidden, like the device list) says the level, the devices in the building, the floor's sentence, the sensors behind it and the catalogue groups; the selection card has a "Floor" row.
+
+### Decisions taken (Sếp, "accept all", 2026-10-27)
+
+1. **Ramp and scale** (Q1): the command center's current stops (`#132b50` … `#9bc3ff`) and its fixed 19 – 27 °C scale, clamped (29.3 °C reads at the brightest, with its real number). 2. **Interpolation** (Q2): inverse-distance weighting; the legend's words depend on the number of
+   sensors. 3. **Which devices feed it** (Q3): a numeric `temperature_c` and a device that is reporting (not paused, stopped, silent, or any device while the link is lost). 4. **Heat at campus level** (Q4): none; the floor of the focused building only, on by default and not
+   remembered. 5. **The hatch** (Q5): 45° lines in `#5a7488` at 35 %, as the frame's chart pattern. 6. **Camera** (Q6): as above. 7. **Limits** (Q7): the campus level's (60 – 900 m, tilt 20° – 78°, target inside the boundary plus 40 m); the building view fits the footprint **united with
+   its assets**, since `GEN-01` stands 11 m past the wall. 8. **The rest of the campus** (Q8): ghost opacity, beacons not faded. 9. **Row A and Row B bands** (Q9): not drawn. 10. **Inspector** (Q10): composed from what Fleet and Topology compose; no "3 of 3". 11. **Class
+   footprints** (Q11): a Studio-owned table keyed by class, one row per class in the list.
+
+### Where it differs from frame 15, and why
+
+- **The ramp and the scale.** The frame's `--heat-*` (`#1f2a4d` … `#b7bbff`) and its legend (21 – 30 °C) are the command center's superseded V2 values. The command center's current ramp and its 19 – 27 °C scale (ops-command-center at `0899c86`, `apps/console/src/styles/tokens.css` and
+  `docs/design/v2/asset-classes.md`, "Heat overlay"; **this repository does not check them**) are used, so the same 29.3 °C is the same colour in both twins. The frame is out of date; fixing it is not part of this ticket.
+- **No Row A / Row B bands.** Nothing in `twin-layout.json` or `devices.json` says where a server row stands, and adding it is a layout-schema change. The devices' own names say "row A" and "row B".
+- **No "Inject here" and no "Open in lab"**: SIM-21.
+- **Walls** are at one opacity (the frame's far and near walls differ), because two opacities need the walls re-ordered whenever the camera moves.
+- **Text** is 13 px where the frame has 12 (`scripts/textSize.ts` fails below 13). **Layers** keep _Alerts_ (SIM-19), which the frame predates; the catalogue count is the building's (8) in focus and the campus's (9) at campus level.
+- **The camera control** is the existing set of action buttons with a third one for the building, not the frame's segmented control: SIM-18 decided that no preset is shown as "current", because the viewer can move the camera off one.
+- **"Also in this building"** lists the UPS and its battery as two rows (one per class); the frame merges them into one.
+- The class footprints (`footprint_m`, ops-command-center `docs/design/v2/asset-classes.md` at `0899c86`) are a copy; **this repository does not check them**.
+
+### Measured: the chunk and the tests
+
+On 2026-10-27, by Sếp, with `pnpm --filter @itp/simulator-ui budget`, on the working tree of the branch `feat/sim-20-twin-building` (the changes were not committed; there is no commit hash; the machine is not recorded, and chunk sizes do not depend on it). The scene chunk
+`assets/TwinScene-DtVMLWpM.js` is 953,601 bytes raw and **250,415 bytes gzipped (level 9)**, the only file counted, with a margin of **99,585 bytes** under 350,000. SIM-19's was 249,433: SIM-20's focused building, floor and hatch added **982 bytes (0.4 %)**. The script's laziness check
+passed (requested only by the twin page). The page chunk was not listed in the output given, so its size is not recorded.
+
+On the same day, by Sếp, `pnpm --filter @itp/simulator-ui exec vitest run --maxWorkers=1` (the machine is not recorded) ran 147 files and 2,559 tests (the count SIM-19 ended with: SIM-20 added none): 2,558 passed and **1 failed**, `Twin.test.tsx` "selects a device from the list, and climbs one level at a time on Escape" (it looks for one level-3
+heading with the building's name after Escape; the hidden text twin's heading repeated the card's). The text twin's heading was renamed ("Inside <building>"), and a second run by Sếp the same day (147 files, 2,559 tests, 121 s; the machine is not recorded) passed **all 2,559**. `lint` (ESLint and the 63 contrast pairs), `typecheck` and `docs:links` passed, run from an assistant session on the same working tree; `format:check` failed
+only on a git-excluded working note of the plan. None of this says anything about the parts that draw (`Buildings`, `HeatFloor`, `CatalogueMarkers`, `Pins`, `Arcs`, `CameraRig`), which jsdom cannot run.
+
+### Still owed (SIM-20)
+
+- **Verification:** as of 2026-10-27 `lint`, `typecheck`, `format:check`, `docs:links`, the unit tests and the chunk budget have each passed on this working tree (the runs are above); that says nothing about the new behaviour, which no unit test covers yet. What is owed is below.
+- **Tests.** `Twin.test.tsx` has no case for SIM-20 and there is no fixture with a building that has no temperature device (`BLD-HUB`, `hub-power-01`): the acceptance criterion "No temperature data" is not covered by a test, and the existing cases pass. New tests are wanted for the pure files
+  (`twinQuery` — `focusedZone`, `levelOf`, `climb` —, `twinHeat`, `twinAssetClasses`, `twinCatalogue`, the geometry and camera functions added here, `twinPins`' floor anchors and `faded`), including two drift guards: every class of the real `twin-layout.json` has an entry in
+  `ASSET_CLASSES`, and the six stops in `lib/twinHeat.ts` equal the six `--heat-*` in `tokens.css`.
+- **The hand checks**, none done: focus the Data Center (see-through walls, the rest faded, breadcrumb, the Escape ladder, the camera back on the last Escape); **click a pin inside the building** (hover and select must work through the walls); the legend says
+  "interpolated"; focus `BLD-HUB` (hatched floor, "No temperature data"); a building with one sensor (one tint and the one-sensor sentence); pause a sensor ("No recent temperature"); `GEN-01` in view; reduced motion; the layers off; `?zone=BLD-DC` and `?device=dc-env-01`
+  open focused with no flight; the hidden text read with a screen reader; the layers card and the legend at the stage's minimum height.
+- **The frame time** on the reference laptop (p95 at most 14 ms), still owed from SIM-17 to SIM-19, now with transparent walls and a coloured floor. Option D stays the fallback.
+
+### Consequences
+
+- The scene chunk gains a second mesh for the focused building, a floor and a hatch (250,415 bytes gzipped in all, measured above); the page chunk gains the level header, the inspector, the asset list, the heat legend and the focus text (its size is not recorded).
+- `CameraRigHandle.fly` takes a `CameraTarget` (a preset or one building); `CameraRig` takes an optional `start`. `TwinPin` gains `faded` and `temperatureC`, `TwinArc` gains `dim`, and `TwinLayers` gains `heat`.
+- The ramp exists twice (`tokens.css` for the DOM legend, `lib/twinHeat.ts` as numbers for the scene) and the class footprints once, as copies of the command center's; both drift if the command center changes them, and only the guards above would notice.
+- A click can now move the camera. It is the viewer's own action and the design's "the view never moves by itself" still holds for everything else.

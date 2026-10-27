@@ -1,9 +1,11 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { type Ref, useEffect, useRef } from 'react';
-import type { TwinAsset, TwinLayout } from '../api/types';
+import type { TwinLayout } from '../api/types';
 import type { TopologyState } from '../lib/topologyState';
-import { LENS } from '../lib/twinCamera';
+import { type CameraTarget, LENS } from '../lib/twinCamera';
+import type { CatalogueBox } from '../lib/twinCatalogue';
 import type { TwinFlow } from '../lib/twinFlow';
+import type { HeatModel } from '../lib/twinHeat';
 import type { TwinPin } from '../lib/twinPins';
 import type { SceneProblem } from '../lib/twinStatus';
 import type { TwinSelection } from '../lib/twinQuery';
@@ -14,6 +16,7 @@ import { CameraRig, type CameraRigHandle } from './CameraRig';
 import { CatalogueMarkers } from './CatalogueMarkers';
 import { Dots, type PulseSource } from './Dots';
 import { Ground } from './Ground';
+import { HeatFloor } from './HeatFloor';
 import { Hub } from './Hub';
 import { LabelProjector, type ViewListener } from './LabelProjector';
 import { Pins } from './Pins';
@@ -63,8 +66,15 @@ export interface TwinSceneProps {
   pins: readonly TwinPin[];
   /** The look of each building by its code: the worst of its devices, or `null` for none. */
   buildingStates: Readonly<Record<string, TopologyState | null>>;
-  /** The nine catalogue assets drawn at campus level. */
-  catalogue: readonly TwinAsset[];
+  /**
+   * The catalogue boxes to draw: the nine campus-level assets as cubes, or, with a building in focus, that building's
+   * assets at their class footprint and the other buildings' campus-level ones dimmed.
+   */
+  catalogue: readonly CatalogueBox[];
+  /** The building in focus: seen through, with the rest of the campus faded and its devices on its floor. `null` for the campus. */
+  focusedCode: string | null;
+  /** Where the camera starts (read once): a building when the address opens on one. Absent: the home view. */
+  start?: CameraTarget;
   /** The Pipeline hub and the arc from each pin to it. */
   flow: TwinFlow;
   /** The arcs that hold a `line` slot of the animation budget (taken on the page): only these move dots. */
@@ -73,8 +83,19 @@ export interface TwinSceneProps {
   moving: ReadonlySet<string>;
   /** Listens to the engine's published messages of the placed devices: what draws a dot. */
   pulses: PulseSource;
+  /**
+   * The floor of the building in focus: the squares of its heat (or a hatch), interpolated between the sensors. `null` at
+   * campus level, where no floor is drawn.
+   */
+  heat: HeatModel | null;
   /** Which layers are on. */
-  layers: { devices: boolean; catalogue: boolean; dataFlow: boolean; alerts: boolean };
+  layers: {
+    devices: boolean;
+    catalogue: boolean;
+    dataFlow: boolean;
+    alerts: boolean;
+    heat: boolean;
+  };
   selection: TwinSelection | null;
   /** What the pointer is over, for the cursor and the larger hovered pin. */
   hovered: TwinSelection | null;
@@ -97,12 +118,17 @@ export interface TwinSceneProps {
 }
 
 /**
- * The 3D campus (SIM-18, SIM-19): the ground, the site boundary, the extruded buildings with the look of their worst device,
+ * The 3D campus (SIM-18, SIM-19, SIM-20): the ground, the site boundary, the extruded buildings with the look of their worst device,
  * a pin for each placed device (with a beacon while an alert is open on it), the logical Pipeline hub with an arc from each
  * pin and the dots that travel them, the catalogue markers, orbit controls the page can also drive, and the projection the DOM labels
  * need, on a canvas that draws on demand. This module and its siblings in `src/twin/` are the only code that imports
  * three.js or React Three Fiber, and the page imports it only through a dynamic `import()`, so it is its own chunk and a
  * device without WebGL 2 never downloads it.
+ *
+ * With a building in focus (SIM-20, `focusedCode`) the same scene is drawn one level in: that building is seen through,
+ * its devices stand on its floor and its catalogue assets are boxes at their class footprint, and the rest of the campus
+ * is faded; its floor is the heat (`HeatFloor`). What is faded, where a device stands and the colour of each square of the
+ * floor are decided in `lib/` and arrive as plain data.
  *
  * The scene is a picture with a text alternative: the wrapper is an image, and the page states the same facts as text
  * (the headline, and a visually hidden list of every device). Labels, the tooltip and the controls are DOM and sit
@@ -113,6 +139,9 @@ export function TwinScene({
   pins,
   buildingStates,
   catalogue,
+  focusedCode,
+  start,
+  heat,
   flow,
   granted,
   moving,
@@ -137,13 +166,21 @@ export function TwinScene({
 
   const buildings = layout.zones.filter((zone) => zone.kind === 'building').length;
   const alerting = pins.filter((pin) => pin.alert !== null).length;
+  const focusedName =
+    focusedCode === null
+      ? null
+      : (layout.zones.find((zone) => zone.code === focusedCode)?.name ?? focusedCode);
   return (
     <div
       className={className}
       role="img"
       // The pointer is over something to choose.
       style={hovered === null ? undefined : { cursor: 'pointer' }}
-      aria-label={`The campus in 3D: the site boundary, ${buildings} buildings and ${pins.length} devices${alerting === 0 ? '' : `, ${alerting} with an open alert`}, each joined by an arc to the logical Pipeline hub. Drag to orbit, scroll to zoom, right-drag to pan. The same facts are listed below as text.`}
+      aria-label={
+        focusedName === null
+          ? `The campus in 3D: the site boundary, ${buildings} buildings and ${pins.length} devices${alerting === 0 ? '' : `, ${alerting} with an open alert`}, each joined by an arc to the logical Pipeline hub. Drag to orbit, scroll to zoom, right-drag to pan. The same facts are listed below as text.`
+          : `${focusedName} in 3D with see-through walls: its devices stand on the floor and its catalogue assets are drawn as dashed boxes; the rest of the campus is faded. Drag to orbit, scroll to zoom, right-drag to pan. The same facts are listed below as text.`
+      }
     >
       <Canvas
         frameloop="demand"
@@ -168,14 +205,16 @@ export function TwinScene({
           zones={layout.zones}
           states={buildingStates}
           selectedCode={selection?.type === 'zone' ? selection.id : null}
+          focusedCode={focusedCode}
           onHover={onHover}
           onLeave={onLeave}
           onSelect={onSelect}
         />
-        <CatalogueMarkers assets={catalogue} visible={layers.catalogue} />
+        <HeatFloor heat={heat} visible={layers.heat} />
+        <CatalogueMarkers boxes={catalogue} visible={layers.catalogue} />
         {/* The rig before the pins and the projector: frame callbacks run in the order they were registered, and the
             rig is what moves the camera that they read. */}
-        <CameraRig boundary={layout.boundary} ref={ref} />
+        <CameraRig boundary={layout.boundary} start={start} ref={ref} />
         <Arcs arcs={flow.arcs} visible={layers.dataFlow} />
         <Hub hub={flow.hub} visible={layers.dataFlow} />
         <Dots arcs={flow.arcs} granted={granted} pulses={pulses} visible={layers.dataFlow} />

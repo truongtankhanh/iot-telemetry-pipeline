@@ -54,6 +54,30 @@ export const stemColor = 0x91a5b4;
 /** A catalogue marker: frame 14's `#8aa0af`, dimmed by the material's opacity. */
 export const markerColor = 0x8aa0af;
 
+/**
+ * The rest of the campus while one building is in focus: the command center's `--tw-ghost-opacity` (0.18). Frame 14's
+ * `.is-ghost` says 0.22; the command center's wins, as for the neutral material. Applies to the other buildings, their
+ * pins, stems and arcs and the other catalogue markers; a beacon never fades.
+ */
+export const ghostOpacity = 0.18;
+
+/**
+ * The hatch of a floor that has no temperature to show (a building with no temperature device, or none reporting): frame 15's
+ * `hatchm` pattern, 45° lines in `#5a7488` at 35 %. A shape, not a colour: it says "nothing measured" where a tint would
+ * say "cold". The ramp itself is in `lib/twinHeat.ts` (the cells arrive coloured).
+ */
+export const heatHatch = { color: 0x5a7488, opacity: 0.35 } as const;
+
+/**
+ * The building in focus (frame 15). Its walls are see-through at one opacity (the frame's far walls are 0.30 and its near
+ * walls 0.10, which would need the walls re-ordered whenever the camera moves; one value in between needs nothing), its
+ * roof is not drawn, and the floor is an opaque base under the heat: frame 15's floor `#0f2230`.
+ */
+export const focusColors = {
+  wallOpacity: 0.16,
+  floor: 0x0f2230,
+} as const;
+
 /** The top colour of a building by its worst device: the neutral top for none or healthy, a tint otherwise. */
 export function buildingTop(state: TopologyState | null): number {
   if (state === 'anomaly' || state === 'down') return buildingTints.warnTop;

@@ -1,6 +1,6 @@
 # Digital twin control room — research and proposal
 
-Status: **approach approved** (SIM-01, revision 3, 2026-10-19); the SIM-17 spike ended on 2026-10-26 in a **conditional go** (chunk 244,876 bytes of 350,000; frame time still to be measured on the reference laptop: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-the-sim-17-spike-conditional-go)). SIM-18 built the campus scene the same day ([ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-sim-18-the-campus-scene): built and unit-tested; the scene chunk is 246,489 bytes of 350,000; the frame time is 60 fps with no late frame on an M3 Pro but not yet measured on the reference laptop). SIM-19 built the data flow, the alert beacons and the fault visuals (the scene chunk is 249,433 bytes of 350,000; Studio's unit tests pass; not yet observed running, and the frame time with a scenario playing is not measured: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-sim-19-data-flow-beacons-and-fault-visuals)).
+Status: **approach approved** (SIM-01, revision 3, 2026-10-19); the SIM-17 spike ended on 2026-10-26 in a **conditional go** (chunk 244,876 bytes of 350,000; frame time still to be measured on the reference laptop: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-the-sim-17-spike-conditional-go)). SIM-18 built the campus scene the same day ([ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-sim-18-the-campus-scene): built and unit-tested; the scene chunk is 246,489 bytes of 350,000; the frame time is 60 fps with no late frame on an M3 Pro but not yet measured on the reference laptop). SIM-19 built the data flow, the alert beacons and the fault visuals (the scene chunk is 249,433 bytes of 350,000; Studio's unit tests pass; not yet observed running, and the frame time with a scenario playing is not measured: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-26-sim-19-data-flow-beacons-and-fault-visuals)). SIM-20 added the building focus and the heat floor on 2026-10-27 ([ADR-0012](../../adr/0012-simulator-studio-digital-twin.md#amendment-2026-10-27-sim-20-building-focus-and-the-heat-floor): written and decided; the scene chunk is 250,415 bytes of 350,000; lint, typecheck and Studio's unit tests (2,559) pass; not yet seen running).
 Frames: 14 campus, 15 building, 16 loading and
 fallback, in [mockups/](mockups/). Decision: [ADR-0012](../../adr/0012-simulator-studio-digital-twin.md). This page
 extends the [brief](brief.md), whose revision 2 deferred the 3D view.
@@ -121,7 +121,7 @@ Overview and the Lab canvas. It shows the campus in 3D with:
 ### Layers and states
 
 Layers: **Devices**, **Data flow**, **Alerts**, **Catalogue** (the command center's assets, dim and dashed, not simulated), **Heat**, and labels. Heat uses the command center's sequential ramp in
-one hue, never red or orange.
+one hue, never red or orange (SIM-20: the ramp is `#132b50` … `#9bc3ff` on a fixed 19 – 27 °C scale, clamped, as the command center's current tokens and heat overlay have it; this repository does not check them; Heat is the floor of the focused building only).
 
 | Device state          | Pin                                                       | Arc                    | Building rim (worst device wins)           |
 | --------------------- | --------------------------------------------------------- | ---------------------- | ------------------------------------------ |
@@ -152,7 +152,7 @@ the malformed cross is on while the fault is on; a duplicate's pair is the secon
 
 - **Camera:** damped orbit, zoom to the cursor, pan; tilt between 20° and 78° from vertical; the target stays inside
   the boundary plus 40 m. Presets _Campus_, _Building_, _Top_ fly in 600 ms, instantly under reduced motion (SIM-18 builds _Campus_ and
-  _Top_, which is 20° from vertical, the steepest the tilt limit allows; _Building_ arrives with SIM-20). The view
+  _Top_, which is 20° from vertical, the steepest the tilt limit allows; _Building_ arrives with SIM-20, as the view of the focused building: its footprint united with its assets, the same limits). The view
   never moves by itself, except where a guided-demo step says to.
 - **Hover** shows a tooltip after 150 ms. **Click** a building to focus it, a pin to inspect the device. **Escape**
   climbs one level (device, building, campus) and never leaves the twin; **Home** returns to the campus. The selection is
@@ -222,7 +222,8 @@ supplies them ([V2-T01](../../tasks/v2/V2-T01-asset-catalogue-sync.md)):
   twin falls back to Topology. See the [simulator README](../../../apps/simulator/README.md#configuration).
 - `devices[].placement` is `illustrative` (placed by hand inside the zone) or `surveyed`. The inspector says which. The
   frames' Row A and Row B are `illustrative`: nothing in the data says where a server row stands.
-- The heat floor is interpolated between sensors and labelled so. It is a drawing aid, not a measurement.
+- The heat floor is interpolated between sensors and labelled so. It is a drawing aid, not a measurement. SIM-20 builds it: inverse-distance weighting (power 2) over the devices of the building that have a `temperature_c` and are reporting, squares of about 3 m, rounded to a tenth of a
+  degree; one sensor gives one tint; none that report gives a **hatch** and "No recent temperature"; no device that measures it gives a hatch and "No temperature data". The legend says "interpolated" in every case (`lib/twinHeat.ts`).
 
 ### Performance and tests
 

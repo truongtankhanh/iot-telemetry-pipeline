@@ -10,9 +10,11 @@ import {
   useState,
 } from 'react';
 import type { TwinLayout, TwinLayoutView } from '../../api/types';
+import type { CatalogueBox } from '../../lib/twinCatalogue';
 import { isLit } from '../../lib/twinFlow';
-import { climb, sameSelection, type TwinSelection } from '../../lib/twinQuery';
-import { type CameraNudge, type CameraPreset } from '../../lib/twinCamera';
+import { buildingBounds } from '../../lib/twinGeometry';
+import { climb, focusedZone, sameSelection, type TwinSelection } from '../../lib/twinQuery';
+import { type CameraNudge, type CameraTarget } from '../../lib/twinCamera';
 import { tooltipOf } from '../../lib/twinPins';
 import { placementSummary, type SceneProblem } from '../../lib/twinStatus';
 import { usePulseBus } from '../../state/pulseContext';
@@ -25,11 +27,15 @@ import { SimulationControls } from '../overview/SimulationControls';
 import { useOverviewParams } from '../overview/useOverviewParams';
 import { useSimulationControls } from '../overview/useSimulationControls';
 import styles from './twin.module.css';
-import { TwinControls, type TwinLayers } from './TwinControls';
+import { type CameraButton, TwinControls, type TwinLayers } from './TwinControls';
+import { TwinBuildingAssets } from './TwinBuildingAssets';
 import { TwinDevices } from './TwinDevices';
+import { TwinFocusText } from './TwinFocusText';
 import { TwinHub } from './TwinHub';
+import { TwinHeatLegend } from './TwinHeatLegend';
 import { TwinLabels, type TwinLabelsHandle } from './TwinLabels';
 import { TwinLegend } from './TwinLegend';
+import { TwinLevel } from './TwinLevel';
 import { TwinLoading } from './TwinLoading';
 import { TwinPlan } from './TwinPlan';
 import { TwinSelectionCard } from './TwinSelectionCard';
@@ -64,6 +70,9 @@ function sourceLine(layout: TwinLayout): string {
   return `Zones, boundary and catalogue are a copy of ${repository} at ${commit.slice(0, 7)}, compared on ${checkedOn}; this repository does not check them. Device positions are placed by hand.`;
 }
 
+/** The same empty list every render while no building is in focus, so the labels are not handed a new array for nothing. */
+const NO_BOXES: readonly CatalogueBox[] = [];
+
 export interface TwinCampusProps {
   /** The simulator's layout, available (the page has checked). */
   view: TwinLayoutView;
@@ -77,6 +86,12 @@ export interface TwinCampusProps {
  * the event timeline of the Overview, so the twin can be driven alone. The selection is in the address (`device`, `zone`);
  * what the pointer is over, the layers and the camera are this page's. Escape climbs one level, Home returns to the
  * campus. Everything it shows of a device comes from Fleet's own rows.
+ *
+ * One level in (SIM-20, frame 15): the building the selection names (a selected building, or the building of a selected
+ * device) is the **focus**, derived from the address and never stored. Choosing a building, or a device of another one,
+ * flies the camera to it (the viewer's own action); Escape from a device goes to its building and the camera stays, Escape
+ * from a building goes to the campus and the camera flies back, so the level and the view cannot disagree. A page that
+ * opens with a building in the address starts at it, with no flight.
  */
 export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
   const [selection, select] = useTwinParams();
@@ -89,11 +104,21 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
     devices: true,
     dataFlow: true,
     alerts: true,
+    heat: true,
     catalogue: true,
   });
   const scene = useRef<TwinSceneHandle | null>(null);
   const labels = useRef<TwinLabelsHandle | null>(null);
   const stage = useRef<HTMLDivElement | null>(null);
+
+  // Where the camera starts: the building the address already names, decided once, when the first state view has come and
+  // the scene is about to be made. (Adjusting state while rendering, the way React documents it for a value derived once.)
+  const [start, setStart] = useState<CameraTarget | undefined>(undefined);
+  const [startDecided, setStartDecided] = useState(false);
+  if (model !== null && !startDecided) {
+    setStartDecided(true);
+    if (model.focus !== null) setStart({ building: model.focus.bounds });
+  }
 
   const controls = useSimulationControls();
   const [overview, updateOverview] = useOverviewParams();
@@ -131,17 +156,53 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
   );
 
   const layout = model?.layout ?? null;
+  const focus = model?.focus ?? null;
+  const focusCode = focus?.code ?? null;
+  const focusBounds = focus?.bounds ?? null;
+
+  // The catalogue boxes that belong to this level (the other buildings' are drawn dimmer and not labelled): their count is
+  // the layer's, and in a focused building they are labelled.
+  const boxes = model?.catalogue.boxes;
+  const ownBoxes = useMemo(() => (boxes ?? []).filter((box) => !box.faded), [boxes]);
+  const assetLabels = focusCode !== null && layers.catalogue ? ownBoxes : NO_BOXES;
+
+  // Choosing something: a building, or a device of another building, takes the camera there; a device of the building in
+  // focus does not move it.
+  const choose = useCallback(
+    (target: TwinSelection) => {
+      select(target);
+      if (layout === null) return;
+      const code = focusedZone(target, layout);
+      if (code === null || code === focusCode) return;
+      const bounds = buildingBounds(layout, code);
+      if (bounds !== null) scene.current?.fly({ building: bounds });
+    },
+    [select, layout, focusCode],
+  );
+  // One step up. A device climbs to its building with the camera where it is; a building climbs to the campus and the camera
+  // flies back to it.
   const escape = useCallback(() => {
     if (selection === null) return false;
-    select(layout === null ? null : climb(selection, layout));
+    const next = layout === null ? null : climb(selection, layout);
+    select(next);
+    if (next === null && focusCode !== null) scene.current?.fly('campus');
     return true;
-  }, [selection, layout, select]);
+  }, [selection, layout, select, focusCode]);
   const home = useCallback(() => {
     scene.current?.fly('campus');
     select(null);
   }, [select]);
+  const toBuilding = useCallback(() => {
+    if (focusCode !== null) select({ type: 'zone', id: focusCode });
+  }, [select, focusCode]);
   const nudge = useCallback((step: CameraNudge) => scene.current?.nudge(step), []);
-  const preset = useCallback((target: CameraPreset) => scene.current?.fly(target), []);
+  const preset = useCallback(
+    (target: CameraButton) => {
+      if (target !== 'building') scene.current?.fly(target);
+      else if (focusBounds !== null) scene.current?.fly({ building: focusBounds });
+    },
+    [focusBounds],
+  );
   useTwinKeys(stage, { escape, home, nudge });
 
   if (model === null) {
@@ -155,14 +216,21 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
 
   return (
     <div data-stale={model.stale ? 'true' : undefined}>
+      <TwinLevel
+        level={model.level}
+        focus={focus}
+        state={focus === null ? null : (model.buildings[focus.code] ?? null)}
+        onCampus={home}
+        onBuilding={toBuilding}
+      />
       <div className={styles.campus}>
-        <Card title="Campus">
+        <Card title={focus === null ? 'Campus' : `${focus.zone.name} interior`}>
           <div
             ref={stage}
             className={styles.stage}
             tabIndex={0}
             role="group"
-            aria-label="Campus view. With focus here, the arrow keys pan and plus and minus zoom; Escape goes up one level and Home returns to the campus."
+            aria-label={`${focus === null ? 'Campus view' : `${focus.zone.name} view`}. With focus here, the arrow keys pan and plus and minus zoom; Escape goes up one level and Home returns to the campus.`}
           >
             <Suspense
               fallback={
@@ -177,7 +245,10 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
                 layout={model.layout}
                 pins={model.pins}
                 buildingStates={model.buildings}
-                catalogue={model.catalogue.drawn}
+                catalogue={model.catalogue.boxes}
+                focusedCode={focusCode}
+                start={start}
+                heat={model.heat}
                 flow={model.flow}
                 granted={grantedArcs}
                 moving={movingBeacons}
@@ -187,7 +258,7 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
                 hovered={hovered}
                 onHover={onHover}
                 onLeave={onLeave}
-                onSelect={select}
+                onSelect={choose}
                 onView={updateLabels}
                 onUnavailable={onUnavailable}
                 className={styles.scene}
@@ -201,6 +272,7 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
                 hoveredId={hoveredDevice}
                 hub={layers.dataFlow ? model.flow.hub : null}
                 alerts={layers.alerts}
+                assets={assetLabels}
               />
             ) : null}
             <TwinTooltip
@@ -212,11 +284,13 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
               link={link}
               lostSince={lostSince}
               layers={layers}
-              catalogueCount={model.catalogue.drawn.length}
+              catalogueCount={ownBoxes.length}
+              focusedName={focus?.zone.name ?? null}
               onLayers={setLayers}
               onPreset={preset}
               onNudge={nudge}
             />
+            {layers.heat ? <TwinHeatLegend heat={model.heat} /> : null}
           </div>
           <TwinLegend />
           <p className={styles.status}>{summary.headline}</p>
@@ -237,16 +311,20 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
             </Banner>
           ) : null}
         </Card>
-        <TwinSelectionCard selection={selection} model={model} onSelect={select} />
+        <div className={styles.aside}>
+          <TwinSelectionCard selection={selection} model={model} onSelect={choose} />
+          {focus === null ? null : <TwinBuildingAssets focus={focus} />}
+        </div>
       </div>
 
       <TwinDevices
         rows={model.list}
         selectedId={selectedDevice}
         now={model.now}
-        onSelect={(id) => select({ type: 'device', id })}
+        onSelect={(id) => choose({ type: 'device', id })}
       />
       <TwinHub hub={model.flow.hub} faultLines={model.faultLines} />
+      <TwinFocusText level={model.level} focus={focus} model={model} />
 
       <div className={styles.simRow}>
         <SimulationControls
