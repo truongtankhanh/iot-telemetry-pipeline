@@ -3,6 +3,10 @@ import type {
   Anomaly,
   AnomalyAnswer,
   AnomalyRequest,
+  BenchmarkCheck,
+  BenchmarkDetail,
+  BenchmarkPreflightAnswer,
+  BenchmarkStartAnswer,
   BurstAnswer,
   FaultBodies,
   FaultKind,
@@ -670,4 +674,113 @@ export async function getExpected(
     );
   }
   return body as unknown as ExpectationPreview;
+}
+
+// ---- The benchmark (SIM-15) ----
+
+function isBenchmarkCheck(item: unknown): item is BenchmarkCheck {
+  return (
+    isObject(item) &&
+    (item.id === 'ingest' || item.id === 'database' || item.id === 'fleet') &&
+    typeof item.label === 'string' &&
+    typeof item.ok === 'boolean' &&
+    (item.reason === null || typeof item.reason === 'string')
+  );
+}
+
+/** A run with its series: the parts a page cannot draw without. The rest of its fields are the type's. */
+const isRunDetail = (run: unknown): boolean =>
+  isObject(run) &&
+  Number.isInteger(run.id) &&
+  typeof run.phase === 'string' &&
+  isObject(run.settings) &&
+  Array.isArray(run.series);
+
+/**
+ * `GET /api/benchmark`: whether a benchmark can run here, the run going now and the last ten, **with their series**
+ * (the snapshot of the stream has the summary without them). Its body is `{ benchmark }`, not a state view. A body that is
+ * not the documented one fails loudly instead of rendering as "no runs".
+ */
+export async function getBenchmark(options: RequestOptions = {}): Promise<BenchmarkDetail> {
+  const response = await send(
+    '/api/benchmark',
+    { headers: { Accept: 'application/json' } },
+    options,
+  );
+  const body = await readJson(response);
+  const detail = isObject(body) ? body.benchmark : undefined;
+  if (
+    !isObject(detail) ||
+    typeof detail.available !== 'boolean' ||
+    typeof detail.running !== 'boolean' ||
+    typeof detail.maxMessages !== 'number' ||
+    !(detail.current === null || isRunDetail(detail.current)) ||
+    !Array.isArray(detail.runs) ||
+    !detail.runs.every(isRunDetail)
+  ) {
+    throw new ApiError(
+      response.status,
+      'The simulator answered with a benchmark Studio does not understand',
+    );
+  }
+  return detail as unknown as BenchmarkDetail;
+}
+
+/**
+ * `GET /api/benchmark/preflight`: the three checks that a start needs, read now (the database is asked again when its last
+ * answer is older than two seconds). Empty when the benchmark is not available. The simulator checks again on a start.
+ */
+export async function getBenchmarkPreflight(
+  options: RequestOptions = {},
+): Promise<BenchmarkPreflightAnswer> {
+  const response = await send(
+    '/api/benchmark/preflight',
+    { headers: { Accept: 'application/json' } },
+    options,
+  );
+  const body = await readJson(response);
+  if (!isObject(body) || !Array.isArray(body.checks) || !body.checks.every(isBenchmarkCheck)) {
+    throw new ApiError(
+      response.status,
+      'The simulator answered with checks Studio does not understand',
+    );
+  }
+  return { checks: body.checks };
+}
+
+/**
+ * Starts a benchmark run of `messages` messages. A benchmark saturates the broker and the CPU and writes its readings to the
+ * database, so the simulator wants `confirm: true`; it is set here and only here, and the one caller is the confirmation
+ * dialog's button. Refused with `400` (the field is named), `503` (not available), `409` when a check fails (`checksOf`
+ * has them) or when another run is going. The answer is the run as it begins and the new state.
+ */
+export function startBenchmark(
+  request: { messages: number },
+  options: RequestOptions = {},
+): Promise<BenchmarkStartAnswer> {
+  return sendCommandFor<BenchmarkStartAnswer>(
+    'POST',
+    '/api/benchmark',
+    { messages: request.messages, confirm: true },
+    options,
+    (body) => isObject(body.run) && Number.isInteger(body.run.id),
+  );
+}
+
+/**
+ * Stops the run that is going. The simulator answers **when the run has ended**, which can take several seconds (it asks
+ * the process to stop, then ends it after 5 s); `409` when none is running. What was published stays published.
+ */
+export const stopBenchmark = (options: RequestOptions = {}) =>
+  sendCommand('POST', '/api/benchmark/stop', undefined, options);
+
+/**
+ * The checks a refused start names, or `null` when `error` is not that refusal (a `409` whose body carries a non-empty
+ * list of checks). A `409` of another kind, "another run is going", has none.
+ */
+export function checksOf(error: unknown): BenchmarkCheck[] | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const checks = isObject(error.body) ? error.body.checks : undefined;
+  if (!Array.isArray(checks) || checks.length === 0 || !checks.every(isBenchmarkCheck)) return null;
+  return checks;
 }

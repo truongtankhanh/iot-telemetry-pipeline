@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { mosquittoPubCommand } from '../../lib/shellCommand';
 import type { MessageRow } from '../../lib/messageRows';
 import { Button } from '../../ui/Button';
@@ -28,6 +29,8 @@ export interface MessageDetailProps {
  * simulator's own reason when it refused.
  */
 export function MessageDetail({ row, selectedId, inLog, port, republish }: MessageDetailProps) {
+  // A benchmark is running: the simulator refuses to republish (it would add to the run being measured); the banner says why.
+  const lock = useBenchmarkLock();
   if (row === null) {
     return (
       <Card title="Message detail">
@@ -102,7 +105,7 @@ export function MessageDetail({ row, selectedId, inLog, port, republish }: Messa
             variant="outline"
             size="sm"
             icon={uiIcons.send}
-            disabled={republish.busy || !inLog}
+            disabled={republish.busy || !inLog || lock.locked}
             onClick={() => void republish.republish(row.id)}
           >
             Republish

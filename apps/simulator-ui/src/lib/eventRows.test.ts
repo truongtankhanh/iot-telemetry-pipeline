@@ -243,6 +243,57 @@ describe('a row for each kind of observation', () => {
     });
   });
 
+  it('says a benchmark run finished with the command line’s own rate (Engine, not Other)', () => {
+    const row = byKind('benchmark');
+    expect(row).toMatchObject({
+      source: 'Engine',
+      glyph: 'engine',
+      message: 'Benchmark run 1 completed: 10,081 messages/s end to end',
+    });
+    expect(row.parts[0]).toEqual({ text: 'Benchmark run 1', strong: true });
+    expect(field(row, 'Outcome')).toBe('completed');
+    expect(field(row, 'Readings stored')).toBe('200,001');
+    expect(field(row, 'Messages per second')).toBe('10,081');
+    expect(field(row, 'End to end (s)')).toBe('9.92');
+  });
+
+  it('says a benchmark run started, with its size', () => {
+    const row = eventRow(event('benchmark', { event: 'started', run: 3, messages: 100000 }));
+    expect(row).toMatchObject({
+      source: 'Engine',
+      message: 'Benchmark run 3 started: 100,000 messages',
+    });
+    expect(field(row, 'Messages')).toBe('100,000 messages');
+  });
+
+  it('gives the reason of a run that did not complete, and no rate for it', () => {
+    const failed = eventRow(
+      event('benchmark', {
+        event: 'finished',
+        run: 2,
+        outcome: 'failed',
+        reason: 'The benchmark process exited without a result (code 1)',
+        messages: 100000,
+        messagesPerSecond: 5000,
+      }),
+    );
+    expect(failed.message).toBe(
+      'Benchmark run 2 failed: The benchmark process exited without a result (code 1)',
+    );
+    const stopped = eventRow(event('benchmark', { event: 'finished', run: 4, outcome: 'stopped' }));
+    expect(stopped.message).toBe('Benchmark run 4 stopped');
+  });
+
+  it('copes with a benchmark event that lacks keys or has an event it does not know', () => {
+    expect(eventRow(event('benchmark', {})).message).toBe('Benchmark run ? changed');
+    expect(eventRow(event('benchmark', { event: 'paused', run: 5 })).message).toBe(
+      'Benchmark run 5 changed',
+    );
+    expect(eventRow(event('benchmark', { event: 'finished', run: 6 })).message).toBe(
+      'Benchmark run 6 ended',
+    );
+  });
+
   it('gives a kind it does not know a row of its own instead of failing', () => {
     const row = eventRow(event('something-new', { a: 1 }));
     expect(row).toMatchObject({

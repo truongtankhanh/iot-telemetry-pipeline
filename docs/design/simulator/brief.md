@@ -215,7 +215,7 @@ history of past runs beyond the session, phone layouts beyond a graceful stack.
 | `/alerts`       | Alerts         | What the rules raised, why, and where each alert went                                            | 13             |
 | `/lab`          | Simulation lab | Configure and inject a fault; sub-pages for scenarios, timeline and faults                       | 12, 03, 05, 07 |
 | `/demo`         | Guided demo    | Scripted walk-through in presenter mode                                                          | 08             |
-| `/analytics`    | Analytics      | Session throughput, lag and rejections; the benchmark                                            | 09             |
+| `/analytics`    | Analytics      | Session throughput, lag, flush time and buffered readings; the benchmark                         | 09             |
 | `/foundations`  | Foundations    | Tokens, status language and motion; internal, hidden in a packaged demo                          | 00             |
 
 ## Principles

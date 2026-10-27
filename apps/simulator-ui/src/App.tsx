@@ -15,15 +15,18 @@ import { type AppRoute, appRoutes, findRoute } from './lib/routes';
 import { createShortcuts } from './lib/shortcuts';
 import { NotBuilt } from './pages/NotBuilt';
 import { Overview } from './pages/Overview';
+import { BenchmarkBanner } from './shell/BenchmarkBanner';
 import { Header } from './shell/Header';
 import { PresenterHeader } from './shell/PresenterHeader';
 import { LinkBanner } from './shell/LinkBanner';
 import { Navigation } from './shell/Navigation';
 import { Shell } from './shell/Shell';
+import { BenchmarkStore } from './state/benchmarkStore';
 import { HistoryStore } from './state/history';
 import { MessageLog } from './state/messageLog';
 import { ObservationLog } from './state/observationLog';
 import { PulseBus } from './state/pulses';
+import { SessionMetricsStore } from './state/sessionMetricsStore';
 import { connectStream } from './state/stream';
 import { createStudioStore } from './state/store';
 import { useDemoSession, useDemoSessionStore } from './state/demoSessionContext';
@@ -81,6 +84,11 @@ const Events = lazy(() =>
 
 // The Guided demo is its own chunk: it brings the script, the driver, the presenter view and the start screen, which no other page needs.
 const Demo = lazy(() => import('./pages/demo/Demo').then((module) => ({ default: module.Demo })));
+
+// The Analytics is its own chunk: it brings the series chart, the settings, the confirmation and the results, which no other page needs.
+const Analytics = lazy(() =>
+  import('./pages/analytics/Analytics').then((module) => ({ default: module.Analytics })),
+);
 
 // The Twin is its own chunk, and the 3D scene inside it is another: the page checks that the device can draw it and that the
 // simulator has a layout before it asks for three.js, which no other page needs.
@@ -164,6 +172,14 @@ function Pages({ routes }: { routes: AppRoute[] }) {
         element={
           <Suspense fallback={<p role="status">Loading…</p>}>
             <Demo />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <Suspense fallback={<p role="status">Loading…</p>}>
+            <Analytics />
           </Suspense>
         }
       />
@@ -310,9 +326,12 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
           />
         }
         banner={
-          link === 'lost' && lostSince !== null ? (
-            <LinkBanner lostSince={lostSince} lastDataAt={lastDataAt} />
-          ) : null
+          <>
+            {link === 'lost' && lostSince !== null ? (
+              <LinkBanner lostSince={lostSince} lastDataAt={lastDataAt} />
+            ) : null}
+            <BenchmarkBanner onAnalytics={current?.path === '/analytics'} />
+          </>
         }
         pinned={railPinned}
         presenter={presenting}
@@ -338,10 +357,21 @@ export function App() {
   const [observations] = useState(() => new ObservationLog());
   // The last 200 forwarded messages, the exact total and the sampling notice, for the Event stream.
   const [messages] = useState(() => new MessageLog());
+  // The benchmark run going and the last ten, with their series: the stream's `benchmark` events and one read of the simulator.
+  const [benchmark] = useState(() => new BenchmarkStore());
+  // What ingest has done since this window opened, a point a second, for the Analytics page's session charts.
+  const [sessionMetrics] = useState(() => new SessionMetricsStore());
   // One animation budget for the window (12 animated nodes, 24 glowing lines). Without a provider nothing animates.
   const [budget] = useState(() => new AnimationBudget());
   useEffect(() => {
-    const connection = connectStream(store, { history, pulses, observations, messages });
+    const connection = connectStream(store, {
+      history,
+      pulses,
+      observations,
+      messages,
+      benchmark,
+      sessionMetrics,
+    });
     return () => {
       connection.close();
       history.dispose();
@@ -349,7 +379,7 @@ export function App() {
       observations.dispose();
       messages.dispose();
     };
-  }, [store, history, pulses, observations, messages]);
+  }, [store, history, pulses, observations, messages, benchmark, sessionMetrics]);
 
   return (
     <StudioProvider
@@ -358,6 +388,8 @@ export function App() {
       pulses={pulses}
       observations={observations}
       messages={messages}
+      benchmark={benchmark}
+      sessionMetrics={sessionMetrics}
     >
       <AnimationBudgetProvider budget={budget}>
         <BrowserRouter>

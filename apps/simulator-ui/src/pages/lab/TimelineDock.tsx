@@ -28,6 +28,8 @@ export interface TimelineDockProps {
   /** The name of the scenario on show (read-only); `null` for the page's own timeline. */
   scenario: string | null;
   busy: boolean;
+  /** A benchmark is running: an injection may start devices, which the simulator refuses, so Inject timeline is off. */
+  locked?: boolean;
   onInject: () => void;
   onClear: () => void;
   /** Called when the person follows the link to the timeline editor, before the page changes: the Lab hands its draft over. */
@@ -54,6 +56,7 @@ export function TimelineDock({
   summary,
   scenario,
   busy,
+  locked = false,
   onInject,
   onClear,
   onOpenEditor,
@@ -95,7 +98,7 @@ export function TimelineDock({
             <Button
               size="sm"
               variant="primary"
-              disabled={anomalies.length === 0 || busy}
+              disabled={anomalies.length === 0 || busy || locked}
               onClick={onInject}
             >
               Inject timeline

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useStudio } from '../../state/studioContext';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import type { ObservedAlert, ScenarioItem, ScenarioRunView } from '../../api/types';
 import { runFor } from '../../lib/runClock';
 import { scenarioPhases } from '../../lib/scenarioPhases';
@@ -91,6 +92,8 @@ export function SimulationControls({
   onFocused,
 }: SimulationControlsProps) {
   const { library, commands, devices, clock } = controls;
+  // A benchmark is running: the simulator refuses Run, Resume, Step and Reset (Pause and Stop stay open); the banner says why.
+  const lock = useBenchmarkLock();
   const buttons = useRef<Record<FocusTarget, HTMLButtonElement | null>>({
     pause: null,
     step: null,
@@ -187,7 +190,7 @@ export function SimulationControls({
             variant="primary"
             icon={uiIcons.play}
             aria-label={`Run ${picked.name}`}
-            disabled={commands.isBusy(picked.name, 'run')}
+            disabled={commands.isBusy(picked.name, 'run') || lock.locked}
             onClick={() => void commands.run(picked.name)}
           >
             Run
@@ -216,7 +219,11 @@ export function SimulationControls({
               Pause{devices.pausable > 0 ? ` ${devices.pausable}` : ''}
             </Button>
             {devices.resumable > 0 ? (
-              <Button icon={uiIcons.play} disabled={devices.state.running} onClick={devices.resume}>
+              <Button
+                icon={uiIcons.play}
+                disabled={devices.state.running || lock.locked}
+                onClick={devices.resume}
+              >
                 Resume {devices.resumable} paused
               </Button>
             ) : null}
@@ -228,7 +235,7 @@ export function SimulationControls({
               buttons.current.step = element;
             }}
             icon={uiIcons.step}
-            disabled={clock.busy !== null}
+            disabled={clock.busy !== null || lock.locked}
             onClick={() => void clock.step()}
           >
             {stepLabel}
@@ -240,7 +247,7 @@ export function SimulationControls({
           }}
           variant="ghost"
           icon={uiIcons.reset}
-          disabled={clock.busy !== null}
+          disabled={clock.busy !== null || lock.locked}
           onClick={() => void clock.reset()}
         >
           Reset

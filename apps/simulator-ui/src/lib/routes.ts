@@ -54,8 +54,8 @@ const page = (
 });
 
 /**
- * The pages of the brief. Built so far: the Overview shell and Foundations (SIM-04), the Fleet (SIM-05), the Topology (SIM-06), the Alerts (SIM-07), the Lab's Scenarios (SIM-08), the Lab's workspace (SIM-10), the Lab's timeline editor (SIM-11), the Lab's faults (SIM-12), the Event stream (SIM-13), the Guided demo (SIM-14) and the Twin (SIM-17, a spike that draws the boundary and the buildings; SIM-18 finishes it); every other route
- * opens the shared placeholder that names the ticket which builds it, so nothing in the navigation or
+ * The pages of the brief. Built so far: the Overview shell and Foundations (SIM-04), the Fleet (SIM-05), the Topology (SIM-06), the Alerts (SIM-07), the Lab's Scenarios (SIM-08), the Lab's workspace (SIM-10), the Lab's timeline editor (SIM-11), the Lab's faults (SIM-12), the Event stream (SIM-13), the Guided demo (SIM-14), the Analytics (SIM-15) and the Twin (SIM-17, a spike that draws the boundary and the buildings; SIM-18 finishes it); a
+ * route that is not built opens the shared placeholder that names the ticket which builds it, so nothing in the navigation or
  * the palette is a dead link.
  */
 const ROUTES: AppRoute[] = [
@@ -175,10 +175,11 @@ const ROUTES: AppRoute[] = [
     '/analytics',
     'Analytics',
     'analytics',
-    'Session throughput, lag and rejections, and the benchmark',
+    'Session throughput, lag, flush time and buffered readings, and the benchmark',
     'SIM-15',
     ['09'],
     'n',
+    { built: true },
   ),
   page(
     '/foundations',

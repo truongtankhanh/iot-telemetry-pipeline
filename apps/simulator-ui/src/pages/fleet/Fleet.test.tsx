@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { stateViewFixture } from '../../api/fixtures/stateView';
 import type { StateView } from '../../api/types';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { axeViolations } from '../../test-axe';
 import { address, deviceCalls, renderFleet, viewWithDevices } from './fleetTestSupport';
 
@@ -376,5 +377,41 @@ describe('Fleet bulk commands', () => {
     expect(deviceCalls(simulator, 'POST', 'pause')).toHaveLength(6);
     await user.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByText(/1 failed/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Fleet while a benchmark runs', () => {
+  it('turns Start off on every card and Start all, and leaves Pause, Stop and Pause all open', () => {
+    renderFleet({ benchmark: runningBenchmark() });
+    // A paused device could be started before; the simulator refuses it now.
+    expect(screen.getByRole('button', { name: 'Start hub-power-01' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Start all' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pause dc-env-02' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Stop dc-env-02' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Pause all' })).toBeEnabled();
+  });
+
+  it('turns Start on again when the run ends', () => {
+    const benchmark = runningBenchmark();
+    renderFleet({ benchmark });
+    expect(screen.getByRole('button', { name: 'Start all' })).toBeDisabled();
+
+    const run = benchmark.get().current;
+    act(() =>
+      benchmark.applyEvent({
+        run: { ...run!, phase: 'ended', outcome: 'stopped', elapsedMs: 99_000 },
+        point: null,
+      }),
+    );
+    expect(screen.getByRole('button', { name: 'Start hub-power-01' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Start all' })).toBeEnabled();
+  });
+
+  it('does not send a start that the control would not let through', async () => {
+    const user = userEvent.setup();
+    const { simulator } = renderFleet({ benchmark: runningBenchmark() });
+    await user.click(screen.getByRole('button', { name: 'Start hub-power-01' }));
+    await user.click(screen.getByRole('button', { name: 'Start all' }));
+    expect(deviceCalls(simulator, 'POST', 'start')).toHaveLength(0);
   });
 });

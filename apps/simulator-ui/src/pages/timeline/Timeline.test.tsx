@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fromAnomalies } from '../../lib/timelineEditor';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { EditorDrafts } from '../../state/editorDrafts';
 import { axeViolations } from '../../test-axe';
 import { renderTimeline } from './timelineTestSupport';
@@ -237,6 +238,17 @@ describe('Timeline: a saved scenario', () => {
     ]);
     expect(button('Save')).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Run now' })).not.toBeInTheDocument();
+  });
+
+  it('does not offer to run it while a benchmark runs, and keeps Save', async () => {
+    const user = userEvent.setup();
+    open({ benchmark: runningBenchmark() });
+    await user.click(await screen.findByRole('button', { name: hot }));
+    await user.click(button('Remove anomaly 2'));
+
+    // The same steps enable Run now when no benchmark runs (the test above).
+    expect(button('Run now')).toBeDisabled();
+    expect(button('Save')).toBeEnabled();
   });
 
   it('asks before it deletes, and goes back to a new scenario once it is deleted', async () => {

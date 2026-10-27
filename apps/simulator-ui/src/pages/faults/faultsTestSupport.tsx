@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { vi } from 'vitest';
 import { stateViewFixture } from '../../api/fixtures/stateView';
 import type { FaultKind, FaultsSnapshot, MetricSample, StateView } from '../../api/types';
+import type { BenchmarkStore } from '../../state/benchmarkStore';
 import { StudioProvider } from '../../state/StudioProvider';
 import { createStudioStore, type LinkState, type StudioStore } from '../../state/store';
 import { Faults } from './Faults';
@@ -160,6 +161,8 @@ export function fakeFaultSimulator(initial: StateView = faultState()): FakeFault
 }
 
 export interface RenderFaultsOptions {
+  /** The window's benchmark; a test with a run going passes one that holds it. */
+  benchmark?: BenchmarkStore;
   /** The state the store holds; `null` is a page before its first message. */
   state?: StateView | null;
   link?: LinkState;
@@ -179,7 +182,7 @@ export function renderFaults(options: RenderFaultsOptions = {}): FaultsHarness {
   if (state) store.getState().setView(structuredClone(state), Date.now());
 
   const result = render(
-    <StudioProvider store={store}>
+    <StudioProvider store={store} benchmark={options.benchmark}>
       <MemoryRouter initialEntries={['/lab/faults']}>
         <Routes>
           <Route path="/lab/faults" element={<Faults />} />

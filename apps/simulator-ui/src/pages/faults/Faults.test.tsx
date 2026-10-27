@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { stateViewFixture } from '../../api/fixtures/stateView';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { axeViolations } from '../../test-axe';
 import { counter, faultState, renderFaults } from './faultsTestSupport';
 
@@ -395,5 +396,25 @@ describe('Faults: the link to the simulator is lost', () => {
       within(screen.getByRole('group', { name: 'Drop messages' })).getByRole('slider'),
     ).toBeDisabled();
     expect(sw('Drop messages')).toBeChecked();
+  });
+});
+
+describe('Faults while a benchmark runs', () => {
+  it('turns the burst, link loss and Clear all faults off, and leaves the other faults and Reset counters open', () => {
+    renderFaults({ benchmark: runningBenchmark() });
+    expect(screen.getByRole('button', { name: 'Send 1,000' })).toBeDisabled();
+    expect(sw('Link loss')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Clear all faults' })).toBeDisabled();
+
+    expect(sw('Drop messages')).toBeEnabled();
+    expect(sw('Delay and jitter')).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Reset counters' })).toBeEnabled();
+  });
+
+  it('keeps them on when no benchmark runs', () => {
+    renderFaults();
+    expect(screen.getByRole('button', { name: 'Send 1,000' })).toBeEnabled();
+    expect(sw('Link loss')).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Clear all faults' })).toBeEnabled();
   });
 });

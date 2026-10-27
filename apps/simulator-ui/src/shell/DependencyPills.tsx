@@ -1,5 +1,7 @@
 import { Link } from 'react-router';
+import { PHASE_WORDS } from '../lib/benchmarkLock';
 import { formatClockTime } from '../lib/time';
+import { useBenchmarkStatus } from '../state/benchmarkContext';
 import { useStudio } from '../state/studioContext';
 import { Pill } from '../ui/Pill';
 import styles from './header.module.css';
@@ -67,6 +69,29 @@ export function FaultsPill() {
       title={titleFor(pill.stale) ?? 'Open the Faults page'}
     >
       <Pill label={pill.label} detail={pill.detail} tone={pill.tone} stale={pill.stale} />
+    </Link>
+  );
+}
+
+/**
+ * "Benchmark running · run 3 · publishing", while a benchmark runs: a link to Analytics, on every page and in the presenter's
+ * header, because a run saturates the broker and the CPU and writes to the live database, and nobody should find that out from a slow
+ * machine. It follows the run's phase and not each point of its series. Nothing is drawn when no run goes.
+ */
+export function BenchmarkPill() {
+  const status = useBenchmarkStatus();
+  if (status === null) return null;
+  return (
+    <Link
+      to="/analytics"
+      className={styles.pillLink}
+      title="A benchmark is running. Open Analytics to follow it or stop it"
+    >
+      <Pill
+        label="Benchmark running"
+        detail={`run ${status.id} · ${PHASE_WORDS[status.phase]}`}
+        tone="warn"
+      />
     </Link>
   );
 }

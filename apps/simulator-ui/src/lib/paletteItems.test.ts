@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type { StateView } from '../api/types';
 import { buildPaletteItems, type PaletteGroup } from './paletteItems';
-import { appRoutes } from './routes';
+import { type AppRoute, appRoutes } from './routes';
 
 const base = fixture;
 const routes = appRoutes({ foundations: true });
@@ -23,12 +23,29 @@ describe('buildPaletteItems', () => {
   });
 
   it('lists every page, and says which are not built yet, with their ticket', () => {
-    const pages = group(build(), 'pages');
+    // Every page of the brief is built now, so the one that is not is declared here.
+    const later: AppRoute = {
+      path: '/later',
+      label: 'Later',
+      icon: 'analytics',
+      description: 'A page that a later ticket builds',
+      ticket: 'SIM-99',
+      frames: ['99'],
+      goKey: null,
+      built: false,
+      parent: null,
+      internal: false,
+    };
+    const items = buildPaletteItems({ view: structuredClone(base), routes: [...routes, later] });
+    const pages = group(items, 'pages');
     expect(pages.find((p) => p.target === '/')?.detail).toMatch(/Health of the simulated campus/);
     expect(pages.find((p) => p.target === '/fleet')?.detail).toMatch(
       /^Every device, its live values/,
     );
-    expect(pages.find((p) => p.target === '/analytics')?.detail).toBe('Not built yet · SIM-15');
+    expect(pages.find((p) => p.target === '/analytics')?.detail).toMatch(
+      /^Session throughput, lag, flush time/,
+    );
+    expect(pages.find((p) => p.target === '/later')?.detail).toBe('Not built yet · SIM-99');
     expect(pages.find((p) => p.target === '/lab/faults')?.label).toBe('Lab · Faults');
   });
 

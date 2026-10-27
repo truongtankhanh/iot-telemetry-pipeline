@@ -1,0 +1,396 @@
+/* The Analytics page (frame 09): a settings column beside the run, the cards and the charts. Tokens only; no text under 13 px. */
+
+/* ---- the chart: the Fleet's classes are reused for the grid, the axis and the first line; these are what Analytics adds ---- */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 2px solid var(--flow);
+}
+
+.swatch[data-secondary='true'] {
+  border-top-color: var(--series-2);
+  border-top-style: dashed;
+}
+
+.lineSecondary {
+  fill: none;
+  stroke: var(--series-2);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.dotSecondary {
+  fill: var(--flow-core);
+  stroke: var(--series-2);
+  stroke-width: 1.5;
+}
+
+.band {
+  fill: var(--accent-soft);
+}
+
+.band[data-alt='true'] {
+  fill: transparent;
+}
+
+.bandLabel {
+  fill: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mark {
+  stroke: var(--text-tertiary);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.markLabel {
+  fill: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+}
+
+.average {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+  opacity: 0.7;
+}
+
+.averageLabel {
+  fill: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+}
+
+.emptyText {
+  fill: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.tag rect {
+  fill: var(--surface-3);
+  stroke: var(--flow);
+}
+
+.tag[data-secondary='true'] rect {
+  stroke: var(--series-2);
+}
+
+.tag text {
+  fill: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-min);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- the run: progress, tiles, charts ---- */
+.reason {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.progressPair {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+}
+
+.stat dt {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.stat dd {
+  margin: 0;
+}
+
+.statValue {
+  font-family: var(--font-ui);
+  font-size: var(--fs-numeral);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.statValue[data-unknown='true'] {
+  color: var(--text-tertiary);
+  font-size: var(--fs-card-title);
+  font-weight: 500;
+}
+
+.statValue small {
+  color: var(--text-tertiary);
+  font-size: var(--fs-body);
+  font-weight: 400;
+}
+
+.statNote {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.metric {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+}
+
+.charts {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.smallCharts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* ---- the results ---- */
+.empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+}
+
+.result[data-shown='true'] {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.resultMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.resultMeta {
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.resultRates {
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.resultReason {
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.resultActions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 1100px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smallCharts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- the page: settings on the left, the run (or the session) on the right ---- */
+.cols {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Without a benchmark to configure (not available) the charts take the whole width. */
+.cols[data-single='true'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A command the simulator refused: in words, and announced. */
+.alert {
+  padding: 10px 14px;
+  border: 1px dashed rgba(255, 98, 128, 0.55);
+  border-radius: var(--radius-2);
+  background: var(--tint-bad);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.side,
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-body);
+}
+
+.facts dt {
+  color: var(--text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.rule {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.checksTitle {
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.checkList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--fs-body);
+}
+
+.check svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.check[data-ok='true'] svg {
+  color: var(--success);
+}
+
+.check[data-ok='false'] svg {
+  color: var(--danger);
+}
+
+.reasonText {
+  color: var(--text-secondary);
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 1100px) {
+  .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

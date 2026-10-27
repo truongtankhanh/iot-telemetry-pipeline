@@ -18,6 +18,7 @@ import { formatClockTime } from '../../lib/time';
 import { LabSwitcher } from '../../shell/LabSwitcher';
 import { draftKey } from '../../state/editorDrafts';
 import { useEditorDrafts } from '../../state/editorDraftsContext';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { useNow } from '../../state/useNow';
 import { useStudio } from '../../state/studioContext';
 import { Button } from '../../ui/Button';
@@ -53,6 +54,8 @@ import { useLabParams } from './useLabParams';
  */
 export function Lab() {
   const view = useStudio((state) => state.view);
+  // A benchmark is running: Inject now and Inject timeline may start devices, which the simulator refuses.
+  const lock = useBenchmarkLock();
   const link = useStudio((state) => state.link);
   const lostSince = useStudio((state) => state.lostSince);
   const now = useNow();
@@ -257,6 +260,7 @@ export function Lab() {
             onDraft={fault.patch}
             expectedAlerts={expectedAlerts}
             busy={progress.running}
+            locked={lock.locked}
             onAdd={addToTimeline}
             onInject={() => void injection.injectNow(fault.plan.anomalies)}
           />
@@ -307,6 +311,7 @@ export function Lab() {
         }
         scenario={custom ? null : pick}
         busy={progress.running}
+        locked={lock.locked}
         onInject={() => void injection.injectTimeline(timeline)}
         onClear={() => setDraft(EMPTY_DRAFT)}
         {...(custom ? { onOpenEditor: openEditor } : {})}

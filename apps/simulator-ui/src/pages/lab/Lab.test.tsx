@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import scenariosFixture from '../../api/fixtures/scenarios.json';
 import type { Anomaly, ScenarioLibraryView } from '../../api/types';
 import { fromAnomalies } from '../../lib/timelineEditor';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { EditorDrafts } from '../../state/editorDrafts';
 import { axeViolations } from '../../test-axe';
 import { installReactFlowStubs } from '../topology/topologyTestSupport';
@@ -257,5 +258,29 @@ describe('Lab: accessibility', () => {
     const { container } = renderLab({ path: '/lab?target=d001' });
     await screen.findByText('Alert, high · about 24 s');
     expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('Lab while a benchmark runs', () => {
+  it('turns Inject now off, and leaves Add to timeline on', async () => {
+    const user = userEvent.setup();
+    renderLab({ path: '/lab?target=d001', benchmark: runningBenchmark() });
+    expect(button('Inject now')).toBeDisabled();
+    expect(button('Add to timeline')).toBeEnabled();
+
+    await user.click(button('Add to timeline'));
+    await screen.findByText('Added 1 fault to the timeline (1 in all).');
+    expect(button('Inject timeline')).toBeDisabled();
+  });
+
+  it('turns Reset off, as on the Overview', () => {
+    renderLab({ path: '/lab?target=d001', benchmark: runningBenchmark() });
+    expect(button('Reset')).toBeDisabled();
+  });
+
+  it('keeps them on when no benchmark runs', () => {
+    renderLab({ path: '/lab?target=d001' });
+    expect(button('Inject now')).toBeEnabled();
+    expect(button('Reset')).toBeEnabled();
   });
 });

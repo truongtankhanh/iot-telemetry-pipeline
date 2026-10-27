@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import scenariosFixture from '../../api/fixtures/scenarios.json';
 import { stateViewFixture } from '../../api/fixtures/stateView';
 import type { ScenarioItem, ScenarioLibraryView } from '../../api/types';
+import type { BenchmarkStore } from '../../state/benchmarkStore';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { StudioProvider } from '../../state/StudioProvider';
 import { createStudioStore } from '../../state/store';
 import { axeViolations } from '../../test-axe';
@@ -40,6 +42,7 @@ function renderCard(
     selected?: boolean;
     running?: boolean;
     onDelete?: (name: string) => void;
+    benchmark?: BenchmarkStore;
   } = {},
 ) {
   const view = structuredClone(stateViewFixture);
@@ -62,7 +65,7 @@ function renderCard(
   const cmd = options.commands ?? commands();
   const result = render(
     <MemoryRouter>
-      <StudioProvider store={store}>
+      <StudioProvider store={store} benchmark={options.benchmark}>
         <ScenarioCard
           item={item}
           rules={view.rules}
@@ -161,6 +164,15 @@ describe('ScenarioCard: run and stop', () => {
     await user.click(screen.getByRole('button', { name: 'Stop server-room-overheat' }));
     expect(cmd.stop).toHaveBeenCalledWith('server-room-overheat');
     expect(screen.getByRole('article')).toHaveAttribute('data-running', 'true');
+  });
+
+  it('turns Run off while a benchmark runs, and leaves Stop open for a scenario that plays', () => {
+    const { unmount } = renderCard(overheat, { benchmark: runningBenchmark() });
+    expect(screen.getByRole('button', { name: 'Run server-room-overheat' })).toBeDisabled();
+    unmount();
+
+    renderCard(overheat, { running: true, benchmark: runningBenchmark() });
+    expect(screen.getByRole('button', { name: 'Stop server-room-overheat' })).toBeEnabled();
   });
 
   it('cannot be pressed twice while a command is on its way', () => {

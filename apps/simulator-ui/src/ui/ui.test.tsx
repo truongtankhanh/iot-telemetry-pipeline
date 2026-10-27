@@ -20,6 +20,7 @@ import { uiIcons } from './icons';
 import { NodeState } from './NodeState';
 import { Pager } from './Pager';
 import { Pill } from './Pill';
+import { Progress } from './Progress';
 import { Segmented } from './Segmented';
 import { SelectField } from './SelectField';
 import { SeverityBadge } from './SeverityBadge';
@@ -1166,6 +1167,62 @@ describe('Banner', () => {
       <>
         <Banner tone="warn">Faults are on.</Banner>
         <Banner tone="info">Gaps are confirmed later.</Banner>
+      </>,
+    );
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('Progress', () => {
+  it('says how far it has got in text, and the bar has the same numbers', () => {
+    render(<Progress label="Published" value={62_400} max={100_000} unit="messages" />);
+    const bar = screen.getByRole('progressbar', { name: 'Published' });
+    expect(bar).toHaveAttribute('aria-valuetext', '62,400 of 100,000 messages');
+    expect((bar as HTMLProgressElement).value).toBe(62_400);
+    expect(bar).toHaveAttribute('max', '100000');
+    expect(screen.getByText('62,400')).toBeInTheDocument();
+    expect(screen.getByText('/ 100,000 messages')).toBeInTheDocument();
+  });
+
+  it('shows a note under the bar', () => {
+    render(
+      <Progress
+        label="Stored in PostgreSQL"
+        value={124_000}
+        max={200_001}
+        unit="readings"
+        note="800 readings still in flight or buffered"
+      />,
+    );
+    expect(screen.getByText('800 readings still in flight or buffered')).toBeInTheDocument();
+  });
+
+  it('says "unknown" and draws an indeterminate bar when the value cannot be known, never zero', () => {
+    render(<Progress label="Stored" value={null} max={200_001} unit="readings" />);
+    const bar = screen.getByRole('progressbar', { name: 'Stored' });
+    expect(bar).not.toHaveAttribute('value');
+    expect(bar).toHaveAttribute('aria-valuetext', 'unknown of 200,001 readings');
+    expect(screen.getByText('unknown')).toBeInTheDocument();
+    expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('does not let a value past the total draw past the bar', () => {
+    render(<Progress label="Stored" value={200_050} max={200_001} unit="readings" />);
+    expect((screen.getByRole('progressbar') as HTMLProgressElement).value).toBe(200_001);
+  });
+
+  it('marks the second bar of a pair with its own tone', () => {
+    const { container } = render(
+      <Progress label="Stored" value={1} max={2} unit="readings" tone="secondary" />,
+    );
+    expect(container.firstElementChild).toHaveAttribute('data-tone', 'secondary');
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <>
+        <Progress label="Published" value={5} max={10} unit="messages" note="Half way" />
+        <Progress label="Stored" value={null} max={20} unit="readings" tone="secondary" />
       </>,
     );
     expect(await axeViolations(container)).toEqual([]);

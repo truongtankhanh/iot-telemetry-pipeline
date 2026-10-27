@@ -2,6 +2,7 @@ import { type ReactNode, useId } from 'react';
 import { MAX_DESCRIPTION_LENGTH } from '../../lib/timelineValidation';
 import { Button } from '../../ui/Button';
 import { Chip } from '../../ui/Chip';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { uiIcons } from '../../ui/icons';
 import styles from './editorHeader.module.css';
 import type { EditorCommands } from './useEditorCommands';
@@ -31,6 +32,8 @@ export function EditorHeader({ editor, commands, onDelete, status }: EditorHeade
   const { doc, errors, kind, dirty } = editor;
   const naming = kind !== 'saved';
   const busy = commands.busy !== null || commands.runBusy;
+  // A benchmark is running: the simulator refuses a scenario run (Stop and Save stay open); the banner says why.
+  const lock = useBenchmarkLock();
 
   // Nothing to save is not a problem to explain; the others are.
   const saveWhy = commands.saveBlock === 'Nothing to save' ? null : commands.saveBlock;
@@ -125,7 +128,7 @@ export function EditorHeader({ editor, commands, onDelete, status }: EditorHeade
             <Button
               variant="primary"
               icon={uiIcons.play}
-              disabled={commands.runBlock !== null || busy}
+              disabled={commands.runBlock !== null || busy || lock.locked}
               aria-busy={commands.runBusy || undefined}
               onClick={() => void commands.runNow()}
             >

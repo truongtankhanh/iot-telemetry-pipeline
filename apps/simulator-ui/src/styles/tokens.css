@@ -63,6 +63,8 @@
   /* Electric cyan is energy moving (data lines, focus). It is not the accent. */
   --flow: #47d7ff;
   --flow-core: #d8f6ff;
+  /* The second line of a chart that has two (stored beside published, on Analytics): a lighter violet than the accent, drawn dashed. */
+  --series-2: #b7bbff;
   /* The pulse inside an amber and a green edge (an anomaly, a delivered alert): the lit core of the line. */
   --warn-core: #fff3d6;
   --ok-core: #dcfff0;

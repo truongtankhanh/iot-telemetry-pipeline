@@ -240,10 +240,12 @@ export interface StateView {
   observationCursor: number;
   faultEffect: FaultEffectView | null;
   /**
-   * The benchmark without its series (`GET /api/benchmark` has them). Optional here only so that the code written before the
-   * Analytics page still compiles; the simulator always sends it.
+   * The benchmark without its series (`GET /api/benchmark` has them). It is the state at the moment of the snapshot or of the
+   * last command: the simulator sends no `state` event when a run changes, so what a run is doing now is in the
+   * `BenchmarkStore`, fed by the `benchmark` stream event. `available`, `reason`, `database` and `maxMessages` do not change
+   * while the simulator runs.
    */
-  benchmark?: BenchmarkSummary;
+  benchmark: BenchmarkSummary;
 }
 
 export interface PublishedMessage {
@@ -406,6 +408,11 @@ export interface BenchmarkEvent {
 /** The answer of `POST /api/benchmark`: the run as it begins, and the state view. */
 export interface BenchmarkStartAnswer extends StateView {
   run: BenchmarkRunSummary;
+}
+
+/** The answer of `GET /api/benchmark/preflight`: the three checks, or none when the benchmark is not available. */
+export interface BenchmarkPreflightAnswer {
+  checks: BenchmarkCheck[];
 }
 
 // ---- The scenario library (SIM-08) ----

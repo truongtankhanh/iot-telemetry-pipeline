@@ -11,6 +11,7 @@ import {
 } from '../../lib/faultSettings';
 import { formatClockTime } from '../../lib/time';
 import { LabSwitcher } from '../../shell/LabSwitcher';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { useNow } from '../../state/useNow';
 import { useStudio } from '../../state/studioContext';
 import { Banner } from '../../ui/Banner';
@@ -40,6 +41,8 @@ const PAGE_DESCRIPTION =
  */
 export function Faults() {
   const view = useStudio((state) => state.view);
+  // A benchmark is running: the simulator refuses Clear all faults, which also releases held messages (Reset counters stays open).
+  const lock = useBenchmarkLock();
   const link = useStudio((state) => state.link);
   const lostSince = useStudio((state) => state.lostSince);
   const now = useNow();
@@ -118,7 +121,7 @@ export function Faults() {
           </Button>
           <Button
             variant="danger"
-            disabled={stale || busy.has('clear')}
+            disabled={stale || busy.has('clear') || lock.locked}
             onClick={() => void commands.clearAll()}
           >
             Clear all faults

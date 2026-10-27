@@ -12,6 +12,8 @@ export interface BulkBarProps {
   filteredTotal: number;
   /** A run is going; the actions wait for it. */
   busy: boolean;
+  /** A benchmark is running: the simulator refuses to start a device, so Start is off (Pause, Stop and Hold stay open). */
+  startLocked?: boolean;
   onRun: (action: BulkAction) => void;
   onHold: () => void;
   onSelectAll: () => void;
@@ -28,6 +30,7 @@ export function BulkBar({
   onPageCount,
   filteredTotal,
   busy,
+  startLocked = false,
   onRun,
   onHold,
   onSelectAll,
@@ -55,7 +58,7 @@ export function BulkBar({
         size="sm"
         variant="outline"
         icon={uiIcons.play}
-        disabled={busy}
+        disabled={busy || startLocked}
         aria-label={`Start ${devices}`}
         onClick={() => onRun('start')}
       >

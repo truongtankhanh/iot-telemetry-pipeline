@@ -39,6 +39,7 @@ import {
   Info,
   Layers,
   LayoutDashboard,
+  Lock,
   type LucideIcon,
   Minus,
   Network,
@@ -176,6 +177,7 @@ export const uiIcons = {
   target: Crosshair,
   info: Info,
   clock: Clock,
+  lock: Lock,
 } satisfies Record<string, Glyph>;
 
 /** The glyph of each stage of the pipeline in the topology. */

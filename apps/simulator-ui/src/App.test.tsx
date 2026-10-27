@@ -2,11 +2,13 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { benchmarkFixture } from './api/fixtures/benchmarkFixtures';
 import scenariosFixture from './api/fixtures/scenarios.json';
 import { stateViewFixture as fixture } from './api/fixtures/stateView';
-import type { StateView } from './api/types';
+import type { BenchmarkRunDetail, BenchmarkRunSummary, StateView } from './api/types';
 import { StudioFrame } from './App';
-import { appRoutes } from './lib/routes';
+import { type AppRoute, appRoutes } from './lib/routes';
+import { BenchmarkStore } from './state/benchmarkStore';
 import { DemoSessionStore } from './state/demoSessionStore';
 import { createStudioStore, type StudioStore } from './state/store';
 import { StudioProvider } from './state/StudioProvider';
@@ -15,6 +17,24 @@ import { axeViolations } from './test-axe';
 
 const base = fixture;
 const NOW = Date.parse('2026-10-20T09:15:00.000Z');
+
+/**
+ * Every page of the brief is built, so the placeholder of a page that is not is exercised with a route that is declared not
+ * built: it has no `<Route>` of its own, and so opens `NotBuilt`.
+ */
+const later: AppRoute = {
+  path: '/later',
+  label: 'Later',
+  icon: 'analytics',
+  description: 'A page that a later ticket builds',
+  ticket: 'SIM-99',
+  frames: ['99'],
+  goKey: null,
+  built: false,
+  parent: null,
+  internal: false,
+};
+const routesWithLater = [...appRoutes({ foundations: true }), later];
 
 const viewWith = (change: (view: StateView) => void = () => {}) => {
   const view = structuredClone(base);
@@ -28,6 +48,7 @@ function renderStudio({
   view = base as StateView | null,
   routes = appRoutes({ foundations: true }),
   demo,
+  benchmark,
 }: {
   path?: string;
   store?: StudioStore;
@@ -35,11 +56,13 @@ function renderStudio({
   routes?: ReturnType<typeof appRoutes>;
   /** The guided demo's session; a test that presents a demo passes one that has started. */
   demo?: DemoSessionStore;
+  /** The benchmark of the window; a test that has a run going passes one with it. */
+  benchmark?: BenchmarkStore;
 } = {}) {
   store.getState().setLink('live', NOW);
   if (view !== null) store.getState().setView(view, NOW);
   const result = render(
-    <StudioProvider store={store} demo={demo}>
+    <StudioProvider store={store} demo={demo} benchmark={benchmark}>
       <MemoryRouter initialEntries={[path]}>
         <StudioFrame routes={routes} />
       </MemoryRouter>
@@ -135,27 +158,27 @@ describe('the header pills (the acceptance criteria of SIM-04)', () => {
 
 describe('navigation', () => {
   it('opens a page that is not built yet on the placeholder that names its ticket', async () => {
-    renderStudio();
+    renderStudio({ routes: routesWithLater });
     await userEvent.click(
       within(screen.getByRole('navigation', { name: 'Pages' })).getByRole('link', {
-        name: /Analytics/,
+        name: /Later/,
       }),
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
-    expect(screen.getByText('Coming with SIM-15')).toBeInTheDocument();
-    expect(document.title).toBe('Analytics · Simulator Studio');
+    expect(screen.getByRole('heading', { level: 1, name: 'Later' })).toBeInTheDocument();
+    expect(screen.getByText('Coming with SIM-99')).toBeInTheDocument();
+    expect(document.title).toBe('Later · Simulator Studio');
   });
 
   it('moves focus to the page when the route changes, and marks the current page', async () => {
-    renderStudio();
+    renderStudio({ routes: routesWithLater });
     const nav = screen.getByRole('navigation', { name: 'Pages' });
     expect(within(nav).getByRole('link', { name: /Overview/ })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    await userEvent.click(within(nav).getByRole('link', { name: /Analytics/ }));
+    await userEvent.click(within(nav).getByRole('link', { name: /Later/ }));
     expect(document.getElementById('main')).toHaveFocus();
-    expect(within(nav).getByRole('link', { name: /Analytics/ })).toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: /Later/ })).toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -181,8 +204,8 @@ describe('navigation', () => {
   });
 
   it('treats a path under a page that is not built as that page, one under a built page as the page, and an unknown path as not found', async () => {
-    const first = renderStudio({ path: '/analytics/7' });
-    expect(screen.getByText('Coming with SIM-15')).toBeInTheDocument();
+    const first = renderStudio({ path: '/later/7', routes: routesWithLater });
+    expect(screen.getByText('Coming with SIM-99')).toBeInTheDocument();
     first.unmount();
     const built = renderStudio({ path: '/fleet/dc-env-01' });
     expect(
@@ -277,7 +300,7 @@ describe('the keyboard', () => {
 
 describe('the palette’s actions', () => {
   it('open the Overview with the scenario picked, and run nothing', async () => {
-    renderStudio({ path: '/analytics' });
+    renderStudio({ path: '/later', routes: routesWithLater });
     await userEvent.keyboard('/');
     await userEvent.keyboard('>run crowded');
     await userEvent.keyboard('{Enter}');
@@ -290,7 +313,7 @@ describe('the palette’s actions', () => {
   });
 
   it('open the Overview with the control focused, after the page has moved focus to itself', async () => {
-    renderStudio({ path: '/analytics' });
+    renderStudio({ path: '/later', routes: routesWithLater });
     await userEvent.keyboard('/');
     await userEvent.keyboard('>reset');
     await userEvent.keyboard('{Enter}');
@@ -358,13 +381,71 @@ describe('the guided demo', () => {
   });
 });
 
+describe('Analytics and the benchmark (SIM-15)', () => {
+  const going = benchmarkFixture.current as BenchmarkRunDetail;
+  const summary = (): BenchmarkRunSummary => {
+    const run: Partial<BenchmarkRunDetail> = structuredClone(going);
+    delete run.series;
+    return run as BenchmarkRunSummary;
+  };
+  const runningBenchmark = () => {
+    const benchmark = new BenchmarkStore();
+    benchmark.applyEvent({ run: summary(), point: null });
+    return benchmark;
+  };
+
+  it('opens the Analytics page and not the placeholder, and goes to it with g then n', async () => {
+    renderStudio({ path: '/fleet' });
+    await userEvent.keyboard('gn');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
+    expect(screen.queryByText(/Coming with SIM-15/)).not.toBeInTheDocument();
+    expect(document.title).toBe('Analytics · Simulator Studio');
+  });
+
+  it('sends a path under the page to the page', async () => {
+    renderStudio({ path: '/analytics/7' });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
+  });
+
+  it('says on every other page that a benchmark runs, in the header and above the page', async () => {
+    renderStudio({ path: '/fleet', benchmark: runningBenchmark() });
+    expect(await screen.findByRole('link', { name: /Benchmark running/ })).toHaveAttribute(
+      'href',
+      '/analytics',
+    );
+    expect(
+      screen.getByText(/the controls that publish are locked until it ends/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Follow it or stop it on Analytics' }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not repeat the banner on Analytics, which says it itself, and keeps the pill', async () => {
+    renderStudio({ path: '/analytics', benchmark: runningBenchmark() });
+    expect(await screen.findByRole('button', { name: 'Stop run' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Follow it or stop it on Analytics' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Benchmark running/ })).toBeInTheDocument();
+  });
+
+  it('shows the pill in the presenter’s header too', async () => {
+    const demo = new DemoSessionStore();
+    demo.dispatch({ type: 'start', scriptId: 'overheat-to-incident', stepCount: 6, now: NOW });
+    renderStudio({ path: '/demo', demo, benchmark: runningBenchmark() });
+    expect(await screen.findByRole('button', { name: /Exit presenter/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Benchmark running/ })).toBeInTheDocument();
+  });
+});
+
 describe('accessibility', () => {
   it('has no violations on the Overview, a placeholder and Foundations', async () => {
     const overview = renderStudio();
     expect(await axeViolations(overview.container)).toEqual([]);
     overview.unmount();
 
-    const placeholder = renderStudio({ path: '/analytics' });
+    const placeholder = renderStudio({ path: '/later', routes: routesWithLater });
     expect(await axeViolations(placeholder.container)).toEqual([]);
     placeholder.unmount();
 

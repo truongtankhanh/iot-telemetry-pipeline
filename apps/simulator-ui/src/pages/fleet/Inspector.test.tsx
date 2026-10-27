@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { stateViewFixture } from '../../api/fixtures/stateView';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { axeViolations } from '../../test-axe';
 import { address, renderFleet } from './fleetTestSupport';
 
@@ -379,5 +380,20 @@ describe('Inspector commands', () => {
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
       'Unknown device "dc-env-02"',
     );
+  });
+});
+
+describe('Inspector while a benchmark runs', () => {
+  it('turns Start off for a device that is not running', () => {
+    renderFleet({ path: '/fleet?device=hub-power-01', benchmark: runningBenchmark() });
+    expect(within(dialog()).getByRole('button', { name: 'Start hub-power-01' })).toBeDisabled();
+  });
+
+  it('leaves Pause and Go silent open for a device that runs', () => {
+    renderFleet({ path: '/fleet?device=dc-env-02', benchmark: runningBenchmark() });
+    expect(within(dialog()).getByRole('button', { name: 'Pause dc-env-02' })).toBeEnabled();
+    expect(
+      within(dialog()).getByRole('button', { name: 'Go silent: stop dc-env-02' }),
+    ).toBeEnabled();
   });
 });

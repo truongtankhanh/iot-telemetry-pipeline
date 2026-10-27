@@ -3,7 +3,7 @@ import { Chip } from '../ui/Chip';
 import { uiIcons } from '../ui/icons';
 import { Kbd } from '../ui/Kbd';
 import { Clock } from './Clock';
-import { DependencyPills, EnginePill, FaultsPill } from './DependencyPills';
+import { BenchmarkPill, DependencyPills, EnginePill, FaultsPill } from './DependencyPills';
 import styles from './header.module.css';
 
 /** The campus of the demo registry (apps/ingest/config/devices.json); the registry names no other. */
@@ -37,6 +37,7 @@ export function Header({ onOpenPalette }: HeaderProps) {
       </div>
       <DependencyPills />
       <div className={styles.end}>
+        <BenchmarkPill />
         <EnginePill />
         <FaultsPill />
         <Button

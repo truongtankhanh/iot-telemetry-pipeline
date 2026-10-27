@@ -1,0 +1,29 @@
+/* The look of the hold dialog, which this one is a sibling of: the layers and the type are composed, not copied. */
+.scrim {
+  composes: scrim from '../fleet/holdDialog.module.css';
+}
+
+.dialog {
+  composes: dialog from '../fleet/holdDialog.module.css';
+  width: min(560px, 100%);
+}
+
+.title {
+  composes: title from '../fleet/holdDialog.module.css';
+}
+
+.buttons {
+  composes: buttons from '../fleet/holdDialog.module.css';
+}
+
+/* What the run costs: one sentence for each, as a list, so a screen reader counts them. */
+.costs {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+}

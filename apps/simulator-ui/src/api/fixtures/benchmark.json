@@ -1,0 +1,204 @@
+{
+  "benchmark": {
+    "available": true,
+    "reason": null,
+    "database": "localhost:5433/telemetry",
+    "maxMessages": 250000,
+    "running": true,
+    "current": {
+      "id": 3,
+      "startedAt": "2026-10-27T09:30:00.000Z",
+      "endedAt": null,
+      "phase": "publishing",
+      "outcome": null,
+      "reason": null,
+      "comparable": null,
+      "settings": { "messages": 100000, "devices": 6, "timeoutS": 120 },
+      "expectedReadings": 200001,
+      "published": 62400,
+      "stored": 124000,
+      "elapsedMs": 10700,
+      "result": null,
+      "marks": { "publishEndedS": null, "rampUpEndS": 1 },
+      "series": [
+        { "t": 0, "published": 0, "stored": 0, "buffered": 0, "flushP95S": null, "queueDelayS": 0 },
+        {
+          "t": 1,
+          "published": 2100,
+          "stored": 3300,
+          "buffered": 640,
+          "flushP95S": 0.012,
+          "queueDelayS": 0.11
+        },
+        {
+          "t": 2,
+          "published": 7800,
+          "stored": 14700,
+          "buffered": 820,
+          "flushP95S": 0.014,
+          "queueDelayS": 0.14
+        },
+        {
+          "t": 3,
+          "published": 13600,
+          "stored": 26500,
+          "buffered": 910,
+          "flushP95S": 0.016,
+          "queueDelayS": 0.16
+        },
+        {
+          "t": 4,
+          "published": 19500,
+          "stored": 38200,
+          "buffered": 880,
+          "flushP95S": 0.018,
+          "queueDelayS": 0.15
+        },
+        {
+          "t": 5,
+          "published": 25300,
+          "stored": 49700,
+          "buffered": 930,
+          "flushP95S": 0.017,
+          "queueDelayS": 0.16
+        },
+        {
+          "t": 6,
+          "published": 31200,
+          "stored": 61500,
+          "buffered": 760,
+          "flushP95S": 0.018,
+          "queueDelayS": 0.13
+        },
+        {
+          "t": 7,
+          "published": 37000,
+          "stored": 73100,
+          "buffered": 840,
+          "flushP95S": 0.019,
+          "queueDelayS": 0.14
+        },
+        {
+          "t": 8,
+          "published": 43000,
+          "stored": 85200,
+          "buffered": 870,
+          "flushP95S": 0.018,
+          "queueDelayS": 0.15
+        },
+        {
+          "t": 9,
+          "published": 48800,
+          "stored": 96900,
+          "buffered": 900,
+          "flushP95S": 0.017,
+          "queueDelayS": 0.16
+        },
+        {
+          "t": 10,
+          "published": 58200,
+          "stored": 115600,
+          "buffered": 820,
+          "flushP95S": 0.018,
+          "queueDelayS": 0.14
+        }
+      ]
+    },
+    "runs": [
+      {
+        "id": 2,
+        "startedAt": "2026-10-27T09:12:00.000Z",
+        "endedAt": "2026-10-27T09:12:18.000Z",
+        "phase": "ended",
+        "outcome": "completed",
+        "reason": null,
+        "comparable": true,
+        "settings": { "messages": 100000, "devices": 6, "timeoutS": 120 },
+        "expectedReadings": 200001,
+        "published": 100000,
+        "stored": 200001,
+        "elapsedMs": 17640,
+        "result": {
+          "messages": 100000,
+          "readingsExpected": 200001,
+          "readingsStored": 200001,
+          "publishSeconds": 17.12,
+          "endToEndSeconds": 17.64,
+          "messagesPerSecond": 5669,
+          "readingsPerSecond": 11338,
+          "vcpu": 8,
+          "node": "v24.1.0"
+        },
+        "marks": { "publishEndedS": 17.1, "rampUpEndS": 1.2 },
+        "series": [
+          {
+            "t": 0,
+            "published": 0,
+            "stored": 0,
+            "buffered": 0,
+            "flushP95S": null,
+            "queueDelayS": 0
+          },
+          {
+            "t": 1,
+            "published": 2400,
+            "stored": 4000,
+            "buffered": 700,
+            "flushP95S": 0.013,
+            "queueDelayS": 0.12
+          },
+          {
+            "t": 9,
+            "published": 52000,
+            "stored": 103800,
+            "buffered": 880,
+            "flushP95S": 0.018,
+            "queueDelayS": 0.15
+          },
+          {
+            "t": 17.6,
+            "published": 100000,
+            "stored": 200001,
+            "buffered": 0,
+            "flushP95S": 0.016,
+            "queueDelayS": 0
+          }
+        ]
+      },
+      {
+        "id": 1,
+        "startedAt": "2026-10-27T09:05:00.000Z",
+        "endedAt": "2026-10-27T09:05:07.000Z",
+        "phase": "ended",
+        "outcome": "failed",
+        "reason": "The benchmark process exited without a result (code 1)",
+        "comparable": false,
+        "settings": { "messages": 100000, "devices": 6, "timeoutS": 120 },
+        "expectedReadings": 200001,
+        "published": 41200,
+        "stored": null,
+        "elapsedMs": 7000,
+        "result": null,
+        "marks": { "publishEndedS": null, "rampUpEndS": null },
+        "series": [
+          {
+            "t": 0,
+            "published": 0,
+            "stored": 0,
+            "buffered": 0,
+            "flushP95S": null,
+            "queueDelayS": 0
+          },
+          {
+            "t": 6,
+            "published": 41200,
+            "stored": null,
+            "buffered": null,
+            "flushP95S": null,
+            "queueDelayS": null
+          }
+        ]
+      }
+    ]
+  }
+}

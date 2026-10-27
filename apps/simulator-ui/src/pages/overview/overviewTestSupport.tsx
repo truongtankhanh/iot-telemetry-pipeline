@@ -12,6 +12,7 @@ import type { ObservationEvent, ScenarioLibraryView, StateView } from '../../api
 import { AnimationBudget } from '../../lib/animationBudget';
 import { HistoryStore } from '../../state/history';
 import { ObservationLog } from '../../state/observationLog';
+import type { BenchmarkStore } from '../../state/benchmarkStore';
 import { StudioProvider } from '../../state/StudioProvider';
 import { createStudioStore, type LinkState, type StudioStore } from '../../state/store';
 import { AnimationBudgetProvider } from '../../ui/AnimationBudget';
@@ -166,6 +167,8 @@ export function fakeOverviewSimulator(
 }
 
 export interface RenderOverviewOptions {
+  /** The window's benchmark; a test with a run going passes one that holds it. */
+  benchmark?: BenchmarkStore;
   /** The address to open (`/?scenario=bad-afternoon`). */
   path?: string;
   /** The state the store holds; `null` is a page before its first message. */
@@ -217,7 +220,12 @@ export function renderOverview(options: RenderOverviewOptions = {}): OverviewHar
   log.seed(simulator.events);
 
   const result = render(
-    <StudioProvider store={store} history={history} observations={log}>
+    <StudioProvider
+      store={store}
+      history={history}
+      observations={log}
+      benchmark={options.benchmark}
+    >
       <AnimationBudgetProvider budget={new AnimationBudget()}>
         <MemoryRouter initialEntries={[path]}>
           <Routes>

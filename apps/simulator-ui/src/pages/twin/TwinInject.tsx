@@ -4,6 +4,7 @@ import type { DeviceInfo } from '../../api/types';
 import { metricUnit } from '../../lib/deviceIdentity';
 import { injectionSentence, INJECT_TILES, labLink, startsInSentence } from '../../lib/twinInject';
 import { Button } from '../../ui/Button';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { Card } from '../../ui/Card';
 import { Icon } from '../../ui/Icon';
 import { faultGlyphs, toneIcons } from '../../ui/icons';
@@ -30,6 +31,8 @@ export function TwinInject({ device }: TwinInjectProps) {
   const group = useId();
   const noteId = useId();
   const busy = injection.progress.running;
+  // A benchmark is running: an injection may start devices, which the simulator refuses; the banner says why.
+  const lock = useBenchmarkLock();
   const metric = plan.metric;
   const unit = metric === null ? '' : metricUnit(metric);
   const sentence = injectionSentence(plan, draft);
@@ -92,7 +95,7 @@ export function TwinInject({ device }: TwinInjectProps) {
         <Button
           variant="primary"
           size="sm"
-          disabled={plan.blocker !== null || busy}
+          disabled={plan.blocker !== null || busy || lock.locked}
           onClick={() => void inject()}
         >
           Inject now
