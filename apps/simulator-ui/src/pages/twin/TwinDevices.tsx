@@ -27,7 +27,10 @@ const COLUMNS: (now: number) => Column<TwinDeviceRow>[] = (now) => [
   {
     id: 'state',
     header: 'State',
-    cell: (row) => (row.reason === null ? row.stateWord : `${row.stateWord}: ${row.reason}`),
+    cell: (row) => {
+      const state = row.reason === null ? row.stateWord : `${row.stateWord}: ${row.reason}`;
+      return row.alert === null ? state : `${state} · ${row.alert}`;
+    },
   },
   { id: 'values', header: 'Latest values', cell: readings },
   {

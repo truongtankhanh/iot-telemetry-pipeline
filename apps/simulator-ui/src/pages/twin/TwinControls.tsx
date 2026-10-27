@@ -9,6 +9,10 @@ import styles from './twinStage.module.css';
 
 export interface TwinLayers {
   devices: boolean;
+  /** The Pipeline hub, the arc from each pin to it and the dots that travel the arcs. */
+  dataFlow: boolean;
+  /** The beacons of open alerts and the alert chip on a label. */
+  alerts: boolean;
   catalogue: boolean;
 }
 
@@ -28,7 +32,7 @@ export interface TwinControlsProps {
  * bottom right — the presets _Campus_ and _Top_ (flights of 600 ms) and the buttons that turn, zoom and reset the view.
  * Every control is a real button or switch with a name, so the camera has a keyboard path that does not need the scene to
  * be focused. The presets are actions and not a choice: the viewer can move the camera off one, so none is shown as
- * "current". Layers for data flow, alerts and heat arrive with the tickets that draw them.
+ * "current". The layers are Devices, Data flow, Alerts and Catalogue; Heat arrives with the ticket that draws it (SIM-20).
  */
 export function TwinControls({
   link,
@@ -59,6 +63,16 @@ export function TwinControls({
             label="Devices"
             checked={layers.devices}
             onChange={(devices) => onLayers({ ...layers, devices })}
+          />
+          <Switch
+            label="Data flow"
+            checked={layers.dataFlow}
+            onChange={(dataFlow) => onLayers({ ...layers, dataFlow })}
+          />
+          <Switch
+            label="Alerts"
+            checked={layers.alerts}
+            onChange={(alerts) => onLayers({ ...layers, alerts })}
           />
           <Switch
             label={`Catalogue · ${catalogueCount}`}

@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import type { ObservedAlert } from '../../api/types';
 import { formatAgo } from '../../lib/time';
+import { openAlertsWords } from '../../lib/twinAlerts';
 import type { TwinPin } from '../../lib/twinPins';
 import type { TwinSelection } from '../../lib/twinQuery';
 import { useStudio } from '../../state/studioContext';
@@ -11,20 +12,6 @@ import styles from './twin.module.css';
 import type { TwinModel } from './useTwinModel';
 
 const NO_ALERTS: readonly ObservedAlert[] = [];
-
-/** "1 high, 2 low": the open alerts of some devices, by severity, worst first. */
-function openAlertsWords(alerts: readonly ObservedAlert[], deviceIds: ReadonlySet<string>): string {
-  const bySeverity = new Map<string, number>();
-  for (const alert of alerts) {
-    if (alert.status !== 'open' || !deviceIds.has(alert.deviceId)) continue;
-    bySeverity.set(alert.severity, (bySeverity.get(alert.severity) ?? 0) + 1);
-  }
-  if (bySeverity.size === 0) return 'none';
-  return ['critical', 'high', 'medium', 'low']
-    .filter((severity) => bySeverity.has(severity))
-    .map((severity) => `${bySeverity.get(severity)} ${severity}`)
-    .join(', ');
-}
 
 function Facts({ rows }: { rows: [label: string, value: string][] }) {
   return (
@@ -52,6 +39,7 @@ function DeviceFacts({ id, model }: { id: string; model: TwinModel }) {
           ['Kind', row.kindLabel],
           ['Building', `${row.zoneName} (${row.zone})`],
           ['State', row.reason === null ? row.stateWord : `${row.stateWord}: ${row.reason}`],
+          ...(row.alert === null ? [] : [['Alert', row.alert] as [string, string]]),
           ...row.readings.map((reading): [string, string] => [reading.label, reading.text]),
           ['Last heard', row.lastSeen === null ? '—' : formatAgo(row.lastSeen, model.now)],
           [
@@ -68,6 +56,14 @@ function DeviceFacts({ id, model }: { id: string; model: TwinModel }) {
         <Link className={pagesStyles.link} to={`/fleet?device=${encodeURIComponent(id)}`}>
           Open in Fleet
         </Link>
+        {row.alert === null ? null : (
+          <>
+            {' · '}
+            <Link className={pagesStyles.link} to="/alerts">
+              Open alerts
+            </Link>
+          </>
+        )}
       </p>
     </>
   );

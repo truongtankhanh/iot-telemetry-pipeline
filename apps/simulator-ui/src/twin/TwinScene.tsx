@@ -3,20 +3,25 @@ import { type Ref, useEffect, useRef } from 'react';
 import type { TwinAsset, TwinLayout } from '../api/types';
 import type { TopologyState } from '../lib/topologyState';
 import { LENS } from '../lib/twinCamera';
+import type { TwinFlow } from '../lib/twinFlow';
 import type { TwinPin } from '../lib/twinPins';
 import type { SceneProblem } from '../lib/twinStatus';
 import type { TwinSelection } from '../lib/twinQuery';
 import { watchContextLoss } from '../lib/webgl';
+import { Arcs } from './Arcs';
 import { Buildings } from './Buildings';
 import { CameraRig, type CameraRigHandle } from './CameraRig';
 import { CatalogueMarkers } from './CatalogueMarkers';
+import { Dots, type PulseSource } from './Dots';
 import { Ground } from './Ground';
+import { Hub } from './Hub';
 import { LabelProjector, type ViewListener } from './LabelProjector';
 import { Pins } from './Pins';
 import { twinColors } from './twinColors';
 
 export type { CameraRigHandle as TwinSceneHandle } from './CameraRig';
 export type { ViewListener } from './LabelProjector';
+export type { PulseSource } from './Dots';
 
 /**
  * The lights make the walls: every face is the top colour, and a Lambert surface lit by a hemisphere light (the same
@@ -60,8 +65,16 @@ export interface TwinSceneProps {
   buildingStates: Readonly<Record<string, TopologyState | null>>;
   /** The nine catalogue assets drawn at campus level. */
   catalogue: readonly TwinAsset[];
+  /** The Pipeline hub and the arc from each pin to it. */
+  flow: TwinFlow;
+  /** The arcs that hold a `line` slot of the animation budget (taken on the page): only these move dots. */
+  granted: ReadonlySet<string>;
+  /** The devices whose beacon may move (they hold a `node` slot of the animation budget); the other beacons are still. */
+  moving: ReadonlySet<string>;
+  /** Listens to the engine's published messages of the placed devices: what draws a dot. */
+  pulses: PulseSource;
   /** Which layers are on. */
-  layers: { devices: boolean; catalogue: boolean };
+  layers: { devices: boolean; catalogue: boolean; dataFlow: boolean; alerts: boolean };
   selection: TwinSelection | null;
   /** What the pointer is over, for the cursor and the larger hovered pin. */
   hovered: TwinSelection | null;
@@ -84,8 +97,9 @@ export interface TwinSceneProps {
 }
 
 /**
- * The 3D campus (SIM-18): the ground, the site boundary, the extruded buildings with the look of their worst device, a pin
- * for each placed device, the catalogue markers, orbit controls the page can also drive, and the projection the DOM labels
+ * The 3D campus (SIM-18, SIM-19): the ground, the site boundary, the extruded buildings with the look of their worst device,
+ * a pin for each placed device (with a beacon while an alert is open on it), the logical Pipeline hub with an arc from each
+ * pin and the dots that travel them, the catalogue markers, orbit controls the page can also drive, and the projection the DOM labels
  * need, on a canvas that draws on demand. This module and its siblings in `src/twin/` are the only code that imports
  * three.js or React Three Fiber, and the page imports it only through a dynamic `import()`, so it is its own chunk and a
  * device without WebGL 2 never downloads it.
@@ -99,6 +113,10 @@ export function TwinScene({
   pins,
   buildingStates,
   catalogue,
+  flow,
+  granted,
+  moving,
+  pulses,
   layers,
   selection,
   hovered,
@@ -118,13 +136,14 @@ export function TwinScene({
   useEffect(() => () => stop.current?.(), []);
 
   const buildings = layout.zones.filter((zone) => zone.kind === 'building').length;
+  const alerting = pins.filter((pin) => pin.alert !== null).length;
   return (
     <div
       className={className}
       role="img"
       // The pointer is over something to choose.
       style={hovered === null ? undefined : { cursor: 'pointer' }}
-      aria-label={`The campus in 3D: the site boundary, ${buildings} buildings and ${pins.length} devices. Drag to orbit, scroll to zoom, right-drag to pan. The same facts are listed below as text.`}
+      aria-label={`The campus in 3D: the site boundary, ${buildings} buildings and ${pins.length} devices${alerting === 0 ? '' : `, ${alerting} with an open alert`}, each joined by an arc to the logical Pipeline hub. Drag to orbit, scroll to zoom, right-drag to pan. The same facts are listed below as text.`}
     >
       <Canvas
         frameloop="demand"
@@ -157,11 +176,16 @@ export function TwinScene({
         {/* The rig before the pins and the projector: frame callbacks run in the order they were registered, and the
             rig is what moves the camera that they read. */}
         <CameraRig boundary={layout.boundary} ref={ref} />
+        <Arcs arcs={flow.arcs} visible={layers.dataFlow} />
+        <Hub hub={flow.hub} visible={layers.dataFlow} />
+        <Dots arcs={flow.arcs} granted={granted} pulses={pulses} visible={layers.dataFlow} />
         <Pins
           pins={pins}
           selectedId={selection?.type === 'device' ? selection.id : null}
           hoveredId={hovered?.type === 'device' ? hovered.id : null}
           visible={layers.devices}
+          alerts={layers.alerts}
+          moving={moving}
           onHover={onHover}
           onLeave={onLeave}
           onSelect={onSelect}

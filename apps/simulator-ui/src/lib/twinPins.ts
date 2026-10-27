@@ -10,6 +10,7 @@ import type { FleetRow } from './fleetQuery';
 import { formatValue } from './rules';
 import { formatAgo } from './time';
 import { deviceTopologyState, TOPOLOGY_WORDS, type TopologyState, worstOf } from './topologyState';
+import { type AlertMark, alertWords } from './twinAlerts';
 import { DEFAULT_BUILDING_HEIGHT_M, sceneOf } from './twinGeometry';
 import type { TwinSelection } from './twinQuery';
 
@@ -54,6 +55,8 @@ export interface TwinPin {
   reason: string | null;
   /** When the device was last heard from (ms since the epoch), or `null`. */
   lastSeen: number | null;
+  /** The worst alert open on the device (a beacon on the pin, a chip on the label), or `null`. */
+  alert: AlertMark | null;
   placement: 'illustrative' | 'surveyed';
   /** Where the pin floats, in scene metres. */
   anchor: [number, number, number];
@@ -71,6 +74,8 @@ export interface PinOptions {
    * "ingest unreachable").
    */
   linkLost: boolean;
+  /** The open alert of each device that has one (`alertMarks`). */
+  alerts: ReadonlyMap<string, AlertMark>;
 }
 
 /** `29.3 °C`, `702 ppm`, or `—` for no value. */
@@ -93,6 +98,10 @@ function detailOf(
   if ((state === 'healthy' || state === 'anomaly') && first !== undefined && first.value !== null) {
     return `${zoneName} · ${readingText(first.metric, first.value)}`;
   }
+  // A silent device shows how old its last value is (the fault table: "the label shows the age of the last value").
+  if (row.status.kind === 'silent' && row.lastSeen !== null) {
+    return `${zoneName} · silent · last value ${formatAgo(row.lastSeen, now)}`;
+  }
   return `${zoneName} · ${row.status.word.toLowerCase()}`;
 }
 
@@ -114,7 +123,15 @@ export function twinPins(
     const zone = zones.get(position.zone);
     const roof = zone?.kind === 'building' ? (zone.heightM ?? DEFAULT_BUILDING_HEIGHT_M) : 0;
     const [east, north] = position.at;
-    const state: TopologyState = options.linkLost ? 'stale' : deviceTopologyState(row.status.kind);
+    const alert = options.alerts.get(row.device.id) ?? null;
+    const fleetState: TopologyState = options.linkLost
+      ? 'stale'
+      : deviceTopologyState(row.status.kind);
+    // An alert outlives the breach that raised it (it clears after the readings are back), so for a while a device reads in
+    // range while its alert is open. The design table makes "alert open" amber: the pin, the rim and the arc look like an
+    // anomaly. Only the look changes: the word stays Fleet's, and a device that is not reporting stays dark.
+    const state: TopologyState =
+      fleetState === 'healthy' && alert !== null ? 'anomaly' : fleetState;
     const identity = kindIdentity(row.device.kind);
     const zoneName = zone?.name ?? position.zone;
     pins.push({
@@ -131,6 +148,7 @@ export function twinPins(
       word: row.status.word,
       reason: row.status.reason,
       lastSeen: row.lastSeen,
+      alert,
       placement: position.placement,
       anchor: sceneOf(east, north, roof + PIN_LIFT_M),
       stemBase: sceneOf(east, north, roof),
@@ -208,6 +226,8 @@ export interface TwinDeviceRow {
   reason: string | null;
   /** When the device was last heard from (ms since the epoch), or `null`. */
   lastSeen: number | null;
+  /** The worst open alert in words (`alert #7 high, +1 more`), or `null`. */
+  alert: string | null;
   readings: TwinReading[];
   /** `illustrative` or `surveyed` for a device the layout places; `null` for one it does not. */
   placement: 'illustrative' | 'surveyed' | null;
@@ -223,12 +243,14 @@ export function deviceList(
   layout: Pick<TwinLayout, 'zones' | 'devices'>,
   placement: TwinPlacement,
   rows: readonly FleetRow[],
+  alerts: ReadonlyMap<string, AlertMark>,
 ): TwinDeviceRow[] {
   const zones = new Map(layout.zones.map((zone) => [zone.code, zone.name]));
   const positions = new Map(layout.devices.map((device) => [device.id, device]));
   const reasons = new Map(placement.unplaced.map((device) => [device.id, device.reason]));
   return rows.map((row) => {
     const position = positions.get(row.device.id);
+    const mark = alerts.get(row.device.id);
     return {
       id: row.device.id,
       name: row.name,
@@ -238,6 +260,7 @@ export function deviceList(
       stateWord: row.status.word,
       reason: row.status.reason,
       lastSeen: row.lastSeen,
+      alert: mark === undefined ? null : alertWords(mark),
       readings: row.readings.map(({ metric, value }) => ({
         metric,
         label: metricLabel(metric),
@@ -276,6 +299,7 @@ export function tooltipOf(
       lines: [
         `${pin.kindLabel} · ${pin.zoneName}`,
         pin.reason === null ? pin.word : `${pin.word}: ${pin.reason}`,
+        ...(pin.alert === null ? [] : [`Alert: ${alertWords(pin.alert)}`]),
         ...pin.readings.map((reading) => `${reading.label} ${reading.text}`),
         pin.placement === 'illustrative'
           ? 'Position: illustrative (placed by hand)'

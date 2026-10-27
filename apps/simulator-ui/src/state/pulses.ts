@@ -1,5 +1,14 @@
-/** Told when a device published: the id and when (ms since the epoch, this window's clock). */
-export type PulseListener = (deviceId: string, at: number) => void;
+import type { PublishedMessage } from '../api/types';
+
+/** What was not plain about a message: a second copy, a burst message, a malformed payload, a republish. */
+export type PulseFault = NonNullable<PublishedMessage['fault']>;
+
+/**
+ * Told when a device published: the id and when (ms since the epoch, this window's clock), and, for a message that was
+ * not a plain one, what kind. The third argument is for the twin's dots (a duplicate travels as a pair); the
+ * topology's edges take two parameters and never see it.
+ */
+export type PulseListener = (deviceId: string, at: number, fault?: PulseFault) => void;
 
 /**
  * "A message left a device", as an event. It exists for the dots that travel the topology's edges: they must move when
@@ -12,11 +21,15 @@ export type PulseListener = (deviceId: string, at: number) => void;
 export class PulseBus {
   private readonly listeners = new Map<string, Set<PulseListener>>();
 
-  /** Calls the listeners of a device. One that throws is logged and does not stop the others, nor the stream that called. */
-  emit(deviceId: string, at: number): void {
+  /**
+   * Calls the listeners of a device. One that throws is logged and does not stop the others, nor the stream that called.
+   * A plain message calls them with two arguments, as before, so a listener written for two never sees a third.
+   */
+  emit(deviceId: string, at: number, fault?: PulseFault): void {
     for (const listener of this.listeners.get(deviceId) ?? []) {
       try {
-        listener(deviceId, at);
+        if (fault === undefined) listener(deviceId, at);
+        else listener(deviceId, at, fault);
       } catch (error) {
         // Logged, not rethrown: a broken dot must not stop the stream's other work or the other edges' dots.
         console.error(`pulse listener for ${deviceId} failed`, error);
