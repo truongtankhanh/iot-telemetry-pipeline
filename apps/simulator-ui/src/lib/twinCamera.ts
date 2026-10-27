@@ -1,4 +1,5 @@
 import type { TwinBoundary } from '../api/types';
+import type { GroundBox } from './twinGeometry';
 
 /**
  * The camera of the digital twin, as numbers: the limits of the command center's brief and the home view, which are the
@@ -50,6 +51,17 @@ export function clampTarget(
 }
 
 /**
+ * How far the camera must be for a sphere of `radius` to fit the lens with the home margin, inside the campus distance
+ * limits. The narrower of the two half-angles decides: a tall canvas is limited by its width.
+ */
+export function fitDistance(radius: number, aspect: number, fovDeg: number = HOME_FOV_DEG): number {
+  const halfVertical = toRadians(fovDeg) / 2;
+  const halfAngle = Math.min(halfVertical, Math.atan(Math.tan(halfVertical) * aspect));
+  const fit = (radius * (1 + HOME_MARGIN)) / Math.sin(halfAngle);
+  return Math.min(MAX_DISTANCE_M, Math.max(MIN_DISTANCE_M, fit));
+}
+
+/**
  * The first view: looking at the middle of the boundary from the south-east, far enough that the whole boundary is in
  * the picture with a margin (a circle round the boundary's rectangle, so the fit is a little generous), inside the
  * campus distance limits. `aspect` is the canvas's width over its height.
@@ -65,11 +77,7 @@ export function homeView(
     -(boundary.south + boundary.north) / 2 || 0,
   ];
   const radius = Math.hypot(boundary.east - boundary.west, boundary.north - boundary.south) / 2;
-  const halfVertical = toRadians(fovDeg) / 2;
-  // The narrower of the two half-angles decides: a tall canvas is limited by its width.
-  const halfAngle = Math.min(halfVertical, Math.atan(Math.tan(halfVertical) * aspect));
-  const fit = (radius * (1 + HOME_MARGIN)) / Math.sin(halfAngle);
-  const distance = Math.min(MAX_DISTANCE_M, Math.max(MIN_DISTANCE_M, fit));
+  const distance = fitDistance(radius, aspect, fovDeg);
 
   const tilt = toRadians(HOME_TILT_DEG);
   const yaw = toRadians(HOME_YAW_DEG);
@@ -91,8 +99,9 @@ export interface CameraView {
 }
 
 /**
- * The presets that fly. _Building_ arrives with the building focus (SIM-20). _Top_ is the nearest to overhead the tilt
- * limit allows: 20° from vertical, the same yaw and distance as the home view, so the limit the design set stays one.
+ * The presets that need nothing but the boundary. _Top_ is the nearest to overhead the tilt limit allows: 20° from
+ * vertical, the same yaw and distance as the home view, so the limit the design set stays one. The _Building_ view is not
+ * a preset: it is made for one building (`CameraTarget`).
  */
 export type CameraPreset = 'campus' | 'top';
 
@@ -129,6 +138,43 @@ export function presetView(
   if (preset === 'top') return topView(boundary, aspect);
   const home = homeView(boundary, aspect);
   return { target: home.target, position: home.position };
+}
+
+/** What a view of one building has to hold: its footprint united with its assets (`buildingBounds`), and its height. */
+export interface BuildingFocus {
+  box: GroundBox;
+  heightM: number;
+}
+
+/** Where the camera can be sent: a preset, or one building. */
+export type CameraTarget = CameraPreset | { building: BuildingFocus };
+
+/**
+ * The view of one building: the home view's yaw and tilt, looking at the middle of the box at half the building's height,
+ * far enough that the box and the height fit the lens, inside the same distance, tilt and target limits as the campus.
+ * The command center has limits of its own per level; they are not copied.
+ */
+export function buildingView(
+  focus: BuildingFocus,
+  boundary: TwinBoundary,
+  aspect: number,
+): CameraView {
+  const { box, heightM } = focus;
+  const east = (box.west + box.east) / 2;
+  const north = (box.south + box.north) / 2;
+  const target = clampTarget([east, heightM / 2, -north || 0], boundary);
+  const radius = Math.hypot(box.east - box.west, box.north - box.south, heightM) / 2;
+  return {
+    target,
+    position: orbitPosition(target, fitDistance(radius, aspect), HOME_TILT_DEG, HOME_YAW_DEG),
+  };
+}
+
+/** The view for a flight's destination. */
+export function viewFor(target: CameraTarget, boundary: TwinBoundary, aspect: number): CameraView {
+  return typeof target === 'string'
+    ? presetView(target, boundary, aspect)
+    : buildingView(target.building, boundary, aspect);
 }
 
 /**

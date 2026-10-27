@@ -85,6 +85,14 @@ div[data-stale='true'] .stage {
   gap: 16px;
 }
 
+/* The right-hand column: the selection and, in a focused building, what else stands in it. */
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
 /* ---- the selection card ---- */
 
 .selectionTitle {
@@ -156,6 +164,109 @@ div[data-stale='true'] .stage {
   gap: 8px;
   font-size: var(--fs-min);
   color: var(--text-secondary);
+}
+
+/* ---- the building in focus (SIM-20, frame 15) ---- */
+
+/* The header over the stage: the breadcrumb, the building's name and the key that goes up a level. */
+.level {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 12px;
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+/* The separator is decoration: the empty alternative keeps it out of what a screen reader says. */
+.crumbs li + li::before {
+  content: '›' / '';
+  margin-inline: 2px 4px;
+  color: var(--text-tertiary);
+}
+
+.crumbs [aria-current='location'] {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.levelTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.levelTitle h2 {
+  margin: 0;
+  font-size: var(--fs-page-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.levelTitle + .hint {
+  margin: 0;
+}
+
+/* The device inspector: the name with its state, then the value, the rule in words and the chart. */
+.inspectorHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+
+.inspectorHead .selectionTitle {
+  margin: 0;
+}
+
+.reading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 8px 0 0;
+}
+
+/* Only numerals of 24 px and up glow; what stands beside it is plain text. */
+.big {
+  font-size: var(--fs-numeral);
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: #e6fbff;
+  text-shadow:
+    0 0 8px rgba(71, 215, 255, 0.6),
+    0 0 20px rgba(71, 215, 255, 0.3);
+}
+
+.unit {
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.metricName {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+.rule {
+  margin: 4px 0 8px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
 }
 
 /* ---- the text twin ---- */

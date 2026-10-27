@@ -4,7 +4,7 @@ import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide } from 't
 import { LENS } from '../lib/twinCamera';
 import { isLit, type TwinArc } from '../lib/twinFlow';
 import { type DashPattern, ribbonIndices, writeRibbon } from '../lib/twinRibbon';
-import { arcColors } from './twinColors';
+import { arcColors, ghostOpacity } from './twinColors';
 
 /** Widths on the screen, in pixels: frame 14's halo (8) and core (2), a little wider for the glow to read at 1.5 pixel ratio. */
 const HALO_PX = 9;
@@ -60,8 +60,9 @@ export interface ArcsProps {
  * wire in grey or red. Each is a **ribbon** that faces the camera and keeps its width in pixels (`writeRibbon`), because a
  * line is one pixel wide in WebGL. No bloom pass and no filter: a bloom costs more than six arcs justify and would glow the
  * buildings too. The ribbons are rewritten whenever the scene is drawn, which is when the camera moved or something
- * changed; nothing here asks for a frame of its own. A drop is drawn as gaps in the core. The dots that travel the arcs
- * are `Dots`. The geometries are **disposed** when the arcs change or the scene unmounts.
+ * changed; nothing here asks for a frame of its own. A drop is drawn as gaps in the core. An arc that leaves a faded pin
+ * (another building is in focus) is drawn at the ghost opacity. The dots that travel the arcs are `Dots`. The geometries
+ * are **disposed** when the arcs change or the scene unmounts.
  */
 export function Arcs({ arcs, visible }: ArcsProps) {
   const invalidate = useThree((state) => state.invalidate);
@@ -103,7 +104,7 @@ export function Arcs({ arcs, visible }: ArcsProps) {
               <meshBasicMaterial
                 color={arcColors[arc.look]}
                 transparent
-                opacity={HALO_OPACITY}
+                opacity={arc.dim ? HALO_OPACITY * ghostOpacity : HALO_OPACITY}
                 blending={AdditiveBlending}
                 depthTest={false}
                 depthWrite={false}
@@ -114,8 +115,8 @@ export function Arcs({ arcs, visible }: ArcsProps) {
           <mesh geometry={core.geometry} renderOrder={6} frustumCulled={false}>
             <meshBasicMaterial
               color={arcColors[arc.look]}
-              transparent={!isLit(arc.look)}
-              opacity={isLit(arc.look) ? 1 : 0.8}
+              transparent={arc.dim || !isLit(arc.look)}
+              opacity={arc.dim ? ghostOpacity : isLit(arc.look) ? 1 : 0.8}
               depthTest={false}
               depthWrite={false}
               side={DoubleSide}

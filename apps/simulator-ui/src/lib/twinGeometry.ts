@@ -1,4 +1,5 @@
-import type { TwinBoundary, TwinZone } from '../api/types';
+import type { TwinAsset, TwinBoundary, TwinLayout, TwinZone } from '../api/types';
+import { footprintOfClass } from './twinAssetClasses';
 
 /**
  * The geometry of the digital twin, as plain numbers: nothing here imports three.js, so the scene (`src/twin/`) is the
@@ -74,6 +75,101 @@ export function footprintOf(zone: Pick<TwinZone, 'at' | 'size'>): GroundBox {
   };
 }
 
+/** The ground a box of `size` [width, depth] stands on when it is centred on `at` ([east, north]). */
+export function assetBox(
+  at: readonly [number, number],
+  size: readonly [number, number],
+): GroundBox {
+  return {
+    west: at[0] - size[0] / 2,
+    east: at[0] + size[0] / 2,
+    south: at[1] - size[1] / 2,
+    north: at[1] + size[1] / 2,
+  };
+}
+
+/** The smallest box that holds both. */
+export function unionBox(a: GroundBox, b: GroundBox): GroundBox {
+  return {
+    west: Math.min(a.west, b.west),
+    east: Math.max(a.east, b.east),
+    south: Math.min(a.south, b.south),
+    north: Math.max(a.north, b.north),
+  };
+}
+
+/** The ground of a catalogue asset, from its class footprint (a class the table lacks is a 1.4 m cube). */
+export function assetGround(asset: Pick<TwinAsset, 'at' | 'class'>): GroundBox {
+  const [width, depth] = footprintOfClass(asset.class);
+  return assetBox(asset.at, [width, depth]);
+}
+
+export interface BuildingBounds {
+  /** The footprint united with the ground of every catalogue asset of the building, so one outside the wall is in view. */
+  box: GroundBox;
+  heightM: number;
+}
+
+/** What a view of one building must hold; `null` for a code that is not a building of the layout. */
+export function buildingBounds(
+  layout: Pick<TwinLayout, 'zones' | 'catalogue'>,
+  code: string,
+): BuildingBounds | null {
+  const zone = layout.zones.find(
+    (candidate) => candidate.code === code && candidate.kind === 'building',
+  );
+  if (zone === undefined) return null;
+  const box = layout.catalogue
+    .filter((asset) => asset.zone === code)
+    .reduce((bounds, asset) => unionBox(bounds, assetGround(asset)), footprintOf(zone));
+  return { box, heightM: zone.heightM ?? DEFAULT_BUILDING_HEIGHT_M };
+}
+
+/** One square of the floor, with its centre in metres [east, north] and its edges. */
+export interface FloorCell {
+  col: number;
+  row: number;
+  east: number;
+  north: number;
+  box: GroundBox;
+}
+
+export interface FloorGrid {
+  cols: number;
+  rows: number;
+  /** Row by row from the south-west corner: `cells[row * cols + col]`. */
+  cells: FloorCell[];
+}
+
+/**
+ * The floor of a box cut into cells about `cellM` on a side (a whole number across each way, at least one), the squares
+ * the heat floor colours and its tests share. A box with no width or depth is one cell.
+ */
+export function floorCells(box: GroundBox, cellM: number): FloorGrid {
+  const width = Math.max(0, box.east - box.west);
+  const depth = Math.max(0, box.north - box.south);
+  const size = cellM > 0 ? cellM : 1;
+  const cols = Math.max(1, Math.round(width / size));
+  const rows = Math.max(1, Math.round(depth / size));
+  const stepEast = width / cols;
+  const stepNorth = depth / rows;
+  const cells: FloorCell[] = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const west = box.west + col * stepEast;
+      const south = box.south + row * stepNorth;
+      cells.push({
+        col,
+        row,
+        east: west + stepEast / 2,
+        north: south + stepNorth / 2,
+        box: { west, east: west + stepEast, south, north: south + stepNorth },
+      });
+    }
+  }
+  return { cols, rows, cells };
+}
+
 /** The buildings of the layout, in its order; the other kinds of zone are flat and are not drawn by the spike. */
 export function buildingShells(layout: { zones: readonly TwinZone[] }): Shell[] {
   return layout.zones
@@ -90,6 +186,8 @@ type Vec3 = [number, number, number];
 
 const VERTICES_PER_BUILDING = 20;
 const INDICES_PER_BUILDING = 30;
+/** A building's index run starts with its top quad (two triangles): the building in focus is drawn without those. */
+export const ROOF_INDICES = 6;
 const EDGE_FLOATS_PER_BUILDING = 12 * 2 * 3;
 
 /**

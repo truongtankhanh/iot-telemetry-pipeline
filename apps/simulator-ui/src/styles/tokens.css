@@ -73,6 +73,19 @@
   --neon-warn: 0 0 0 1px rgba(255, 194, 61, 0.55), 0 0 12px rgba(255, 194, 61, 0.38);
   --neon-bad: 0 0 0 1px rgba(255, 98, 128, 0.55), 0 0 12px rgba(255, 98, 128, 0.38);
 
+  /*
+   * The telemetry ramp of the twin's heat floor: sequential in the accent's hue (216°), lightness carries the value, never
+   * red, orange, yellow or cyan, so it cannot be read as a severity. The command center's (ops-command-center at 0899c86,
+   * apps/console/src/styles/tokens.css); this repository does not check it. It is never text, so contrast.ts has no pair for it:
+   * the legend carries the number. `lib/twinHeat.ts` holds the same six values as numbers for the scene.
+   */
+  --heat-0: #132b50;
+  --heat-1: #1c3d6f;
+  --heat-2: #22539c;
+  --heat-3: #266cd5;
+  --heat-4: #5292f2;
+  --heat-5: #9bc3ff;
+
   --radius-1: 4px;
   --radius-2: 6px;
   --radius-3: 10px;

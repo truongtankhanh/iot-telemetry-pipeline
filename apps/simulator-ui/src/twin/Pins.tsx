@@ -22,7 +22,7 @@ import { beaconPhase } from '../lib/twinFlow';
 import { PIN_LIFT_M, type TwinPin } from '../lib/twinPins';
 import type { TwinSelection } from '../lib/twinQuery';
 import { CLICK_SLOP_PX } from './Buildings';
-import { pinFills, severityColors, stateColors, stemColor } from './twinColors';
+import { ghostOpacity, pinFills, severityColors, stateColors, stemColor } from './twinColors';
 
 /** How wide a pin is on the screen, in pixels, wherever the camera is: a pin is a mark, not a model. */
 const PIN_PX = 16;
@@ -170,6 +170,9 @@ export interface PinsProps {
  * grows and fades once every `BEACON_PERIOD_MS`, behind the pin so the pin stays readable. It is a child of the pin's
  * billboard head, so it keeps its size on the screen too. The scene asks for the next frame only while a beacon exists,
  * the tab is shown and the viewer has not asked for less motion; then the ring is still and larger.
+ *
+ * With a building in focus (SIM-20) the pins of that building stand just above its floor, on a short stem, and the pins of
+ * every other building are `faded` (pin, ring and stem at the ghost opacity) unless they carry a beacon, which never fades.
  */
 export function Pins({
   pins,
@@ -239,10 +242,24 @@ export function Pins({
         const selected = pin.id === selectedId;
         const target: TwinSelection = { type: 'device', id: pin.id };
         const ring = selected ? stateColors.selected : stateColors[pin.state];
+        // Another building is in focus: the pin, its stem and its ring are drawn at the ghost opacity.
+        const opacity = pin.faded ? ghostOpacity : 1;
+        // The stem runs from the pin down to where the device stands: the roof, or in focus the floor, so its length is the
+        // pin's own and not `PIN_LIFT_M`.
+        const stemLength = pin.anchor[1] - pin.stemBase[1];
         return (
           <group key={pin.id} position={pin.anchor}>
-            <lineSegments geometry={geometries.stem} renderOrder={10}>
-              <lineBasicMaterial color={stemColor} depthTest={false} />
+            <lineSegments
+              geometry={geometries.stem}
+              renderOrder={10}
+              scale={[1, stemLength / PIN_LIFT_M, 1]}
+            >
+              <lineBasicMaterial
+                color={stemColor}
+                depthTest={false}
+                transparent={pin.faded}
+                opacity={opacity}
+              />
             </lineSegments>
             <group
               ref={(head) => {
@@ -281,6 +298,8 @@ export function Pins({
                   <meshBasicMaterial
                     color={pin.state === 'anomaly' ? pinFills.anomaly : pinFills.normal}
                     depthTest={false}
+                    transparent={pin.faded}
+                    opacity={opacity}
                   />
                 </mesh>
                 <mesh
@@ -288,7 +307,12 @@ export function Pins({
                   position-z={0.02}
                   renderOrder={12}
                 >
-                  <meshBasicMaterial color={ring} depthTest={false} />
+                  <meshBasicMaterial
+                    color={ring}
+                    depthTest={false}
+                    transparent={pin.faded}
+                    opacity={opacity}
+                  />
                 </mesh>
                 <mesh
                   geometry={geometries.hit}

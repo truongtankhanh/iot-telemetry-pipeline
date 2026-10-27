@@ -39,6 +39,8 @@ export interface TwinArc {
   gaps: boolean;
   /** Delay: how many milliseconds a dot is slower. */
   slow: number;
+  /** The pin it leaves is faded (another building is in focus): drawn at the ghost opacity. */
+  dim: boolean;
 }
 
 export interface HubModel {
@@ -129,6 +131,7 @@ export function twinFlow(
       look: lookOf(pin, hub, visuals),
       gaps: fault.gaps,
       slow: fault.slow,
+      dim: pin.faded,
     };
   });
   return {

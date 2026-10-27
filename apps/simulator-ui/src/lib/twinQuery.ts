@@ -52,6 +52,36 @@ export function climb(
   return device === undefined ? null : { type: 'zone', id: device.zone };
 }
 
+/** How deep into the twin the selection puts the viewer: the whole campus, one building, or one device inside it. */
+export type ViewLevel = 'campus' | 'building' | 'device';
+
+/**
+ * The building the viewer is focused on, derived from the selection and never stored: a selected building, or the
+ * building a selected device stands in. `null` when nothing is selected, for a zone that is not a building, and for a
+ * device the layout does not place (it has no building). So the address (`device`, `zone`) stays the only state.
+ */
+export function focusedZone(
+  selection: TwinSelection | null,
+  layout: Pick<TwinLayout, 'zones' | 'devices'>,
+): string | null {
+  if (selection === null) return null;
+  const code =
+    selection.type === 'zone'
+      ? selection.id
+      : layout.devices.find((candidate) => candidate.id === selection.id)?.zone;
+  if (code === undefined) return null;
+  return layout.zones.some((zone) => zone.code === code && zone.kind === 'building') ? code : null;
+}
+
+/** The level of the Escape ladder the selection is on; a selection that cannot be shown is the campus. */
+export function levelOf(
+  selection: TwinSelection | null,
+  layout: Pick<TwinLayout, 'zones' | 'devices'>,
+): ViewLevel {
+  if (focusedZone(selection, layout) === null) return 'campus';
+  return selection?.type === 'device' ? 'device' : 'building';
+}
+
 /**
  * Why a selection in the address cannot be shown, in a sentence; `null` when it can. A shared link may name a device the
  * registry no longer has, a device the layout has no position for, or a zone that is not a building.

@@ -307,6 +307,19 @@
   border-color: var(--text-tertiary);
 }
 
+/* A catalogue asset's label in a focused building: the code only, dashed and dim, like the box it names (not simulated). */
+.assetLabel {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  padding: 2px 6px;
+}
+
+.assetLabel b {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 .labelChips {
   display: flex;
   flex-wrap: wrap;
@@ -411,6 +424,76 @@
   font-size: var(--fs-min);
   font-weight: 500;
   color: var(--text-secondary);
+}
+
+/* The heat key (frame 15): a card over the stage's bottom left. It is read, not used, so it lets the pointer through. */
+.heatLegend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  box-sizing: border-box;
+  width: min(300px, calc(100% - 24px));
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
+
+.heatTitle {
+  margin: 0 0 6px;
+  font-size: var(--fs-min);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* The six stops of the command center's ramp, evenly spaced; continuous, so a tick sits on a colour and not on a block's edge. */
+.heatRamp {
+  height: 10px;
+  border-radius: var(--radius-1);
+  background: linear-gradient(
+    to right,
+    var(--heat-0) 0%,
+    var(--heat-1) 20%,
+    var(--heat-2) 40%,
+    var(--heat-3) 60%,
+    var(--heat-4) 80%,
+    var(--heat-5) 100%
+  );
+}
+
+.heatEnds {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: var(--fs-min);
+  color: var(--text-tertiary);
+}
+
+.heatText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-size: var(--fs-min);
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+/* The hatch swatch: frame 15's `hatchm` — 45° lines over the floor's colour — so "nothing measured" is a shape. */
+.heatHatch {
+  flex: none;
+  width: 20px;
+  height: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-1);
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--text-tertiary) 55%, transparent) 0 2px,
+    transparent 2px 6px
+  );
 }
 
 .tools {
