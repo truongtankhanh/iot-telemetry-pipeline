@@ -390,3 +390,56 @@ describe('the Twin page, data flow, beacons and faults (SIM-19)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('the Twin page, Inject here (SIM-21)', () => {
+  const table = () => screen.getByRole('table', { name: /Devices in the twin, as text/ });
+
+  it('has no card to inject at while nothing is selected', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    expect(screen.queryByRole('heading', { name: /^Inject at / })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Inject now' })).toBeNull();
+  });
+
+  it('shows the card for a selected device, aimed at it, with a way into the Lab on the same device', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    await userEvent.click(within(table()).getByRole('row', { name: /dc-env-01/ }));
+
+    expect(screen.getByRole('heading', { name: 'Inject at dc-env-01' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Inject now' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open in lab' })).toHaveAttribute(
+      'href',
+      '/lab?target=dc-env-01',
+    );
+  });
+
+  it('moves the card to another device, and takes it away when the selection climbs to a building', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    await userEvent.click(within(table()).getByRole('row', { name: /dc-env-01/ }));
+    expect(screen.getByRole('heading', { name: 'Inject at dc-env-01' })).toBeInTheDocument();
+
+    await userEvent.click(within(table()).getByRole('row', { name: /lib-air-01/ }));
+    expect(screen.getByRole('heading', { name: 'Inject at lib-air-01' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Inject at dc-env-01' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Open in lab' })).toHaveAttribute(
+      'href',
+      '/lab?target=lib-air-01',
+    );
+
+    // A building has no card: its devices are chosen from it.
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('heading', { name: /^Inject at / })).toBeNull();
+  });
+
+  it('has no dock when no guided demo is presented', async () => {
+    stubFetch(() => answer(twinLayoutFixture));
+    renderTwin();
+    await screen.findByTestId('scene');
+    expect(screen.queryByRole('region', { name: 'Guided demo' })).toBeNull();
+  });
+});

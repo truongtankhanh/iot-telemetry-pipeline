@@ -893,3 +893,13 @@ to the contract, the metric names, Compose, Kubernetes or CI.
   confirmation, one run at a time, a ceiling and a timeout. Nothing was hardened.
 - **Not done here.** The page itself (`SIM-15-ui`); `--qos` and `--no-wait` (they would make results not comparable with `docs/benchmarks.md`); an index on `reading (received_at)`; a server-side history of the session
   charts outside a run; a CSV of a series; a run through the engine.
+
+## Amendment, 2026-10-27: camera steps and presenter mode on the twin (SIM-21)
+
+The guided-demo amendment above said a camera step would be a new kind of `action`. SIM-21 built it as **a field of the step** instead, and put presenter mode on the twin. This section records the change; it has not been tested or seen running (see [ADR-0012's SIM-21 amendment](0012-simulator-studio-digital-twin.md#amendment-2026-10-27-sim-21-inject-from-the-scene-and-camera-steps), which holds the details and what is owed).
+
+- **`camera` is a field, not an action.** A step has at most one `action`, and the step that heats the server room already runs the scenario; a camera as an action would have made it two steps and broken frame 08's six. `DemoStep.camera` is `'campus'`, `'top'` or `{ building: '<zone code>' }`, validated by `validateScript`. `DemoAction` is unchanged and still a union.
+  The camera moves when a step comes on screen (forward, back, restart or its awaited event) and only then, and only on a page that has a camera: the twin. Elsewhere it is ignored.
+- **Presenter mode is the demo page's and the twin's** (`App.tsx`'s `PRESENTER_PATHS`). On the twin the demo's driver and keys are the Demo page's own, mounted by a dock beside the scene (never together with the Demo page), and the session is still the window's store, so leaving with `Esc` stops nothing there either. **`Esc` and `←` are presenter mode's on the twin**, not the twin's.
+- The script's text can name the command center's twin as a second screen, in a step's `notes`. It promises nothing about that repository.
+- **Not done here:** other scripts, an editor or an import for scripts, a script step that injects a fault from the scene (the first script still starts the scenario), and a pipeline strip in the dock.

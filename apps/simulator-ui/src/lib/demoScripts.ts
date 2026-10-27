@@ -24,6 +24,7 @@ export const OVERHEAT_TO_INCIDENT: DemoScript = {
       title: 'Everything is normal',
       summary: '{devices}, {rate}',
       say: '“Every device on the campus is publishing readings, and the pipeline is storing them. Nothing is wrong yet.”',
+      camera: 'campus',
       notes: 'The rate is the stream the simulator carries now, not a target.',
     },
     {
@@ -40,6 +41,8 @@ export const OVERHEAT_TO_INCIDENT: DemoScript = {
       say: '“Row A in the data center just got hotter than it should be. Nothing in the pipeline knows that yet. Watch the rule count the readings.”',
       action: { type: 'run-scenario', scenario: 'server-room-overheat' },
       await: { type: 'rule-raised', ruleId: SUBJECT.ruleId, deviceId: SUBJECT.deviceId },
+      // The twin flies to the building the subject device stands in, and focuses on it.
+      camera: { building: 'BLD-DC' },
       notes:
         'The anomaly begins a few seconds after the scenario starts; the count follows the readings Studio sees.',
     },
@@ -56,6 +59,9 @@ export const OVERHEAT_TO_INCIDENT: DemoScript = {
       summary: 'In the Command Center',
       say: '“The outbox worker delivers the alert, and the Command Center opens an incident for the operators.”',
       await: { type: 'incident-delivered', ruleId: SUBJECT.ruleId, deviceId: SUBJECT.deviceId },
+      camera: 'campus',
+      notes:
+        'To show where an operator sees it, open the command center’s own twin on a second screen, if it is running.',
     },
     {
       id: 'recover',

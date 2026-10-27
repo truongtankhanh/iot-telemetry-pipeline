@@ -10,6 +10,11 @@ export interface TwinKeyHandlers {
   /** Back to the campus: the Campus preset, and no selection. */
   home: () => void;
   nudge: (nudge: CameraNudge) => void;
+  /**
+   * A guided demo is being presented on this page: `Esc` and `←` are presenter mode's (leave, back), so the twin does not take
+   * them (`createTwinShortcuts`). The level above is reached with the breadcrumb.
+   */
+  presenting?: boolean;
 }
 
 /**
@@ -22,7 +27,7 @@ export function useTwinKeys(stage: RefObject<HTMLElement | null>, handlers: Twin
   const paletteOpen = useStudio((state) => state.paletteOpen);
   const modalOpen = useStudio((state) => state.modalCount > 0);
   const handle = useMemo(() => createTwinShortcuts(), []);
-  const { escape, home, nudge } = handlers;
+  const { escape, home, nudge, presenting = false } = handlers;
 
   useEffect(() => {
     if (paletteOpen || modalOpen) return;
@@ -35,6 +40,7 @@ export function useTwinKeys(stage: RefObject<HTMLElement | null>, handlers: Twin
         altKey: event.altKey,
         target,
         stageFocused: target instanceof Node && stage.current?.contains(target) === true,
+        presenting,
       });
       if (action === null) return;
       if (action.type === 'escape') {
@@ -47,5 +53,5 @@ export function useTwinKeys(stage: RefObject<HTMLElement | null>, handlers: Twin
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [paletteOpen, modalOpen, handle, stage, escape, home, nudge]);
+  }, [paletteOpen, modalOpen, handle, stage, escape, home, nudge, presenting]);
 }
