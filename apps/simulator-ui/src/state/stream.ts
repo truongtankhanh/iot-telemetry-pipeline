@@ -1,10 +1,14 @@
 import {
+  getBenchmark as fetchBenchmark,
   getObservations as fetchObservations,
   getState as fetchState,
   type ObservationsRequest,
   type RequestOptions,
 } from '../api/client';
 import type {
+  BenchmarkDetail,
+  BenchmarkEvent,
+  BenchmarkSummary,
   ObservationEvent,
   ObservationsPage,
   PublishedMessage,
@@ -13,10 +17,12 @@ import type {
   StateView,
 } from '../api/types';
 import { RateCounter } from '../lib/rate';
+import type { BenchmarkStore } from './benchmarkStore';
 import type { HistoryStore } from './history';
 import type { MessageLog } from './messageLog';
 import { OBSERVATION_CAPACITY, type ObservationLog } from './observationLog';
 import type { PulseBus } from './pulses';
+import type { SessionMetricsStore } from './sessionMetricsStore';
 import type { StudioStore } from './store';
 
 /** The part of `EventSource` the stream uses, so a test can pass a fake (jsdom has none). */
@@ -52,7 +58,24 @@ export interface StreamOptions {
     request: ObservationsRequest,
     options: RequestOptions,
   ) => Promise<ObservationsPage>;
+  /**
+   * The benchmark of the window: the snapshot seeds its summary, each `benchmark` event is applied to it, and the series
+   * the snapshot does not carry are read from the simulator (`getBenchmark`) when there is a run to read. Without it the
+   * benchmark's events are ignored.
+   */
+  benchmark?: BenchmarkStore;
+  /** Reads `GET /api/benchmark`; defaults to the client's. */
+  getBenchmark?: (options: RequestOptions) => Promise<BenchmarkDetail>;
+  /** Where ingest's reads are kept for the Analytics page's session charts: each `metrics` event and each snapshot adds one. */
+  sessionMetrics?: SessionMetricsStore;
 }
+
+/** A benchmark section Studio can seed from: an older simulator has none, and a nonsense one is not guessed at. */
+const isBenchmarkSummary = (value: unknown): value is BenchmarkSummary =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as BenchmarkSummary).available === 'boolean' &&
+  Array.isArray((value as BenchmarkSummary).runs);
 
 /** The most the simulator lets one page hold. */
 const OBSERVATIONS_PAGE = 500;
@@ -85,6 +108,13 @@ export interface StreamConnection {
  *   time, a newer snapshot cancels the one going on); when the cursor is _lower_ than what the log holds the simulator
  *   started again and its ids began at 1, so the log is cleared first. A read that fails changes nothing: the live
  *   events go on filling the log, and the next snapshot tries again.
+ * - `benchmark` is applied to `benchmark`, when one is given. The simulator sends **no `state` event when a run changes**, so
+ *   `view.benchmark` is the state of the snapshot and nothing later; the run going and the finished ones are the store's. A
+ *   snapshot seeds the store with the summary it carries (no series) and, when it names a run, reads `GET /api/benchmark` once for
+ *   the series (one read at a time, a newer snapshot cancels the one going on, a read that fails changes nothing: the events go
+ *   on filling the store and the next snapshot tries again). Events that arrive while the read is on its way are merged with it,
+ *   never overwritten by it.
+ * - With `sessionMetrics`, the metrics of each snapshot and of each `metrics` event are recorded there, one point per read.
  * - `tick-error` is not used by the shell.
  *
  * The browser reconnects an `EventSource` by itself. The link is `live` while it is open and `lost`
@@ -101,10 +131,14 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
 
   const observations = options.observations;
   const readObservations = options.getObservations ?? fetchObservations;
+  const benchmark = options.benchmark;
+  const readBenchmark = options.getBenchmark ?? fetchBenchmark;
+  const sessionMetrics = options.sessionMetrics;
 
   let closed = false;
   let refetchTimer: ReturnType<typeof setTimeout> | undefined;
   let observationRead: AbortController | undefined;
+  let benchmarkRead: AbortController | undefined;
 
   store.getState().setLink('connecting', now());
   source.addEventListener('open', () => store.getState().setLink('live', now()));
@@ -163,8 +197,35 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     }
   }
 
+  /** Reads the series of the runs the simulator holds into the benchmark; resolves when it is done, cancelled or failed. */
+  async function fillBenchmark(): Promise<void> {
+    benchmarkRead?.abort();
+    benchmarkRead = undefined;
+    if (benchmark === undefined) return;
+
+    const controller = new AbortController();
+    benchmarkRead = controller;
+    try {
+      const detail = await readBenchmark({ signal: controller.signal });
+      if (!controller.signal.aborted) benchmark.seedDetail(detail);
+    } catch {
+      // The store stays as it is: the live events keep filling it and the next snapshot reads again.
+    } finally {
+      if (benchmarkRead === controller) benchmarkRead = undefined;
+    }
+  }
+
   on<Snapshot>('snapshot', (data, at) => {
     store.getState().applySnapshot(data, at);
+    const summary: unknown = data.benchmark;
+    if (benchmark !== undefined && isBenchmarkSummary(summary)) {
+      benchmark.seedSummary(summary);
+      // Nothing to read series for when the benchmark cannot run, or has not run.
+      if (summary.available && (summary.current !== null || summary.runs.length > 0)) {
+        void fillBenchmark();
+      }
+    }
+    if (Array.isArray(data.metrics?.samples)) sessionMetrics?.record(data.metrics);
     const publishLog = Array.isArray(data.publishLog) ? data.publishLog : [];
     options.history?.seed(publishLog);
     options.messages?.seed(publishLog, { total: data.publishTotal, sampling: data.sampling });
@@ -172,9 +233,11 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
   });
   on<StateView['ingest']>('ingest', (data, at) => store.getState().patchSlice('ingest', data, at));
   on<StateView['alerts']>('alerts', (data, at) => store.getState().patchSlice('alerts', data, at));
-  on<StateView['metrics']>('metrics', (data, at) =>
-    store.getState().patchSlice('metrics', data, at),
-  );
+  on<StateView['metrics']>('metrics', (data, at) => {
+    store.getState().patchSlice('metrics', data, at);
+    // A body that is not a feed cannot be a point.
+    if (Array.isArray(data.samples)) sessionMetrics?.record(data);
+  });
   on<StateView['broker']>('broker', (data, at) => store.getState().patchSlice('broker', data, at));
 
   source.addEventListener('state', () => {
@@ -206,6 +269,13 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     if (typeof report.skipped === 'number') rate.record(at, report.skipped);
     options.messages?.applySampling(report);
   });
+  on<BenchmarkEvent>('benchmark', (event) => {
+    // A run without a number cannot be told from another, and could not be kept once.
+    const run = event.run;
+    if (typeof run !== 'object' || run === null || !Number.isInteger(run.id)) return;
+    const point = typeof event.point === 'object' ? event.point : null;
+    benchmark?.applyEvent({ run, point });
+  });
   on<ObservationEvent>('observation', (event) => {
     // An event without an id cannot be told from another, and could not be kept once.
     if (typeof event.id === 'number') observations?.record(event);
@@ -220,6 +290,7 @@ export function connectStream(store: StudioStore, options: StreamOptions = {}): 
     close() {
       closed = true;
       observationRead?.abort();
+      benchmarkRead?.abort();
       observations?.setLoading(null);
       if (refetchTimer !== undefined) clearTimeout(refetchTimer);
       clearInterval(rateTimer);

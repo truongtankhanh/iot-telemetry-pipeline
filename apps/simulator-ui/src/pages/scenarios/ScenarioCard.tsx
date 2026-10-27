@@ -5,6 +5,7 @@ import { expectationView, scenarioChips, scenarioMeta } from '../../lib/scenario
 import { startBanner } from '../../lib/scenarioStart';
 import { documentOfItem, downloadScenario } from '../../lib/timelineExport';
 import { useStudio } from '../../state/studioContext';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { Button } from '../../ui/Button';
 import { Chip } from '../../ui/Chip';
 import { Icon } from '../../ui/Icon';
@@ -67,6 +68,8 @@ export function ScenarioCard({
   const running = useStudio(
     (state) => state.view?.runs.some((run) => run.scenario === item.name) ?? false,
   );
+  // A benchmark is running: the simulator refuses a scenario run (Stop stays open); the banner says why.
+  const lock = useBenchmarkLock();
   const expectation = expectationView(item);
   const banner = startBanner(item.needsStart);
   const worst = worstSeverity(item);
@@ -170,7 +173,7 @@ export function ScenarioCard({
             icon={uiIcons.play}
             aria-label={`Run ${item.name}`}
             aria-busy={commands.isBusy(item.name, 'run') || undefined}
-            disabled={commands.isBusy(item.name)}
+            disabled={commands.isBusy(item.name) || lock.locked}
             onClick={() => void commands.run(item.name)}
           >
             Run

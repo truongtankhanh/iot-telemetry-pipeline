@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { DeviceInfo } from '../../api/types';
+import type { BenchmarkStore } from '../../state/benchmarkStore';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { StudioProvider } from '../../state/StudioProvider';
 import { createStudioStore } from '../../state/store';
 import { axeViolations } from '../../test-axe';
@@ -22,7 +24,7 @@ const fleet = () => labFleet(6);
 const serverRoom = (): DeviceInfo => fleet().devices[0]!;
 
 /** The card inside what it reads: a store holding the fleet, a router, and a fake simulator behind `fetch`. */
-function renderCard(device: DeviceInfo = serverRoom()) {
+function renderCard(device: DeviceInfo = serverRoom(), benchmark?: BenchmarkStore) {
   const state = fleet();
   const simulator = fakeLabSimulator(structuredClone(state));
   vi.stubGlobal('fetch', simulator.fetch);
@@ -30,7 +32,7 @@ function renderCard(device: DeviceInfo = serverRoom()) {
   store.getState().setLink('live', Date.now());
   store.getState().setView(structuredClone(state), Date.now());
   const result = render(
-    <StudioProvider store={store}>
+    <StudioProvider store={store} benchmark={benchmark}>
       <MemoryRouter initialEntries={['/twin']}>
         <TwinInject device={device} />
       </MemoryRouter>
@@ -239,5 +241,17 @@ describe('TwinInject: one path with the Lab (SIM-21 acceptance)', () => {
       { deviceId: 'd001', metric: 'temperature_c', value: 31, startAt: 30, duration: 45 },
     ]);
     expect(anomaliesSent(simulator)).toEqual(fromLab);
+  });
+});
+
+describe('TwinInject while a benchmark runs', () => {
+  it('turns Inject now off: an injection may start devices, which the simulator refuses', () => {
+    renderCard(serverRoom(), runningBenchmark());
+    expect(injectButton()).toBeDisabled();
+  });
+
+  it('keeps Inject now on when no benchmark runs', () => {
+    renderCard();
+    expect(injectButton()).toBeEnabled();
   });
 });

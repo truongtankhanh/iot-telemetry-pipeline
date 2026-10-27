@@ -1,0 +1,7 @@
+{
+  "checks": [
+    { "id": "ingest", "label": "Ingest ready", "ok": true, "reason": null },
+    { "id": "database", "label": "Database reachable", "ok": true, "reason": null },
+    { "id": "fleet", "label": "Fleet paused", "ok": true, "reason": null }
+  ]
+}

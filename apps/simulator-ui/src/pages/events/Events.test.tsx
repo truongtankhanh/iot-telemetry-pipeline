@@ -1,6 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { axeViolations } from '../../test-axe';
 import {
   address,
@@ -312,6 +313,13 @@ describe('the open message', () => {
     expect(screen.getByLabelText('mosquitto_pub command').textContent).toContain(
       "-m 'it'\\''s not json'",
     );
+  });
+
+  it('cannot send a message again while a benchmark runs: it would add to the run being measured', async () => {
+    const user = userEvent.setup();
+    renderEvents({ messages: manyMessages(3), benchmark: runningBenchmark() });
+    await open(user, 2);
+    expect(screen.getByRole('button', { name: 'Republish' })).toBeDisabled();
   });
 
   it('keeps the message on show after its row has left the log, and cannot send it again', async () => {

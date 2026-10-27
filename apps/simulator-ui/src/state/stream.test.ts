@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { benchmarkFixture } from '../api/fixtures/benchmarkFixtures';
 import { stateViewFixture as fixture } from '../api/fixtures/stateView';
 import type {
+  BenchmarkDetail,
+  BenchmarkRunDetail,
+  BenchmarkRunSummary,
+  BenchmarkSummary,
+  MetricsFeed,
   ObservationEvent,
   ObservationsPage,
   PublishedMessage,
@@ -8,10 +14,12 @@ import type {
   Snapshot,
   StateView,
 } from '../api/types';
+import { BenchmarkStore } from './benchmarkStore';
 import { HistoryStore } from './history';
 import { MessageLog } from './messageLog';
 import { ObservationLog } from './observationLog';
 import { PulseBus } from './pulses';
+import { SessionMetricsStore } from './sessionMetricsStore';
 import { createStudioStore } from './store';
 import { connectStream, type EventSourceLike } from './stream';
 
@@ -52,6 +60,9 @@ function setup(
       request: { before?: number; limit?: number },
       options: { signal?: AbortSignal },
     ) => Promise<ObservationsPage>;
+    benchmark?: BenchmarkStore;
+    getBenchmark?: (options: { signal?: AbortSignal }) => Promise<BenchmarkDetail>;
+    sessionMetrics?: SessionMetricsStore;
   } = {},
 ) {
   const store = createStudioStore();
@@ -65,6 +76,9 @@ function setup(
     ...(options.observations ? { observations: options.observations } : {}),
     ...(options.messages ? { messages: options.messages } : {}),
     ...(options.getObservations ? { getObservations: options.getObservations } : {}),
+    ...(options.benchmark ? { benchmark: options.benchmark } : {}),
+    ...(options.getBenchmark ? { getBenchmark: options.getBenchmark } : {}),
+    ...(options.sessionMetrics ? { sessionMetrics: options.sessionMetrics } : {}),
   });
   return { store, source, getState, connection };
 }
@@ -771,5 +785,274 @@ describe('the message log and the sampling of the simulator (SIM-13)', () => {
     vi.advanceTimersByTime(1000);
     expect(history.series('dc-env-01', 'temperature_c')).toHaveLength(1);
     expect(ids(messages)).toEqual([2, 1]);
+  });
+});
+
+describe('the benchmark (SIM-15)', () => {
+  const going = benchmarkFixture.current as BenchmarkRunDetail;
+  const summaryOf = (run: BenchmarkRunDetail): BenchmarkRunSummary => {
+    const summary: Partial<BenchmarkRunDetail> = structuredClone(run);
+    delete summary.series;
+    return summary as BenchmarkRunSummary;
+  };
+  /** What a snapshot says about the benchmark while run 3 goes: the summaries, no series. */
+  const runningSummary: BenchmarkSummary = {
+    ...view.benchmark,
+    running: true,
+    current: summaryOf(going),
+    runs: benchmarkFixture.runs.map(summaryOf),
+  };
+  const snapshotWith = (benchmark: BenchmarkSummary = runningSummary): Snapshot => ({
+    ...view,
+    benchmark,
+    publishLog: [],
+  });
+  const settle = () => vi.advanceTimersByTimeAsync(0);
+
+  it('seeds the summary of a snapshot, and reads the series of the runs it names', async () => {
+    const benchmark = new BenchmarkStore();
+    const getBenchmark = vi.fn(async () => benchmarkFixture);
+    const { source } = setup({ benchmark, getBenchmark });
+    source.emit('snapshot', snapshotWith());
+    expect(benchmark.get().status).toEqual({ id: 3, phase: 'publishing' });
+    expect(benchmark.get().current?.series).toEqual([]);
+
+    await settle();
+    expect(getBenchmark).toHaveBeenCalledTimes(1);
+    expect(benchmark.get().current?.series).toHaveLength(going.series.length);
+    expect(benchmark.get().runs.map((run) => run.id)).toEqual([2, 1]);
+  });
+
+  it('reads nothing when the simulator has no run to name, or cannot run one', async () => {
+    const benchmark = new BenchmarkStore();
+    const getBenchmark = vi.fn(async () => benchmarkFixture);
+    const { source } = setup({ benchmark, getBenchmark });
+    source.emit('snapshot', snapshotWith({ ...view.benchmark, current: null, runs: [] }));
+    source.emit(
+      'snapshot',
+      snapshotWith({ ...runningSummary, available: false, reason: 'not configured' }),
+    );
+    await settle();
+    expect(getBenchmark).not.toHaveBeenCalled();
+    expect(benchmark.get().status).toEqual({ id: 3, phase: 'publishing' });
+  });
+
+  it('applies each benchmark event to the store: a point, a phase, the end', () => {
+    const benchmark = new BenchmarkStore();
+    const { source } = setup({ benchmark });
+    const point = {
+      t: 11,
+      published: 63000,
+      stored: 125000,
+      buffered: 700,
+      flushP95S: 0.02,
+      queueDelayS: 0.1,
+    };
+    source.emit('benchmark', {
+      run: { ...summaryOf(going), elapsedMs: 11_000 },
+      point,
+    });
+    expect(benchmark.get().current?.series).toEqual([point]);
+
+    source.emit('benchmark', {
+      run: { ...summaryOf(going), phase: 'ended', outcome: 'completed', elapsedMs: 20_000 },
+      point: null,
+    });
+    expect(benchmark.get().status).toBeNull();
+    expect(benchmark.get().runs[0]?.outcome).toBe('completed');
+  });
+
+  it('does not touch the view in the store: a run changing is not a state event', () => {
+    const benchmark = new BenchmarkStore();
+    const { store, source } = setup({ benchmark });
+    source.emit('snapshot', snapshotWith({ ...view.benchmark, current: null, runs: [] }));
+    const before = store.getState().view;
+    source.emit('benchmark', { run: summaryOf(going), point: null });
+    expect(store.getState().view).toBe(before);
+    expect(benchmark.get().status).toEqual({ id: 3, phase: 'publishing' });
+  });
+
+  it('ignores a benchmark event that is not JSON, names no run, or carries a point that is not one', () => {
+    const benchmark = new BenchmarkStore();
+    const { source } = setup({ benchmark });
+    source.emit('benchmark', 'not json');
+    source.emit('benchmark', {});
+    source.emit('benchmark', { run: { id: 'three' } });
+    source.emit('benchmark', { run: null, point: null });
+    expect(benchmark.get().status).toBeNull();
+
+    source.emit('benchmark', { run: summaryOf(going), point: 'late' });
+    expect(benchmark.get().current?.series).toEqual([]);
+  });
+
+  it('keeps an event that arrived while the read was on its way', async () => {
+    const benchmark = new BenchmarkStore();
+    const release: (() => void)[] = [];
+    const getBenchmark = vi.fn(
+      () =>
+        new Promise<BenchmarkDetail>((resolve) => {
+          release.push(() => resolve(benchmarkFixture));
+        }),
+    );
+    const { source } = setup({ benchmark, getBenchmark });
+    source.emit('snapshot', snapshotWith());
+    const late = {
+      t: 11,
+      published: 63000,
+      stored: 125000,
+      buffered: 700,
+      flushP95S: 0.02,
+      queueDelayS: 0.1,
+    };
+    source.emit('benchmark', { run: { ...summaryOf(going), elapsedMs: 11_000 }, point: late });
+
+    release[0]?.();
+    await settle();
+    expect(benchmark.get().current?.series.map((p) => p.t)).toEqual([
+      ...going.series.map((p) => p.t),
+      11,
+    ]);
+  });
+
+  it('does not let a read that ended undo a run that ended meanwhile', async () => {
+    const benchmark = new BenchmarkStore();
+    const release: (() => void)[] = [];
+    const getBenchmark = vi.fn(
+      () =>
+        new Promise<BenchmarkDetail>((resolve) => {
+          release.push(() => resolve(benchmarkFixture));
+        }),
+    );
+    const { source } = setup({ benchmark, getBenchmark });
+    source.emit('snapshot', snapshotWith());
+    source.emit('benchmark', {
+      run: { ...summaryOf(going), phase: 'ended', outcome: 'completed', elapsedMs: 20_000 },
+      point: null,
+    });
+    release[0]?.();
+    await settle();
+    expect(benchmark.get().current).toBeNull();
+    expect(benchmark.get().runs[0]?.id).toBe(3);
+  });
+
+  it('cancels the read going on when a newer snapshot arrives, and only the newer one writes', async () => {
+    const benchmark = new BenchmarkStore();
+    const signals: AbortSignal[] = [];
+    const release: (() => void)[] = [];
+    const getBenchmark = vi.fn(
+      (options: { signal?: AbortSignal }) =>
+        new Promise<BenchmarkDetail>((resolve) => {
+          if (options.signal) signals.push(options.signal);
+          // The first answer is one that must never be written: it names a run that the second does not.
+          const stray = signals.length === 1;
+          release.push(() =>
+            resolve(
+              stray ? { ...benchmarkFixture, current: { ...going, id: 9 } } : benchmarkFixture,
+            ),
+          );
+        }),
+    );
+    const { source } = setup({ benchmark, getBenchmark });
+    source.emit('snapshot', snapshotWith());
+    source.emit('snapshot', snapshotWith());
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+
+    release[0]?.();
+    release[1]?.();
+    await settle();
+    expect(benchmark.get().current?.id).toBe(3);
+    expect(benchmark.get().current?.series).toHaveLength(going.series.length);
+  });
+
+  it('leaves the store as it is when the read fails, and reads again at the next snapshot', async () => {
+    const benchmark = new BenchmarkStore();
+    const getBenchmark = vi
+      .fn<() => Promise<BenchmarkDetail>>()
+      .mockRejectedValueOnce(new Error('Cannot reach the simulator'))
+      .mockResolvedValue(benchmarkFixture);
+    const { source } = setup({ benchmark, getBenchmark });
+    source.emit('snapshot', snapshotWith());
+    await settle();
+    expect(benchmark.get().status).toEqual({ id: 3, phase: 'publishing' });
+    expect(benchmark.get().current?.series).toEqual([]);
+
+    source.emit('snapshot', snapshotWith());
+    await settle();
+    expect(benchmark.get().current?.series).toHaveLength(going.series.length);
+  });
+
+  it('does not write a read that finished after it was closed', async () => {
+    const benchmark = new BenchmarkStore();
+    const signals: AbortSignal[] = [];
+    const release: (() => void)[] = [];
+    const getBenchmark = vi.fn(
+      (options: { signal?: AbortSignal }) =>
+        new Promise<BenchmarkDetail>((resolve) => {
+          if (options.signal) signals.push(options.signal);
+          release.push(() => resolve(benchmarkFixture));
+        }),
+    );
+    const { source, connection } = setup({ benchmark, getBenchmark });
+    source.emit('snapshot', snapshotWith());
+    connection.close();
+    expect(signals[0]?.aborted).toBe(true);
+    release[0]?.();
+    await settle();
+    expect(benchmark.get().current?.series).toEqual([]);
+  });
+
+  it('copes with a simulator that sends no benchmark section, and works without a store', async () => {
+    const benchmark = new BenchmarkStore();
+    const getBenchmark = vi.fn(async () => benchmarkFixture);
+    const old: Partial<Snapshot> = { ...view, publishLog: [] };
+    delete old.benchmark;
+    const withStore = setup({ benchmark, getBenchmark });
+    withStore.source.emit('snapshot', old);
+    await settle();
+    expect(getBenchmark).not.toHaveBeenCalled();
+    expect(benchmark.get().status).toBeNull();
+
+    const without = setup({ getBenchmark });
+    without.source.emit('snapshot', snapshotWith());
+    without.source.emit('benchmark', { run: summaryOf(going), point: null });
+    await settle();
+    expect(getBenchmark).not.toHaveBeenCalled();
+  });
+});
+
+describe('the session metrics (SIM-15)', () => {
+  const feedAt = (second: number, messages: number): MetricsFeed => ({
+    samples: [
+      { name: 'telemetry_messages_total', labels: { result: 'accepted' }, value: messages },
+      { name: 'telemetry_buffered_readings', labels: {}, value: 5 },
+    ],
+    lastOkAt: new Date(T0 + second * 1000).toISOString(),
+    stale: false,
+  });
+
+  it('records the metrics of a snapshot and of each metrics event, and still replaces the slice', () => {
+    const sessionMetrics = new SessionMetricsStore();
+    const { store, source } = setup({ sessionMetrics });
+    source.emit('snapshot', { ...view, metrics: feedAt(0, 100), publishLog: [] });
+    source.emit('metrics', feedAt(2, 700));
+    expect(sessionMetrics.get().points.map((point) => point.messagesPerS)).toEqual([null, 300]);
+    expect(store.getState().view?.metrics.lastOkAt).toBe(feedAt(2, 700).lastOkAt);
+  });
+
+  it('ignores a metrics body that is not a feed, but a stale feed still ends the chain', () => {
+    const sessionMetrics = new SessionMetricsStore();
+    const { source } = setup({ sessionMetrics });
+    source.emit('metrics', feedAt(0, 100));
+    source.emit('metrics', { lastOkAt: null, stale: true });
+    source.emit('metrics', { ...feedAt(5, 900), stale: true, samples: [] });
+    source.emit('metrics', feedAt(6, 1000));
+    expect(sessionMetrics.get().points.map((point) => point.messagesPerS)).toEqual([null, null]);
+  });
+
+  it('works without a store', () => {
+    const { store, source } = setup();
+    source.emit('metrics', feedAt(0, 100));
+    expect(store.getState().view).toBeNull();
   });
 });

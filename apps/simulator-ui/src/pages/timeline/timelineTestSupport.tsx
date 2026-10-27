@@ -18,6 +18,7 @@ import { vi } from 'vitest';
 import { stateViewFixture } from '../../api/fixtures/stateView';
 import type { Anomaly, ScenarioLibraryView, StateView } from '../../api/types';
 import { EditorDrafts } from '../../state/editorDrafts';
+import type { BenchmarkStore } from '../../state/benchmarkStore';
 import { StudioProvider } from '../../state/StudioProvider';
 import { createStudioStore, type LinkState, type StudioStore } from '../../state/store';
 import { AddressProbe } from '../fleet/AddressProbe';
@@ -177,6 +178,8 @@ export function fakeEditorSimulator(
 }
 
 export interface RenderEditorOptions {
+  /** The window's benchmark; a test with a run going passes one that holds it. */
+  benchmark?: BenchmarkStore;
   /** The address to start at, query included. */
   path?: string;
   /** The state the store holds; `null` is a page before its first message. */
@@ -213,7 +216,7 @@ export function editorHarness(options: RenderEditorOptions = {}): EditorHarness 
   const drafts = options.drafts ?? new EditorDrafts();
 
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <StudioProvider store={store} drafts={drafts}>
+    <StudioProvider store={store} drafts={drafts} benchmark={options.benchmark}>
       <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
     </StudioProvider>
   );

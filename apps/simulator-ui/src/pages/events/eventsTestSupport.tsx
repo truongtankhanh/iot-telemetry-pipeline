@@ -10,6 +10,7 @@ import { vi } from 'vitest';
 import { stateViewFixture } from '../../api/fixtures/stateView';
 import type { PublishedMessage, SamplingReport, Snapshot, StateView } from '../../api/types';
 import { MessageLog } from '../../state/messageLog';
+import type { BenchmarkStore } from '../../state/benchmarkStore';
 import { StudioProvider } from '../../state/StudioProvider';
 import { createStudioStore, type LinkState, type StudioStore } from '../../state/store';
 import { AddressProbe } from '../fleet/AddressProbe';
@@ -131,6 +132,8 @@ export function fakeEventsSimulator(
 }
 
 export interface RenderEventsOptions {
+  /** The window's benchmark; a test with a run going passes one that holds it. */
+  benchmark?: BenchmarkStore;
   path?: string;
   /** The state the store holds; `null` is a page before its first message. */
   view?: StateView | null;
@@ -167,7 +170,7 @@ export function renderEvents(options: RenderEventsOptions = {}): EventsHarness {
   log.seed(messages, { total: options.total, sampling: options.sampling });
 
   const result = render(
-    <StudioProvider store={store} messages={log}>
+    <StudioProvider store={store} messages={log} benchmark={options.benchmark}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/events" element={<Events />} />

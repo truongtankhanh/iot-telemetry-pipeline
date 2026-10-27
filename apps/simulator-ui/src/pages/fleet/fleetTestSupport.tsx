@@ -9,6 +9,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { vi } from 'vitest';
 import { stateViewFixture } from '../../api/fixtures/stateView';
 import type { DeviceInfo, PublishedMessage, StateView } from '../../api/types';
+import type { BenchmarkStore } from '../../state/benchmarkStore';
 import { HistoryStore } from '../../state/history';
 import { StudioProvider } from '../../state/StudioProvider';
 import { createStudioStore, type LinkState, type StudioStore } from '../../state/store';
@@ -146,6 +147,8 @@ export interface RenderFleetOptions {
   seed?: boolean;
   /** Devices the fake simulator refuses as unknown. */
   failFor?: readonly string[];
+  /** The window's benchmark; a test with a run going passes one that holds it. */
+  benchmark?: BenchmarkStore;
 }
 
 /** The Fleet in a router (starting at `path`), a store and a history, with `fetch` replaced by the fake simulator. */
@@ -168,7 +171,7 @@ export function renderFleet(options: RenderFleetOptions = {}): FleetHarness {
   if (view && seed) seedHistory(history, view);
 
   const result = render(
-    <StudioProvider store={store} history={history}>
+    <StudioProvider store={store} history={history} benchmark={options.benchmark}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/fleet" element={<Fleet />} />

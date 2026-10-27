@@ -6,6 +6,7 @@ import { metricIcon, metricLabel, metricUnit } from '../../lib/deviceIdentity';
 import { formatValue, rulesFor } from '../../lib/rules';
 import { formatClockTime } from '../../lib/time';
 import { useSeries } from '../../state/historyContext';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { Button } from '../../ui/Button';
 import { LineChart } from '../../ui/charts/LineChart';
 import { Chip } from '../../ui/Chip';
@@ -61,6 +62,8 @@ export function DeviceCard({
 
   const state = engineDevice?.state ?? 'stopped';
   const busy = commands.isBusy(device.id);
+  // A benchmark is running: the simulator refuses to start a device (Pause and Stop stay open); the banner says why.
+  const lock = useBenchmarkLock();
   const error = commands.errorOf(device.id);
   const holds = engineDevice?.holds ?? {};
   const detail =
@@ -163,7 +166,7 @@ export function DeviceCard({
             size="sm"
             variant="outline"
             icon={uiIcons.play}
-            disabled={state === 'running' || busy}
+            disabled={state === 'running' || busy || lock.locked}
             aria-label={`Start ${device.id}`}
             onClick={() => void commands.start(device.id)}
           >

@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { axeViolations } from '../../test-axe';
 import { BulkBar, type BulkBarProps } from './BulkBar';
 import { BulkStatus, type BulkStatusProps } from './BulkStatus';
@@ -42,6 +43,14 @@ describe('BulkBar', () => {
     expect(screen.getByRole('button', { name: 'Pause 1 selected device' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start 1 selected device' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Stop 1 selected device' })).toBeInTheDocument();
+  });
+
+  it('turns Start off when it is told a benchmark runs, and leaves the other actions', () => {
+    render(<BulkBar {...barProps({ startLocked: true })} />);
+    expect(screen.getByRole('button', { name: 'Start 2 selected devices' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pause 2 selected devices' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Stop 2 selected devices' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Hold value…' })).toBeEnabled();
   });
 
   it('asks for pause, start and stop, a hold, select all and clear', async () => {
@@ -277,5 +286,15 @@ describe('selecting devices in the Fleet table', () => {
       expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument(),
     );
     expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('the bulk bar of the Fleet while a benchmark runs', () => {
+  it('turns Start off for the selection, and leaves Pause open', async () => {
+    const user = userEvent.setup();
+    renderFleet({ path: '/fleet?view=table', benchmark: runningBenchmark() });
+    await user.click(screen.getByRole('checkbox', { name: 'Select dc-env-01' }));
+    expect(screen.getByRole('button', { name: 'Start 1 selected device' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pause 1 selected device' })).toBeEnabled();
   });
 });

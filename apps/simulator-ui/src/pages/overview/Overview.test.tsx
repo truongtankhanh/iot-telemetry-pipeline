@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { StateView } from '../../api/types';
+import { runningBenchmark } from '../../state/benchmarkTestSupport';
 import { axeViolations } from '../../test-axe';
 import { viewWithDevices } from '../fleet/fleetTestSupport';
 import { graphNode, installReactFlowStubs } from '../topology/topologyTestSupport';
@@ -608,5 +609,26 @@ describe('the controls the command palette sends the person to', () => {
     renderOverview({ path: '/?focus=explode' });
     expect(address()).toBe('/?focus=explode');
     expect(document.activeElement?.tagName).toBe('BODY');
+  });
+});
+
+describe('the Overview while a benchmark runs', () => {
+  it('turns Run, Resume and Reset off, and leaves Pause open', async () => {
+    renderOverview({ benchmark: runningBenchmark() });
+    expect(await screen.findByRole('button', { name: /^Run / })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Resume \d+ paused$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pause 5' })).toBeEnabled();
+  });
+
+  it('turns Step off on the simulated clock', async () => {
+    renderOverview({ simulated: true, benchmark: runningBenchmark() });
+    expect(await screen.findByRole('button', { name: /^Step/ })).toBeDisabled();
+  });
+
+  it('turns them on again when no benchmark runs', async () => {
+    renderOverview();
+    expect(await screen.findByRole('button', { name: /^Run / })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeEnabled();
   });
 });

@@ -39,6 +39,11 @@ export interface ConfigurationPanelProps {
   expectedAlerts: readonly ExpectedAlert[] | null;
   /** A fault is being sent. */
   busy: boolean;
+  /**
+   * A benchmark is running: an injection may start devices, which the simulator refuses, so Inject now is off (Add to timeline is a
+   * draft and stays on); the banner says why.
+   */
+  locked?: boolean;
   onAdd: () => void;
   onInject: () => void;
 }
@@ -121,6 +126,7 @@ export function ConfigurationPanel({
   onDraft,
   expectedAlerts,
   busy,
+  locked = false,
   onAdd,
   onInject,
 }: ConfigurationPanelProps) {
@@ -291,7 +297,7 @@ export function ConfigurationPanel({
           <Button variant="outline" size="sm" disabled={disabled} onClick={onAdd}>
             Add to timeline
           </Button>
-          <Button variant="primary" size="sm" disabled={disabled} onClick={onInject}>
+          <Button variant="primary" size="sm" disabled={disabled || locked} onClick={onInject}>
             Inject now
           </Button>
         </div>

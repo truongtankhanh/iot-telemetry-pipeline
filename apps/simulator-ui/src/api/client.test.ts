@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import alertsPageFixture from './fixtures/alerts-page.json';
+import { benchmarkFixture, benchmarkPreflightFixture } from './fixtures/benchmarkFixtures';
 import expectationsFixture from './fixtures/expectations.json';
 import observationsFixture from './fixtures/observations.json';
 import scenariosFixture from './fixtures/scenarios.json';
@@ -8,11 +9,14 @@ import { twinLayoutFixture } from './fixtures/twinLayout';
 import {
   addAnomaly,
   ApiError,
+  checksOf,
   clearFault,
   clearFaults,
   conflictsOf,
   deleteScenario,
   getAlerts,
+  getBenchmark,
+  getBenchmarkPreflight,
   getExpected,
   getObservations,
   getScenarios,
@@ -32,8 +36,10 @@ import {
   setDeviceInterval,
   setFault,
   setFaultScope,
+  startBenchmark,
   startDevice,
   stepEngine,
+  stopBenchmark,
   stopDevice,
   stopScenario,
 } from './client';
@@ -1492,6 +1498,295 @@ describe('the fault commands', () => {
         fetch: asFetch(refusal(500, 'The link could not be restored')),
       }).catch((e: unknown) => e);
       expect((failure as ApiError).status).toBe(500);
+    });
+  });
+});
+
+describe('the benchmark fixture', () => {
+  const [finished, failed] = benchmarkFixture.runs;
+  const { current } = benchmarkFixture;
+
+  it('has the keys of the detail, of a run, of a point, of a result and of the marks', () => {
+    expect(keys(benchmarkFixture)).toEqual([
+      'available',
+      'current',
+      'database',
+      'maxMessages',
+      'reason',
+      'running',
+      'runs',
+    ]);
+    for (const run of [current!, finished!, failed!]) {
+      expect(keys(run)).toEqual([
+        'comparable',
+        'elapsedMs',
+        'endedAt',
+        'expectedReadings',
+        'id',
+        'marks',
+        'outcome',
+        'phase',
+        'published',
+        'reason',
+        'result',
+        'series',
+        'settings',
+        'startedAt',
+        'stored',
+      ]);
+      expect(keys(run.marks)).toEqual(['publishEndedS', 'rampUpEndS']);
+      expect(keys(run.settings)).toEqual(['devices', 'messages', 'timeoutS']);
+      for (const point of run.series) {
+        expect(keys(point)).toEqual(
+          ['buffered', 'flushP95S', 'published', 'queueDelayS', 't', 'stored'].sort(),
+        );
+      }
+    }
+    expect(keys(finished!.result!)).toEqual([
+      'endToEndSeconds',
+      'messages',
+      'messagesPerSecond',
+      'node',
+      'publishSeconds',
+      'readingsExpected',
+      'readingsPerSecond',
+      'readingsStored',
+      'vcpu',
+    ]);
+  });
+
+  it('is the summary of the state fixture, plus the series', () => {
+    const facts = (value: object) => keys(value).filter((k) => k !== 'current' && k !== 'runs');
+    expect(facts(view.benchmark)).toEqual(facts(benchmarkFixture));
+    expect(view.benchmark.database).toBe(benchmarkFixture.database);
+    expect(view.benchmark.maxMessages).toBe(benchmarkFixture.maxMessages);
+  });
+
+  it('has the run going on top of the finished ones, which are newest first', () => {
+    expect(current!.phase).toBe('publishing');
+    expect(current!.outcome).toBeNull();
+    expect(current!.comparable).toBeNull();
+    expect(benchmarkFixture.running).toBe(true);
+    expect(benchmarkFixture.runs.map((run) => run.id)).toEqual([2, 1]);
+    expect(finished!.comparable).toBe(true);
+    expect(failed!.comparable).toBe(false);
+    expect(failed!.result).toBeNull();
+  });
+
+  it('has a result in the command line’s own formulas and rounding', () => {
+    const result = finished!.result!;
+    expect(result.messagesPerSecond).toBe(Math.round(result.messages / result.endToEndSeconds));
+    expect(result.readingsPerSecond).toBe(
+      Math.round(result.readingsStored / result.endToEndSeconds),
+    );
+    expect(result.readingsExpected).toBe(finished!.expectedReadings);
+  });
+
+  it('shows no credentials of the database', () => {
+    expect(benchmarkFixture.database).toBe('localhost:5433/telemetry');
+    expect(JSON.stringify(benchmarkFixture)).not.toMatch(/postgres:|password|@localhost/i);
+  });
+});
+
+describe('the benchmark commands', () => {
+  const asFetch = (fn: unknown) => fn as typeof fetch;
+  const sent = (fn: ReturnType<typeof reply>) => {
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    return { url, method: init.method, headers: init.headers, body: init.body };
+  };
+  const JSON_HEADERS = { Accept: 'application/json', 'Content-Type': 'application/json' };
+  const refusal = (status: number, message: string, extra: object = {}) =>
+    reply({ statusCode: status, error: 'Refused', message, ...extra }, { status });
+  const failed = (check: 'ingest' | 'database' | 'fleet', reason: string) => ({
+    id: check,
+    label: check,
+    ok: false,
+    reason,
+  });
+
+  describe('getBenchmark', () => {
+    it('reads /api/benchmark and returns the detail, not the wrapper', async () => {
+      const fetchFn = reply({ benchmark: benchmarkFixture });
+      const detail = await getBenchmark({ fetch: asFetch(fetchFn) });
+      expect(detail).toEqual(benchmarkFixture);
+      expect(fetchFn).toHaveBeenCalledWith(
+        '/api/benchmark',
+        expect.objectContaining({ headers: { Accept: 'application/json' } }),
+      );
+    });
+
+    it('accepts a simulator that cannot run a benchmark (no runs, no current)', async () => {
+      const none = {
+        ...benchmarkFixture,
+        available: false,
+        reason: 'not configured',
+        running: false,
+        current: null,
+        runs: [],
+      };
+      const detail = await getBenchmark({ fetch: asFetch(reply({ benchmark: none })) });
+      expect(detail.available).toBe(false);
+      expect(detail.reason).toBe('not configured');
+    });
+
+    it('fails loudly on a body that is not the documented one', async () => {
+      // `undefined` is left out of the JSON, so this run arrives without its series.
+      const withoutSeries = { ...benchmarkFixture.runs[0]!, series: undefined };
+      // Not the state view: its `benchmark` section is a valid detail with no runs, so `GET /api/state` read here would pass.
+      for (const body of [
+        {},
+        { checks: [] },
+        { benchmark: null },
+        { benchmark: { ...benchmarkFixture, runs: 'none' } },
+        { benchmark: { ...benchmarkFixture, running: 'yes' } },
+        { benchmark: { ...benchmarkFixture, runs: [withoutSeries] } },
+        { benchmark: { ...benchmarkFixture, current: { id: 1 } } },
+      ]) {
+        const failure = await getBenchmark({ fetch: asFetch(reply(body)) }).catch(
+          (e: unknown) => e,
+        );
+        expect(failure).toBeInstanceOf(ApiError);
+        expect((failure as ApiError).message).toMatch(/does not understand/);
+      }
+    });
+
+    it('reports a simulator that does not answer with status 0, and passes an abort on', async () => {
+      const down = vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      });
+      const failure = await getBenchmark({ fetch: asFetch(down) }).catch((e: unknown) => e);
+      expect((failure as ApiError).status).toBe(0);
+
+      const controller = new AbortController();
+      const fetchFn = reply({ benchmark: benchmarkFixture });
+      await getBenchmark({ fetch: asFetch(fetchFn), signal: controller.signal });
+      const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+      expect(init.signal).toBe(controller.signal);
+    });
+  });
+
+  describe('getBenchmarkPreflight', () => {
+    it('reads the three checks from /api/benchmark/preflight', async () => {
+      const fetchFn = reply(benchmarkPreflightFixture);
+      const answer = await getBenchmarkPreflight({ fetch: asFetch(fetchFn) });
+      expect(answer.checks.map((check) => check.id)).toEqual(['ingest', 'database', 'fleet']);
+      expect(fetchFn).toHaveBeenCalledWith(
+        '/api/benchmark/preflight',
+        expect.objectContaining({ headers: { Accept: 'application/json' } }),
+      );
+    });
+
+    it('keeps the reason of a check that fails, and accepts no checks at all', async () => {
+      const bad = { checks: [failed('fleet', 'dc-env-01 is running')] };
+      const answer = await getBenchmarkPreflight({ fetch: asFetch(reply(bad)) });
+      expect(answer.checks[0]).toMatchObject({ ok: false, reason: 'dc-env-01 is running' });
+      const none = await getBenchmarkPreflight({ fetch: asFetch(reply({ checks: [] })) });
+      expect(none.checks).toEqual([]);
+    });
+
+    it('fails loudly on a body that is not a list of checks', async () => {
+      for (const body of [view, {}, { checks: 'ok' }, { checks: [{ id: 'other' }] }]) {
+        const failure = await getBenchmarkPreflight({ fetch: asFetch(reply(body)) }).catch(
+          (e: unknown) => e,
+        );
+        expect(failure).toBeInstanceOf(ApiError);
+        expect((failure as ApiError).message).toMatch(/does not understand/);
+      }
+    });
+  });
+
+  describe('startBenchmark', () => {
+    const answer = { ...view, run: benchmarkFixture.current };
+
+    it('posts the size with the confirmation, as JSON, and answers the run and the state', async () => {
+      const fetchFn = reply(answer);
+      const started = await startBenchmark({ messages: 100_000 }, { fetch: asFetch(fetchFn) });
+      expect(started.run.id).toBe(3);
+      expect(started.engine.devices.length).toBe(view.engine.devices.length);
+      const call = sent(fetchFn);
+      expect(call).toMatchObject({
+        url: '/api/benchmark',
+        method: 'POST',
+        headers: JSON_HEADERS,
+      });
+      expect(JSON.parse(call.body as string)).toEqual({ messages: 100_000, confirm: true });
+    });
+
+    it('fails loudly on an answer without the run', async () => {
+      for (const body of [view, { ...view, run: 'started' }, { ...view, run: { id: 'x' } }]) {
+        const failure = await startBenchmark(
+          { messages: 10 },
+          { fetch: asFetch(reply(body)) },
+        ).catch((e: unknown) => e);
+        expect(failure).toBeInstanceOf(ApiError);
+      }
+    });
+
+    it('carries the simulator’s reason for 400, 503 and 409', async () => {
+      for (const [status, reason] of [
+        [400, '"messages" must be a whole number from 1 to 250,000'],
+        [503, 'not configured'],
+        [409, 'A benchmark is already running'],
+      ] as const) {
+        const failure = await startBenchmark(
+          { messages: 10 },
+          { fetch: asFetch(refusal(status, reason)) },
+        ).catch((e: unknown) => e);
+        expect((failure as ApiError).status).toBe(status);
+        expect((failure as ApiError).message).toBe(reason);
+      }
+    });
+
+    it('gives the checks of a refused start to checksOf', async () => {
+      const checks = [
+        failed('database', 'connection refused'),
+        failed('fleet', 'dc-env-01 is running'),
+      ];
+      const fetchFn = refusal(409, 'The benchmark cannot start: 2 checks fail', { checks });
+      const failure = await startBenchmark({ messages: 10 }, { fetch: asFetch(fetchFn) }).catch(
+        (e: unknown) => e,
+      );
+      expect(checksOf(failure)).toEqual(checks);
+    });
+  });
+
+  describe('stopBenchmark', () => {
+    it('is a POST with no body, as JSON, and answers the new state', async () => {
+      const fetchFn = reply(view);
+      const state = await stopBenchmark({ fetch: asFetch(fetchFn) });
+      expect(state.engine.devices.length).toBe(view.engine.devices.length);
+      expect(sent(fetchFn)).toEqual({
+        url: '/api/benchmark/stop',
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: undefined,
+      });
+    });
+
+    it('carries the simulator’s reason when no run is going', async () => {
+      const failure = await stopBenchmark({
+        fetch: asFetch(refusal(409, 'No benchmark is running')),
+      }).catch((e: unknown) => e);
+      expect((failure as ApiError).status).toBe(409);
+      expect((failure as ApiError).message).toBe('No benchmark is running');
+    });
+  });
+
+  describe('checksOf', () => {
+    const checks = [failed('ingest', 'ingest is unreachable')];
+
+    it('returns the checks of a 409 that names them', () => {
+      expect(checksOf(new ApiError(409, 'checks fail', { checks }))).toEqual(checks);
+    });
+
+    it('is null for a 409 of another kind, another status, or something that is not a refusal', () => {
+      expect(checksOf(new ApiError(409, 'A benchmark is already running', {}))).toBeNull();
+      expect(checksOf(new ApiError(409, 'checks fail', { checks: [] }))).toBeNull();
+      expect(checksOf(new ApiError(409, 'checks fail', { checks: [{ id: 'x' }] }))).toBeNull();
+      expect(checksOf(new ApiError(409, 'checks fail'))).toBeNull();
+      expect(checksOf(new ApiError(400, 'checks fail', { checks }))).toBeNull();
+      expect(checksOf(new Error('checks fail'))).toBeNull();
+      expect(checksOf(undefined)).toBeNull();
     });
   });
 });

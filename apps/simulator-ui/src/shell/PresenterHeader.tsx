@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
 import { uiIcons } from '../ui/icons';
 import { Kbd } from '../ui/Kbd';
-import { DependencyPills } from './DependencyPills';
+import { BenchmarkPill, DependencyPills } from './DependencyPills';
 import headerStyles from './header.module.css';
 import styles from './presenterHeader.module.css';
 
@@ -40,6 +40,7 @@ export function PresenterHeader({ onExit }: PresenterHeaderProps) {
       </div>
       <DependencyPills />
       <div className={headerStyles.end}>
+        <BenchmarkPill />
         <Chip icon={uiIcons.clock}>
           Step {Math.min(session.stepIndex + 1, Math.max(session.stepCount, 1))} of{' '}
           {session.stepCount} · {formatElapsed(elapsedMs(session, now))} in

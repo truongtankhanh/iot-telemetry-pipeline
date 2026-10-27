@@ -26,7 +26,7 @@ describe('appRoutes', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('builds the Overview, the Fleet, the Topology, the Twin (a spike), the Events, the Alerts, the Lab with its scenarios, timeline and faults, the Demo, and Foundations only; every other page names the ticket that builds it', () => {
+  it('builds every page of the brief and Foundations; a page that is not built names the ticket that builds it', () => {
     expect(routes.filter((r) => r.built).map((r) => r.path)).toEqual([
       '/',
       '/fleet',
@@ -39,12 +39,21 @@ describe('appRoutes', () => {
       '/lab/timeline',
       '/lab/faults',
       '/demo',
+      '/analytics',
       '/foundations',
     ]);
     for (const route of routes.filter((r) => !r.built)) {
       expect(route.ticket).toMatch(/^SIM-\d\d$/);
       expect(route.frames.length).toBeGreaterThan(0);
     }
+  });
+
+  it('says what Analytics shows, without rejections (the ticket and the frame draw four charts)', () => {
+    const analytics = routes.find((r) => r.path === '/analytics');
+    expect(analytics?.description).toBe(
+      'Session throughput, lag, flush time and buffered readings, and the benchmark',
+    );
+    expect(analytics?.goKey).toBe('n');
   });
 
   it('leaves Foundations out when it is not enabled, and keeps everything else', () => {

@@ -475,6 +475,8 @@ function describeEvent(kind: string, data: Data): Described {
         ],
       };
     }
+    case 'benchmark':
+      return describeBenchmark(data);
     default:
       return {
         source: 'Other',
@@ -482,6 +484,53 @@ function describeEvent(kind: string, data: Data): Described {
         fields: [['Kind', kind, true]],
       };
   }
+}
+
+const count = (value: number | null): string | null =>
+  value === null ? null : value.toLocaleString('en-US');
+
+/**
+ * A benchmark run begins or ends (the simulator notes both on its timeline; the phases between are for the stream). It is the simulator
+ * itself, so its source is Engine. A run that did not complete says why in the simulator's words, and only a completed one gives its
+ * rate, which is the command line's own `messagesPerSecond`.
+ */
+function describeBenchmark(data: Data): Described {
+  const run = textOrNumber(data.run);
+  const title = `Benchmark run ${run ?? '?'}`;
+  const messages = count(num(data.messages));
+  const size = messages === null ? null : `${messages} messages`;
+  const fields: Described['fields'] = [['Run', run, true]];
+
+  if (data.event === 'started') {
+    fields.push(['Event', 'started'], ['Messages', size]);
+    return {
+      source: 'Engine',
+      parts: plain(strong(title), size === null ? ' started' : ` started: ${size}`),
+      fields,
+    };
+  }
+  if (data.event === 'finished') {
+    const outcome = text(data.outcome) ?? 'ended';
+    const rate = count(num(data.messagesPerSecond));
+    const reason = text(data.reason);
+    const detail =
+      outcome === 'completed' && rate !== null ? `${rate} messages/s end to end` : reason;
+    fields.push(
+      ['Event', 'finished'],
+      ['Outcome', outcome],
+      ['Reason', reason],
+      ['Messages', size],
+      ['Readings stored', count(num(data.readingsStored))],
+      ['End to end (s)', textOrNumber(data.endToEndSeconds)],
+      ['Messages per second', rate],
+    );
+    return {
+      source: 'Engine',
+      parts: plain(strong(title), detail === null ? ` ${outcome}` : ` ${outcome}: ${detail}`),
+      fields,
+    };
+  }
+  return { source: 'Engine', parts: plain(strong(title), ' changed'), fields };
 }
 
 const present = (values: readonly (string | null | undefined)[] = []): string[] => [

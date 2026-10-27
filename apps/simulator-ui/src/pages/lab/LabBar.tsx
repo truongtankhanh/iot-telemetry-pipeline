@@ -5,6 +5,7 @@ import { type BarProgress, CUSTOM_PICK } from '../../lib/labTimeline';
 import { seconds } from '../../lib/scenarioExpectation';
 import { Button } from '../../ui/Button';
 import { Chip } from '../../ui/Chip';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { uiIcons } from '../../ui/icons';
 import { SelectField } from '../../ui/SelectField';
 import { BulkStatus } from '../fleet/BulkStatus';
@@ -54,6 +55,8 @@ export function LabBar({
   intervalMs,
 }: LabBarProps) {
   const { library, commands, devices, clock } = controls;
+  // A benchmark is running: the simulator refuses Run, Resume, Step and Reset (Pause and Stop stay open); the banner says why.
+  const lock = useBenchmarkLock();
   const items = library.library?.scenarios ?? [];
   const item: ScenarioItem | undefined =
     pick === CUSTOM_PICK ? undefined : items.find((candidate) => candidate.name === pick);
@@ -101,7 +104,7 @@ export function LabBar({
               variant="primary"
               icon={uiIcons.play}
               aria-label={`Run ${item.name}`}
-              disabled={commands.isBusy(item.name, 'run')}
+              disabled={commands.isBusy(item.name, 'run') || lock.locked}
               onClick={() => void commands.run(item.name)}
             >
               Run
@@ -121,7 +124,7 @@ export function LabBar({
                 <Button
                   size="sm"
                   icon={uiIcons.play}
-                  disabled={devices.state.running}
+                  disabled={devices.state.running || lock.locked}
                   onClick={devices.resume}
                 >
                   Resume {devices.resumable} paused
@@ -133,7 +136,7 @@ export function LabBar({
             <Button
               size="sm"
               icon={uiIcons.step}
-              disabled={clock.busy !== null}
+              disabled={clock.busy !== null || lock.locked}
               onClick={() => void clock.step()}
             >
               Step +{intervalMs / 1000} s
@@ -143,7 +146,7 @@ export function LabBar({
             size="sm"
             variant="ghost"
             icon={uiIcons.reset}
-            disabled={clock.busy !== null}
+            disabled={clock.busy !== null || lock.locked}
             onClick={() => void clock.reset()}
           >
             Reset

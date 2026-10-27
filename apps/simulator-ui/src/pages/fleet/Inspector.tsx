@@ -7,6 +7,7 @@ import { kindLabel, type FleetRow } from '../../lib/fleetQuery';
 import { formatClockTime } from '../../lib/time';
 import { useDeviceLatest } from '../../state/historyContext';
 import { useStudioStore } from '../../state/studioContext';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { Button } from '../../ui/Button';
 import { DeviceBadge } from '../../ui/DeviceBadge';
 import { uiIcons } from '../../ui/icons';
@@ -56,6 +57,8 @@ export function Inspector({ row, engineDevice, view, now, commands, onClose }: I
   const intervalMs = engineDevice?.intervalMs ?? view.config.intervalMs;
   const state = engineDevice?.state ?? 'stopped';
   const busy = commands.isBusy(device.id);
+  // A benchmark is running: the simulator refuses to start a device (Pause, Stop and holds stay open); the banner says why.
+  const lock = useBenchmarkLock();
   const error = commands.errorOf(device.id);
 
   const [wantsHold, setWantsHold] = useState(false);
@@ -281,7 +284,7 @@ export function Inspector({ row, engineDevice, view, now, commands, onClose }: I
             size="sm"
             variant="outline"
             icon={uiIcons.play}
-            disabled={state === 'running' || busy}
+            disabled={state === 'running' || busy || lock.locked}
             aria-label={`Start ${device.id}`}
             onClick={() => void commands.start(device.id)}
           >

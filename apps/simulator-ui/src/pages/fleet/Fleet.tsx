@@ -14,6 +14,7 @@ import {
 } from '../../lib/fleetQuery';
 import { formatClockTime } from '../../lib/time';
 import { useStudio } from '../../state/studioContext';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { useNow } from '../../state/useNow';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
@@ -65,6 +66,8 @@ export function Fleet() {
   const link = useStudio((state) => state.link);
   const lostSince = useStudio((state) => state.lostSince);
   const publishRate = useStudio((state) => state.publishRate);
+  // A benchmark is running: the simulator refuses to start a device, so Start all is off (Pause all stays open); the banner says why.
+  const lock = useBenchmarkLock();
   const now = useNow();
   const [query, update] = useFleetParams();
   const rows = useFleetRows(view, now);
@@ -167,7 +170,7 @@ export function Fleet() {
             size="sm"
             variant="outline"
             icon={uiIcons.play}
-            disabled={bulk.state.running || allIds.length === 0}
+            disabled={bulk.state.running || allIds.length === 0 || lock.locked}
             onClick={() => requestBulk('start', allIds)}
           >
             Start all
@@ -209,6 +212,7 @@ export function Fleet() {
             onPageCount={pageIds.filter((id) => selection.has(id)).length}
             filteredTotal={filteredIds.length}
             busy={bulk.state.running}
+            startLocked={lock.locked}
             onRun={(action) => requestBulk(action, [...selection])}
             onHold={() => setHoldOpen(true)}
             onSelectAll={() => setSelected(new Set(filteredIds))}

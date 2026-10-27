@@ -15,6 +15,7 @@ import {
 import { formatClockTime } from '../../lib/time';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
+import { useBenchmarkLock } from '../../state/useBenchmarkLock';
 import { faultGlyphs } from '../../ui/icons';
 import { NumberField } from '../../ui/NumberField';
 import { PercentField } from '../../ui/PercentField';
@@ -102,6 +103,8 @@ export function FaultList({
   onBurst,
 }: FaultListProps) {
   const headingId = useId();
+  // A benchmark is running: the simulator refuses a burst and any change to link loss (the other faults are settings and stay open).
+  const lock = useBenchmarkLock();
   const rowFor = (info: FaultRowInfo) => {
     const kind = info.kind;
     if (kind === 'burst') {
@@ -117,7 +120,11 @@ export function FaultList({
               variant="outline"
               size="sm"
               disabled={
-                disabled || busy.has('burst') || faults.bursting || faults.linkLoss !== null
+                disabled ||
+                busy.has('burst') ||
+                faults.bursting ||
+                faults.linkLoss !== null ||
+                lock.locked
               }
               onClick={onBurst}
             >
@@ -134,7 +141,7 @@ export function FaultList({
         label={info.title}
         labelHidden
         checked={on}
-        disabled={disabled || busy.has(kind)}
+        disabled={disabled || busy.has(kind) || (kind === 'link-loss' && lock.locked)}
         onChange={(next) => onSwitch(kind, next)}
       />
     );
