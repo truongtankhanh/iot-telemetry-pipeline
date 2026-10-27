@@ -8,6 +8,11 @@ export type TwinAction =
 /** A key press, and whether focus is on the stage (the scene and its controls): only then do arrows and `+` / `-` move the camera. */
 export interface TwinKeyEvent extends KeyEventLike {
   stageFocused: boolean;
+  /**
+   * A guided demo is being presented on this page (SIM-21): `Esc` leaves presenter mode and `←` goes back a step, so neither is
+   * the twin's then. The level above is reached with the breadcrumb, the arrows that are left still pan.
+   */
+  presenting?: boolean;
 }
 
 const NUDGES: Record<string, CameraNudge> = {
@@ -35,9 +40,10 @@ export function createTwinShortcuts(): (event: TwinKeyEvent) => TwinAction | nul
     if (event.metaKey || event.ctrlKey || event.altKey || isEditableTarget(event.target)) {
       return null;
     }
-    if (event.key === 'Escape') return { type: 'escape' };
+    if (event.key === 'Escape') return event.presenting === true ? null : { type: 'escape' };
     if (event.key === 'Home') return { type: 'home' };
     if (!event.stageFocused) return null;
+    if (event.presenting === true && event.key === 'ArrowLeft') return null;
     const nudge = Object.hasOwn(NUDGES, event.key) ? NUDGES[event.key] : undefined;
     return nudge === undefined ? null : { type: 'nudge', nudge };
   };

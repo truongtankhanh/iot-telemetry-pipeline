@@ -1,6 +1,6 @@
 import { rangeOf } from './rules';
 
-/** The events a step can wait for: the four the ticket names. A later ticket may add to the list (a camera step is an action, not an event). */
+/** The events a step can wait for: the four the ticket names. (A camera is not an event: it is the step's `camera`, below.) */
 export const DEMO_AWAIT_TYPES = [
   'rule-raised',
   'alert-opened',
@@ -17,10 +17,21 @@ export interface DemoAwait {
   deviceId: string;
 }
 
-/** What a step does when it begins. A union, so a new kind of action extends it without changing the code that reads the others. */
+/**
+ * What a step does when it begins. A union, so a new kind of action extends it without changing the code that reads the others.
+ * A step has at most one action, which is why the camera is not one: a step that starts the scenario must be able to move the
+ * camera too (SIM-21, ADR-0011's amendment).
+ */
 export type DemoAction =
   | { type: 'run-scenario'; scenario: string }
   | { type: 'hold-value'; deviceId: string; metric: string; value: number };
+
+/**
+ * Where the twin's camera goes when a step comes on screen (SIM-21): the whole campus, overhead, or one building, named by its
+ * zone code (`BLD-DC`). A building is also the thing the twin focuses on, so the scene fades the rest of the campus. Whether the
+ * layout has that building is the twin's to say; the script only has to name one.
+ */
+export type DemoCamera = 'campus' | 'top' | { building: string };
 
 export interface DemoStep {
   /** Unique in the script; the key of a step in the session. */
@@ -32,6 +43,11 @@ export interface DemoStep {
   say: string;
   action?: DemoAction;
   await?: DemoAwait;
+  /**
+   * The camera moves when the step comes on screen (forward, back or restart) and only then: a step without one leaves the camera
+   * where the presenter put it. Only the twin page has a camera; elsewhere it is ignored.
+   */
+  camera?: DemoCamera;
   /** Seconds a step may wait before it says what it is still waiting for; derived from the scenario's expectation when absent. */
   timeoutS?: number;
   /** For the presenter only, behind `N`. */
@@ -184,6 +200,11 @@ export function validateScript(raw: unknown): ScriptValidation {
         if (awaited !== null) step.await = awaited;
       }
 
+      if (entry.camera !== undefined) {
+        const camera = readCamera(entry.camera, where, problems);
+        if (camera !== null) step.camera = camera;
+      }
+
       steps.push(step);
     });
   }
@@ -230,6 +251,15 @@ function readAction(raw: unknown, where: string, problems: string[]): DemoAction
     return { type: 'hold-value', deviceId: raw.deviceId, metric: raw.metric, value: raw.value };
   }
   problems.push(`${where} has an action of an unknown type: ${String(raw.type)}.`);
+  return null;
+}
+
+function readCamera(raw: unknown, where: string, problems: string[]): DemoCamera | null {
+  if (raw === 'campus' || raw === 'top') return raw;
+  if (isRecord(raw) && isText(raw.building)) return { building: raw.building };
+  problems.push(
+    `${where} has a camera that is not "campus", "top" or { building: "<zone code>" }.`,
+  );
   return null;
 }
 

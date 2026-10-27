@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import { startNotices } from '../../lib/demoWaiting';
 import { scriptLine } from '../../lib/demoText';
 import { Banner } from '../../ui/Banner';
@@ -16,10 +17,12 @@ export interface StartScreenProps {
 /**
  * Before the demo and after `Esc` (frame 08's page, outside presenter mode): the script and its steps, what would stop it from
  * finishing (said now, not a minute into it), and the way in: "Start presenter", or "Resume at step N" when the presenter left with
- * `Esc` (which stopped nothing). The session is kept for the life of the window; a reload loses it, and this says so.
+ * `Esc` (which stopped nothing), and the same two ways in on the twin: "Present on the twin" starts (or resumes) and goes to `/twin`, where
+ * the step is drawn beside the scene (SIM-21). The session is kept for the life of the window; a reload loses it, and this says so.
  */
 export function StartScreen({ driver }: StartScreenProps) {
   const { script, session, text, live, actions } = driver;
+  const navigate = useNavigate();
   const resume = useRef<HTMLButtonElement>(null);
   const paused = session.status === 'paused-for-exit';
   const finished = session.status === 'finished';
@@ -105,6 +108,18 @@ export function StartScreen({ driver }: StartScreenProps) {
               {finished ? 'Start again' : 'Start presenter'}
             </Button>
           )}
+          {/* The same start (or resume) and then the twin: its page draws the current step beside the scene and moves its camera. */}
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => {
+              navigate('/twin');
+              if (paused) actions.resume();
+              else actions.start();
+            }}
+          >
+            {paused ? 'Resume on the twin' : 'Present on the twin'}
+          </Button>
           {session.status === 'idle' ? null : (
             <Button variant="ghost" onClick={() => void actions.stopDemo()}>
               Stop demo and release

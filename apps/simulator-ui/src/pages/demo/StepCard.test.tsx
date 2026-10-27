@@ -246,6 +246,43 @@ describe('StepCard', () => {
   });
 });
 
+describe('StepCard, compact (beside the twin’s scene)', () => {
+  it('is the frame’s card unless it is asked to be compact', () => {
+    const { container } = show();
+    expect(container.querySelector('[data-compact]')).toBeNull();
+    show({ compact: false });
+    expect(document.querySelectorAll('[data-compact]')).toHaveLength(0);
+  });
+
+  it('marks itself compact, and says the same things with the same keys', () => {
+    const { container } = show({ compact: true });
+    expect(container.querySelectorAll('[data-compact="true"]')).toHaveLength(1);
+    expect(screen.getByText('Step 3')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Heat the server room' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Row A in the data center/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Waiting for the rule server-room-hot to raise on dc-env-01'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('29.3')).toBeInTheDocument();
+    expect(screen.getByText('Alert opens about 4 s from now')).toBeInTheDocument();
+  });
+
+  it('still moves the step with its buttons', async () => {
+    const { props } = show({ compact: true });
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(props.onBack).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Next: The alert opens' }));
+    expect(props.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = show({ compact: true });
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
 describe('StepList', () => {
   const items = [
     {

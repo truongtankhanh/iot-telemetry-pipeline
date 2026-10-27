@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import scenariosFixture from '../api/fixtures/scenarios.json';
 import { stateViewFixture } from '../api/fixtures/stateView';
+import { twinLayoutFixture } from '../api/fixtures/twinLayout';
+import type { TwinLayout } from '../api/types';
 import { DEMO_AWAIT_TYPES, validateScript } from './demoScript';
 import { DEMO_SCRIPTS, OVERHEAT_TO_INCIDENT } from './demoScripts';
 import { fillText } from './demoText';
+import { cameraMove } from './twinDemoCamera';
 
 describe('the shipped scripts', () => {
   it('every one validates', () => {
@@ -82,5 +85,43 @@ describe('overheat to incident', () => {
     for (const step of OVERHEAT_TO_INCIDENT.steps) {
       expect(`${step.title} ${step.summary} ${step.say}`, step.id).not.toMatch(/\d/);
     }
+  });
+});
+
+describe('overheat to incident, on the twin', () => {
+  const layout = twinLayoutFixture.layout as TwinLayout;
+  const cameras = OVERHEAT_TO_INCIDENT.steps.map((step) => step.camera);
+
+  it('moves the camera on three steps only: the campus, the Data Center, the campus', () => {
+    expect(cameras).toEqual([
+      'campus',
+      undefined,
+      { building: 'BLD-DC' },
+      undefined,
+      'campus',
+      undefined,
+    ]);
+  });
+
+  it('flies to the building the subject device stands in, and that building is one of the layout', () => {
+    const { deviceId } = OVERHEAT_TO_INCIDENT.subject;
+    const device = stateViewFixture.devices.find((item) => item.id === deviceId);
+    const heat = OVERHEAT_TO_INCIDENT.steps.find((step) => step.id === 'heat');
+    expect(heat?.camera).toEqual({ building: device?.zoneCode });
+    expect(layout.zones.find((zone) => zone.code === device?.zoneCode)?.kind).toBe('building');
+  });
+
+  it('has a camera every one of which this campus layout can follow', () => {
+    for (const camera of cameras) {
+      if (camera === undefined) continue;
+      const { move, problem } = cameraMove(camera, layout);
+      expect(problem, JSON.stringify(camera)).toBeNull();
+      expect(move, JSON.stringify(camera)).not.toBeNull();
+    }
+  });
+
+  it('puts the second screen in the notes of the incident step, and says it is only if it is running', () => {
+    const incident = OVERHEAT_TO_INCIDENT.steps.find((step) => step.id === 'incident');
+    expect(incident?.notes).toMatch(/command center.+twin.+second screen.+if it is running/i);
   });
 });

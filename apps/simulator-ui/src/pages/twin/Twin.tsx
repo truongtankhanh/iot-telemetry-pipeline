@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import type { FallbackReason, SceneProblem } from '../../lib/twinStatus';
 import { webgl2Available } from '../../lib/webgl';
 import { PageHeader } from '../../ui/PageHeader';
@@ -6,7 +6,22 @@ import { ViewSwitch } from '../../ui/ViewSwitch';
 import styles from './twin.module.css';
 import { TwinCampus } from './TwinCampus';
 import { TwinFallback } from './TwinFallback';
+import { TwinPresenterDock } from './TwinPresenterDock';
 import { useTwinLayout } from './useTwinLayout';
+
+/**
+ * What the page shows where the campus is not drawn (loading, a failed read, a layout that cannot be used, no WebGL 2, a lost
+ * graphics context), with the guided demo's current step under it while a demo is being presented: presenter mode takes the navigation
+ * away on this page (SIM-21), so the way on must not depend on the scene. The campus draws the dock itself, beside its scene.
+ */
+function WithDock({ children }: { children: ReactNode }) {
+  return (
+    <>
+      {children}
+      <TwinPresenterDock problem={null} />
+    </>
+  );
+}
 
 /**
  * The page once the device can draw it: reads the layout from the simulator and decides what `/twin` is — the campus, or
@@ -20,21 +35,37 @@ function TwinStage() {
 
   if (layout.status === 'loading') {
     return (
-      <p role="status" className={styles.status}>
-        Reading the campus layout…
-      </p>
+      <WithDock>
+        <p role="status" className={styles.status}>
+          Reading the campus layout…
+        </p>
+      </WithDock>
     );
   }
   if (layout.status === 'error') {
     const reason: FallbackReason = { kind: 'layout-error', message: layout.error ?? '' };
-    return <TwinFallback reason={reason} onRetry={layout.retry} />;
+    return (
+      <WithDock>
+        <TwinFallback reason={reason} onRetry={layout.retry} />
+      </WithDock>
+    );
   }
 
   const view = layout.view;
   if (view === null || !view.available || view.layout === null) {
-    return <TwinFallback reason={{ kind: 'layout-unavailable', reason: view?.reason ?? null }} />;
+    return (
+      <WithDock>
+        <TwinFallback reason={{ kind: 'layout-unavailable', reason: view?.reason ?? null }} />
+      </WithDock>
+    );
   }
-  if (problem !== null) return <TwinFallback reason={{ kind: problem }} />;
+  if (problem !== null) {
+    return (
+      <WithDock>
+        <TwinFallback reason={{ kind: problem }} />
+      </WithDock>
+    );
+  }
 
   return <TwinCampus view={view} onUnavailable={onUnavailable} />;
 }
@@ -56,7 +87,13 @@ export function Twin() {
       >
         <ViewSwitch current="twin" />
       </PageHeader>
-      {canDraw ? <TwinStage /> : <TwinFallback reason={{ kind: 'no-webgl2' }} />}
+      {canDraw ? (
+        <TwinStage />
+      ) : (
+        <WithDock>
+          <TwinFallback reason={{ kind: 'no-webgl2' }} />
+        </WithDock>
+      )}
     </>
   );
 }

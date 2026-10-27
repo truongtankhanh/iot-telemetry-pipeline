@@ -189,6 +189,40 @@ describe('validateScript', () => {
     expect(problemsOf(raw)).toEqual(['Step 2 needs an "id".']);
   });
 
+  it('accepts the camera of a step as campus, top or a building, and gives it back as it is', () => {
+    for (const camera of ['campus', 'top', { building: 'BLD-DC' }]) {
+      const raw = changed((script) => (stepsOf(script)[0]!.camera = camera));
+      const result = validateScript(raw);
+      expect(result.ok, JSON.stringify(camera)).toBe(true);
+      expect(result.ok && result.script.steps[0]?.camera).toEqual(camera);
+    }
+  });
+
+  it('leaves a step without a camera without one, and lets a camera sit beside an action', () => {
+    const plain = validateScript(valid());
+    expect(plain.ok && 'camera' in (plain.script.steps[0] ?? {})).toBe(false);
+    const beside = validateScript(
+      changed((script) => (stepsOf(script)[1]!.camera = { building: 'BLD-DC' })),
+    );
+    expect(beside.ok && beside.script.steps[1]?.action?.type).toBe('run-scenario');
+    expect(beside.ok && beside.script.steps[1]?.camera).toEqual({ building: 'BLD-DC' });
+  });
+
+  it('keeps only the building of a camera object', () => {
+    const raw = changed((script) => (stepsOf(script)[0]!.camera = { building: 'BLD-DC', zoom: 3 }));
+    const result = validateScript(raw);
+    expect(result.ok && result.script.steps[0]?.camera).toEqual({ building: 'BLD-DC' });
+  });
+
+  it('refuses a camera that is not campus, top or a building, naming the step', () => {
+    const sentence =
+      'Step "one" has a camera that is not "campus", "top" or { building: "<zone code>" }.';
+    for (const bad of ['orbit', '', 3, true, null, [], {}, { building: '' }, { building: 7 }]) {
+      const raw = changed((script) => (stepsOf(script)[0]!.camera = bad));
+      expect(problemsOf(raw), JSON.stringify(bad)).toEqual([sentence]);
+    }
+  });
+
   it('reports every problem, not only the first', () => {
     const raw = changed((script) => {
       script.title = '';

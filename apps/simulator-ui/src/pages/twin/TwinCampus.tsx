@@ -15,6 +15,7 @@ import { isLit } from '../../lib/twinFlow';
 import { buildingBounds } from '../../lib/twinGeometry';
 import { climb, focusedZone, sameSelection, type TwinSelection } from '../../lib/twinQuery';
 import { type CameraNudge, type CameraTarget } from '../../lib/twinCamera';
+import type { CameraMove } from '../../lib/twinDemoCamera';
 import { tooltipOf } from '../../lib/twinPins';
 import { placementSummary, type SceneProblem } from '../../lib/twinStatus';
 import { usePulseBus } from '../../state/pulseContext';
@@ -33,14 +34,17 @@ import { TwinDevices } from './TwinDevices';
 import { TwinFocusText } from './TwinFocusText';
 import { TwinHub } from './TwinHub';
 import { TwinHeatLegend } from './TwinHeatLegend';
+import { TwinInject } from './TwinInject';
 import { TwinLabels, type TwinLabelsHandle } from './TwinLabels';
 import { TwinLegend } from './TwinLegend';
 import { TwinLevel } from './TwinLevel';
+import { TwinPresenterDock } from './TwinPresenterDock';
 import { TwinLoading } from './TwinLoading';
 import { TwinPlan } from './TwinPlan';
 import { TwinSelectionCard } from './TwinSelectionCard';
 import { TwinTooltip } from './TwinTooltip';
 import { useGrantedSlots } from './useGrantedSlots';
+import { useTwinDemoCamera } from './useTwinDemoCamera';
 import { useTwinKeys } from './useTwinKeys';
 import { useTwinModel } from './useTwinModel';
 import { useTwinParams } from './useTwinParams';
@@ -111,13 +115,30 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
   const labels = useRef<TwinLabelsHandle | null>(null);
   const stage = useRef<HTMLDivElement | null>(null);
 
-  // Where the camera starts: the building the address already names, decided once, when the first state view has come and
-  // the scene is about to be made. (Adjusting state while rendering, the way React documents it for a value derived once.)
+  // A guided-demo step's camera (SIM-21): the move it makes is the page's own (select what it says, fly), and it comes from the
+  // step on screen, never from anything else. At mount the scene starts at it instead of flying.
+  const applyCameraMove = useCallback(
+    (move: CameraMove, flight: boolean) => {
+      if (move.select !== undefined) select(move.select);
+      if (flight) scene.current?.fly(move.fly);
+    },
+    [select],
+  );
+  const demo = useTwinDemoCamera({
+    layout: model?.layout ?? null,
+    hasFocus: (model?.focus ?? null) !== null,
+    apply: applyCameraMove,
+  });
+
+  // Where the camera starts: the building the address already names, else the camera of the demo step on screen; decided once,
+  // when the first state view has come and the scene is about to be made. (Adjusting state while rendering, the way React
+  // documents it for a value derived once.)
   const [start, setStart] = useState<CameraTarget | undefined>(undefined);
   const [startDecided, setStartDecided] = useState(false);
   if (model !== null && !startDecided) {
     setStartDecided(true);
     if (model.focus !== null) setStart({ building: model.focus.bounds });
+    else if (demo.startMove !== null) setStart(demo.startMove.fly);
   }
 
   const controls = useSimulationControls();
@@ -203,14 +224,24 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
     },
     [focusBounds],
   );
-  useTwinKeys(stage, { escape, home, nudge });
+  useTwinKeys(stage, { escape, home, nudge, presenting: demo.presenting });
 
   if (model === null) {
-    return <p role="status">Waiting for the first message from the simulator…</p>;
+    return (
+      <>
+        <p role="status">Waiting for the first message from the simulator…</p>
+        <TwinPresenterDock problem={null} />
+      </>
+    );
   }
 
   const summary = placementSummary(view);
   const selectedDevice = selection?.type === 'device' ? selection.id : null;
+  // The device the "Inject at" card aims at: the selected one, when the simulator has it. A building has no card (its devices are chosen).
+  const injectDevice =
+    selectedDevice === null
+      ? null
+      : (model.rows.find((row) => row.device.id === selectedDevice)?.device ?? null);
   const hoveredDevice = hovered?.type === 'device' ? hovered.id : null;
   const missing = model.catalogue.missing;
 
@@ -312,7 +343,11 @@ export function TwinCampus({ view, onUnavailable }: TwinCampusProps) {
           ) : null}
         </Card>
         <div className={styles.aside}>
+          <TwinPresenterDock problem={demo.problem} />
           <TwinSelectionCard selection={selection} model={model} onSelect={choose} />
+          {injectDevice === null ? null : (
+            <TwinInject key={injectDevice.id} device={injectDevice} />
+          )}
           {focus === null ? null : <TwinBuildingAssets focus={focus} />}
         </div>
       </div>

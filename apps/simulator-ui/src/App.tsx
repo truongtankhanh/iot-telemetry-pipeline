@@ -88,6 +88,9 @@ const Twin = lazy(() => import('./pages/twin/Twin').then((module) => ({ default:
 
 const TITLE = 'Simulator Studio';
 
+/** The pages where presenter mode applies: the guided demo's own, and the twin, which hosts the demo's step and camera. */
+const PRESENTER_PATHS: readonly string[] = ['/demo', '/twin'];
+
 // One array for the life of the window: the shortcuts and the palette's items are derived from it.
 const DEFAULT_ROUTES = appRoutes();
 
@@ -240,11 +243,15 @@ export function StudioFrame({ routes = DEFAULT_ROUTES }: { routes?: AppRoute[] }
   const paletteOpen = useStudio((state) => state.paletteOpen);
   const modalOpen = useStudio((state) => state.modalCount > 0);
   const current = findRoute(routes, pathname);
-  // Presenter mode (the guided demo): the shell leaves the navigation out and the header is the presenter's. It is the demo page
-  // while a demo is being presented; `g` then a letter still goes elsewhere, and the session keeps its step (nothing is stopped).
+  // Presenter mode (the guided demo): the shell leaves the navigation out and the header is the presenter's. It is the demo page, and
+  // the twin (which draws the demo's current step beside its scene and moves its camera: SIM-21), while a demo is being presented;
+  // `g` then a letter still goes elsewhere, and the session keeps its step (nothing is stopped).
   const demoSession = useDemoSession();
   const demoStore = useDemoSessionStore();
-  const presenting = demoSession.status === 'presenting' && current?.path === '/demo';
+  const presenting =
+    demoSession.status === 'presenting' &&
+    current !== undefined &&
+    PRESENTER_PATHS.includes(current.path);
 
   const openPalette = () => store.getState().setPaletteOpen(true);
 

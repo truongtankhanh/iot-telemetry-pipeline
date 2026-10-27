@@ -269,6 +269,134 @@ div[data-stale='true'] .stage {
   font-size: var(--fs-min);
 }
 
+/* ---- the presenter's dock (SIM-21): the demo's current step beside the scene ---- */
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dockProblem {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--tint-warn);
+  color: var(--text-primary);
+  font-size: var(--fs-min);
+}
+
+.dockKeys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+}
+
+/* ---- "Inject at <device>" (SIM-21, frames 14 and 15) ---- */
+
+/* Five chips as native radios: the arrow keys, the single tab stop and the announcement come from the browser. */
+.injectTiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.injectTile {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--surface-0);
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  cursor: pointer;
+}
+
+.injectTile input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.injectTile:hover:not([data-disabled='true']) {
+  color: var(--text-primary);
+  background: rgba(71, 215, 255, 0.1);
+}
+
+.injectTile[data-on='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.injectTile[data-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.injectTile:has(input:focus-visible) {
+  outline: 2px solid var(--flow);
+  outline-offset: 1px;
+}
+
+.injectSentence {
+  margin: 10px 0 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-min);
+  overflow-wrap: anywhere;
+}
+
+.injectFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* The line that says why the button is disabled; it keeps its height so the buttons do not jump when it appears. */
+.injectBlocker {
+  min-height: 1.35em;
+  margin: 8px 0 4px;
+  color: var(--text-secondary);
+  font-size: var(--fs-min);
+  line-height: 1.35;
+}
+
+.injectButtons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.injectNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2);
+  background: var(--tint-ok);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.injectNotice[data-tone='bad'] {
+  background: var(--tint-bad);
+}
+
 /* ---- the text twin ---- */
 
 /*

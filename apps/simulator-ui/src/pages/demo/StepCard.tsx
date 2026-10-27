@@ -54,6 +54,11 @@ export interface StepCardProps {
   notes: string | null;
   notesOpen: boolean;
   notice: CommandNotice | null;
+  /**
+   * The card at the size that fits beside the twin's scene (SIM-21): smaller headings and padding, the same content and the same
+   * keys. Without it the card is the frame's, for a projector.
+   */
+  compact?: boolean | undefined;
   onNext: () => void;
   onBack: () => void;
   onRestart: () => void;
@@ -106,6 +111,7 @@ export function StepCard(props: StepCardProps) {
     notes,
     notesOpen,
     notice,
+    compact,
   } = props;
   const notesId = useId();
   const isLast = index >= count - 1;
@@ -174,7 +180,11 @@ export function StepCard(props: StepCardProps) {
   })();
 
   return (
-    <section className={styles.card} aria-label="Current step">
+    <section
+      className={styles.card}
+      aria-label="Current step"
+      data-compact={compact === true ? 'true' : undefined}
+    >
       <div className={styles.cardBody}>
         <div className={styles.row}>
           <Chip tone="accent">Step {index + 1}</Chip>

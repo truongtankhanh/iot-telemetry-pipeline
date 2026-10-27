@@ -298,6 +298,43 @@
   color: var(--danger);
 }
 
+/* The card beside the twin's scene (SIM-21): the frame's card at a size for a 340 px column. Text stays at 13 px or more. */
+.card[data-compact='true'] .cardBody {
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.card[data-compact='true'] .big {
+  font-size: 24px;
+}
+
+.card[data-compact='true'] .say {
+  font-size: var(--fs-card-title);
+  line-height: 1.4;
+}
+
+.card[data-compact='true'] .waitTitle {
+  font-size: var(--fs-body);
+}
+
+.card[data-compact='true'] .wait {
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.card[data-compact='true'] .value {
+  font-size: 24px;
+}
+
+.card[data-compact='true'] .footer {
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.card[data-compact='true'] .notice {
+  padding: 0 16px 14px;
+}
+
 .keys {
   display: flex;
   flex-wrap: wrap;
