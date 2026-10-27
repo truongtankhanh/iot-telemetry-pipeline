@@ -326,13 +326,15 @@ devices as `unknown_device`; how, and what that leaves in the database, is in
 ## Benchmark
 
 ```bash
-pnpm --filter @itp/simulator bench -- --messages 100000
+pnpm --filter @itp/simulator bench --messages 100000
 ```
 
 Publishes the messages as fast as the broker accepts them, then waits until every reading is in
 PostgreSQL, and prints throughput. It needs the ingest service running and the database reachable
 (`DATABASE_URL`, or `--database`). Results and method: [benchmarks](../../docs/benchmarks.md).
-**From Studio.** The Analytics page runs the same loop. [bench-run.ts](src/bench-run.ts) is the code of both, so a result has the fields, the formulas and the
+Write the flag straight after `bench`, without a `--` of its own: pnpm 10 hands that `--` on to the script, and `parseArgs` then reads `--messages` as a positional argument
+and refuses it.
+**From Studio.** The Analytics page (`/analytics`, [apps/simulator-ui/src/pages/analytics/](../simulator-ui/src/pages/analytics/)) runs the same loop. [bench-run.ts](src/bench-run.ts) is the code of both, so a result has the fields, the formulas and the
 rounding of the `--json` line; two runs are never identical (the three runs in [benchmarks](../../docs/benchmarks.md) differ by 8 %), so "the same" means the same code and
 the same order of magnitude. It does not record results in `docs/benchmarks.md`.
 
@@ -340,7 +342,8 @@ the same order of magnitude. It does not record results in `docs/benchmarks.md`.
   share an event loop with the stream, the poller and Stop. Its settings, the database URL included, reach it over IPC and never on a command line. It never outlives the server:
   the channel closing ends it at the next window of messages. Stop asks it to end the run, then sends `SIGTERM` after 5 s and `SIGKILL` 3 s after that; a process that says nothing for
   120 s is killed; closing the server does the same. The tab is not the owner: closing it changes nothing, and a page that opens again finds the run in the first message of the
-  stream (`benchmark` in the state) and the Stop button works.
+  stream (`benchmark` in the state) and the Stop button works. The page starts a run only from the button of a confirmation that says what it costs, shows its progress and charts,
+  and keeps the last ten runs for download; the buttons that publish are disabled while one runs, but the `409` below is the enforcement, not the page.
 - **Before a run**, three checks, made again when the run starts: ingest answers `/api/ready` as ready; the database answers `SELECT 1` on a connection of the benchmark's own
   (`DATABASE_URL`); the fleet is paused (no device `running`, no scenario playing). A failed check is `409` with the list and the reason of each. Studio does not pause the fleet for you and
   does not resume it afterwards.

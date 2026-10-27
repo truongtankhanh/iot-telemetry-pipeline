@@ -174,27 +174,27 @@ Design choices worth knowing before you edit:
 
 ## Everyday commands
 
-| Command                                                   | What it does                                                                                                                               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm build`                                              | Builds every package through Turborepo (contract first)                                                                                    |
-| `pnpm lint`                                               | ESLint across workspaces                                                                                                                   |
-| `pnpm typecheck`                                          | `tsc --noEmit` across workspaces                                                                                                           |
-| `pnpm format` / `pnpm format:check`                       | Prettier (single quotes, trailing commas, 100 columns) over the whole repo                                                                 |
-| `pnpm test`                                               | Unit tests (Jest for ingest, Vitest for the contract, `node --test` for the simulator)                                                     |
-| `pnpm test:coverage`                                      | Unit tests of `apps/ingest` with a coverage report in `apps/ingest/coverage` and fails below the floor set in `apps/ingest/jest.config.ts` |
-| `pnpm docs:links`                                         | Checks that every relative link and anchor in the tracked Markdown files resolves                                                          |
-| `pnpm test:e2e`                                           | End-to-end suite — wipes `TEST_DATABASE_URL`, see below                                                                                    |
-| `pnpm docker:up` / `docker:down` / `docker:restart`       | PostgreSQL and Mosquitto from Compose, shared by development and the e2e suite                                                             |
-| `pnpm docker:demo`                                        | The whole demo in containers: also builds the ingest service and starts a simulator (foreground)                                           |
-| `pnpm docker:demo:down`                                   | Removes the demo's ingest and simulator containers; PostgreSQL and Mosquitto keep running                                                  |
-| `pnpm docker:observe`                                     | Prometheus (`:9090`) and Grafana (`:3000`) on the shipped rules and dashboard (demo only; see below)                                       |
-| `pnpm docker:observe:down`                                | Removes only those two containers                                                                                                          |
-| `pnpm test:ingest` / `test:simulator` / `test:contract`   | Unit tests of one package (builds what it depends on first)                                                                                |
-| `pnpm e2e:ingest`                                         | `docker:up`, then the ingest e2e suite against the `telemetry_test` database                                                               |
-| `pnpm bench:gaps` / `pnpm bench:gaps:loss` / `…:all`      | Two-replica sequence-gap check, without and with broker loss ([benchmarks](benchmarks.md#gap-count-across-replicas))                       |
-| `pnpm --filter @itp/simulator bench -- --messages 100000` | End-to-end throughput benchmark ([benchmarks](benchmarks.md))                                                                              |
-| `pnpm bench:baseline`                                     | One replica on the host under a CPU profile, three runs, results in `deploy/bench/out/` ([benchmarks](benchmarks.md))                      |
-| `pnpm docs:openapi`                                       | Builds the contract and the service, then regenerates `docs/openapi.json` from the controllers (no database needed)                        |
+| Command                                                 | What it does                                                                                                                               |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm build`                                            | Builds every package through Turborepo (contract first)                                                                                    |
+| `pnpm lint`                                             | ESLint across workspaces                                                                                                                   |
+| `pnpm typecheck`                                        | `tsc --noEmit` across workspaces                                                                                                           |
+| `pnpm format` / `pnpm format:check`                     | Prettier (single quotes, trailing commas, 100 columns) over the whole repo                                                                 |
+| `pnpm test`                                             | Unit tests (Jest for ingest, Vitest for the contract, `node --test` for the simulator)                                                     |
+| `pnpm test:coverage`                                    | Unit tests of `apps/ingest` with a coverage report in `apps/ingest/coverage` and fails below the floor set in `apps/ingest/jest.config.ts` |
+| `pnpm docs:links`                                       | Checks that every relative link and anchor in the tracked Markdown files resolves                                                          |
+| `pnpm test:e2e`                                         | End-to-end suite — wipes `TEST_DATABASE_URL`, see below                                                                                    |
+| `pnpm docker:up` / `docker:down` / `docker:restart`     | PostgreSQL and Mosquitto from Compose, shared by development and the e2e suite                                                             |
+| `pnpm docker:demo`                                      | The whole demo in containers: also builds the ingest service and starts a simulator (foreground)                                           |
+| `pnpm docker:demo:down`                                 | Removes the demo's ingest and simulator containers; PostgreSQL and Mosquitto keep running                                                  |
+| `pnpm docker:observe`                                   | Prometheus (`:9090`) and Grafana (`:3000`) on the shipped rules and dashboard (demo only; see below)                                       |
+| `pnpm docker:observe:down`                              | Removes only those two containers                                                                                                          |
+| `pnpm test:ingest` / `test:simulator` / `test:contract` | Unit tests of one package (builds what it depends on first)                                                                                |
+| `pnpm e2e:ingest`                                       | `docker:up`, then the ingest e2e suite against the `telemetry_test` database                                                               |
+| `pnpm bench:gaps` / `pnpm bench:gaps:loss` / `…:all`    | Two-replica sequence-gap check, without and with broker loss ([benchmarks](benchmarks.md#gap-count-across-replicas))                       |
+| `pnpm --filter @itp/simulator bench --messages 100000`  | End-to-end throughput benchmark ([benchmarks](benchmarks.md))                                                                              |
+| `pnpm bench:baseline`                                   | One replica on the host under a CPU profile, three runs, results in `deploy/bench/out/` ([benchmarks](benchmarks.md))                      |
+| `pnpm docs:openapi`                                     | Builds the contract and the service, then regenerates `docs/openapi.json` from the controllers (no database needed)                        |
 
 Turborepo builds the contract package before anything that depends on it, so run `pnpm build` (or
 any of the above) after editing `packages/telemetry-contract`.

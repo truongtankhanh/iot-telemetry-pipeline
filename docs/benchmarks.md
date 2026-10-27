@@ -5,7 +5,7 @@ PostgreSQL — through the shared subscription, validation, batched inserts, per
 rule evaluation. Measured with [`apps/simulator/src/bench.ts`](../apps/simulator/src/bench.ts).
 
 ```bash
-pnpm --filter @itp/simulator bench -- --messages 100000
+pnpm --filter @itp/simulator bench --messages 100000
 ```
 
 Studio's Analytics page runs the same loop (`apps/simulator/src/bench-run.ts`, in a child process of the control server); the method is unchanged, and Studio records no results here.
