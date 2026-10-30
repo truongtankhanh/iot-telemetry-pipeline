@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Publishes realistic synthetic telemetry for the registered devices, with scripted anomalies and a benchmark mode.",
-  "license": "MIT",
+  "license": "PolyForm-Strict-1.0.0",
   "files": [
     "src"
   ],

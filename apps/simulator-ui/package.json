@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Simulator Studio: the web UI of the simulator's control plane. Built to static files that the simulator serves.",
-  "license": "MIT",
+  "license": "PolyForm-Strict-1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

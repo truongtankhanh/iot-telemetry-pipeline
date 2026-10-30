@@ -2,7 +2,7 @@
   "name": "iot-telemetry-pipeline",
   "private": true,
   "description": "MQTT telemetry ingest with partitioned PostgreSQL storage, rollups, threshold alerts and reliable delivery to ops-command-center.",
-  "license": "MIT",
+  "license": "PolyForm-Strict-1.0.0",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=24"

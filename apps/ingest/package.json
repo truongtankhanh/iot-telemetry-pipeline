@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Telemetry ingest: MQTT consumer, batched PostgreSQL writer, threshold rules and alert delivery.",
-  "license": "MIT",
+  "license": "PolyForm-Strict-1.0.0",
   "files": [
     "dist",
     "config"
