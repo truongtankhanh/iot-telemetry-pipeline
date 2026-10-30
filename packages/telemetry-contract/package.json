@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "MQTT topic layout and telemetry payload format shared by devices, the simulator and the ingest service.",
-  "license": "MIT",
+  "license": "PolyForm-Strict-1.0.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

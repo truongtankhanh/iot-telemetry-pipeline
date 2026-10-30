@@ -5,7 +5,7 @@
 ![NestJS 12](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)
 ![MQTT 5](https://img.shields.io/badge/MQTT-5-660066?logo=mqtt&logoColor=white)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![License: PolyForm Strict 1.0.0](https://img.shields.io/badge/license-PolyForm%20Strict%201.0.0-blue)
 
 Sensor telemetry from a campus — server-room temperatures, CO₂ in lecture halls, power draw —
 ingested over MQTT, stored in PostgreSQL, turned into alerts with hysteresis, and delivered as
@@ -281,4 +281,5 @@ The full index is [docs/README.md](docs/README.md).
 
 ## License
 
-[MIT](LICENSE) © Trương Tấn Khánh
+[PolyForm Strict 1.0.0](LICENSE) © Trương Tấn Khánh: noncommercial use only; no changes, derivative
+works or redistribution.
