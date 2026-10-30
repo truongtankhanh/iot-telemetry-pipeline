@@ -292,9 +292,11 @@ describe('the Twin page, data flow, beacons and faults (SIM-19)', () => {
     expect(scene).toHaveAttribute('data-arcs', '2');
     // An open alert is an anomaly to the eye (amber arc), and amber is lit.
     expect(scene.getAttribute('data-looks')).toContain('dc-env-01:warn');
-    expect(scene.getAttribute('data-granted')).toContain('dc-env-01');
+    // The slots are asked for when the page subscribes to the budget, an effect after the scene is first drawn, and the
+    // grant is a render later still: wait for it rather than read it on the frame the scene appears.
+    await waitFor(() => expect(scene.getAttribute('data-granted')).toContain('dc-env-01'));
     // The fixture has one open alert, on dc-env-01: that beacon may move.
-    expect(scene).toHaveAttribute('data-moving', 'dc-env-01');
+    await waitFor(() => expect(scene).toHaveAttribute('data-moving', 'dc-env-01'));
   });
 
   it('says the open alert as text in the list and on the card, with a link to the alerts', async () => {
