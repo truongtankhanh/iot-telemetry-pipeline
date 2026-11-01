@@ -3,7 +3,7 @@
 # the registry on 2026-10-18 with `docker buildx imagetools inspect node:24-alpine`. The tag stays for
 # readability; the digest is what is built. Nothing moves it: refresh it by hand (Digest line of that
 # command, in all four FROM lines of both Dockerfiles) until a dependency bot does.
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS build
 RUN corepack enable
 WORKDIR /repo
 # From here to the install, this file and the other app's Dockerfile are identical on purpose:
@@ -26,7 +26,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm --filter @itp/simul
  && mkdir -p /out/registry && cp apps/ingest/config/devices.json apps/ingest/config/rules.json apps/simulator/config/twin-layout.json /out/registry/ \
  && cp -r apps/simulator-ui/dist /out/ui
 
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
 # The control server serves the built Studio from here (see STUDIO_DIR in apps/simulator/.env.example).
 ENV STUDIO_DIR=/app/ui
 WORKDIR /app
